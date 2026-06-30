@@ -1,0 +1,12 @@
+{
+  "data": {
+    "today_earnings": 1850.50,
+    "wallet_balance": 12450.00,
+    "completed_trips": 1247,
+    "today_trips": 8,
+    "rating": 4.8,
+    "acceptance_rate": 92.5,
+    "cancellation_rate": 2.1,
+    "current_location": "Andheri West, Mumbai"
+  }
+}

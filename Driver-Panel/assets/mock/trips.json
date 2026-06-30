@@ -1,0 +1,41 @@
+[
+  {
+    "id": "trip_001",
+    "status": "Completed",
+    "pickup_address": "Andheri Railway Station",
+    "destination_address": "BKC, Mumbai",
+    "distance": 8.5,
+    "duration": 28,
+    "fare": 285.0,
+    "net_earnings": 267.25,
+    "payment_mode": "Cash",
+    "passenger_name": "Priya Sharma",
+    "created_at": "2026-06-28T14:00:00Z"
+  },
+  {
+    "id": "trip_002",
+    "status": "Completed",
+    "pickup_address": "Powai Lake",
+    "destination_address": "Airport T2",
+    "distance": 12.3,
+    "duration": 45,
+    "fare": 520.0,
+    "net_earnings": 468.0,
+    "payment_mode": "Online",
+    "passenger_name": "Amit Patel",
+    "created_at": "2026-06-28T11:30:00Z"
+  },
+  {
+    "id": "trip_003",
+    "status": "Cancelled",
+    "pickup_address": "Juhu Beach",
+    "destination_address": "Colaba",
+    "distance": 0,
+    "duration": 0,
+    "fare": 0,
+    "net_earnings": 0,
+    "payment_mode": "Cash",
+    "passenger_name": "Sneha Reddy",
+    "created_at": "2026-06-27T18:00:00Z"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "data": {
+    "today_earnings": 1850.50,
+    "weekly_earnings": 12450.00,
+    "monthly_earnings": 48500.00,
+    "total_trips": 1247,
+    "today_trips": 8,
+    "bonuses": 500.0,
+    "incentives": 750.0,
+    "chart": [
+      {"label": "Mon", "amount": 1200},
+      {"label": "Tue", "amount": 1450},
+      {"label": "Wed", "amount": 980},
+      {"label": "Thu", "amount": 1680},
+      {"label": "Fri", "amount": 2100},
+      {"label": "Sat", "amount": 2450},
+      {"label": "Sun", "amount": 1850}
+    ]
+  }
+}

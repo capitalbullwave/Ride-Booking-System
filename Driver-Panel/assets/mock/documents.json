@@ -1,0 +1,58 @@
+[
+  {
+    "id": "doc_001",
+    "type": "Driving License",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": "2028-05-15",
+    "is_expiring_soon": false
+  },
+  {
+    "id": "doc_002",
+    "type": "RC",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": null,
+    "is_expiring_soon": false
+  },
+  {
+    "id": "doc_003",
+    "type": "Insurance",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": "2026-07-15",
+    "is_expiring_soon": true
+  },
+  {
+    "id": "doc_004",
+    "type": "Pollution Certificate",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": "2026-12-01",
+    "is_expiring_soon": false
+  },
+  {
+    "id": "doc_005",
+    "type": "Permit",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": "2027-01-01",
+    "is_expiring_soon": false
+  },
+  {
+    "id": "doc_006",
+    "type": "PAN",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": null,
+    "is_expiring_soon": false
+  },
+  {
+    "id": "doc_007",
+    "type": "Aadhaar",
+    "status": "verified",
+    "document_url": null,
+    "expiry_date": null,
+    "is_expiring_soon": false
+  }
+]

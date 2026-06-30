@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "ride_001",
+    "pickup_address": "Andheri Railway Station, Mumbai",
+    "destination_address": "Bandra Kurla Complex, Mumbai",
+    "distance": 8.5,
+    "duration": 28,
+    "fare": 285.0,
+    "commission": 42.75,
+    "net_earnings": 267.25,
+    "passenger_rating": 5.0,
+    "driver_rating": 4.8,
+    "payment_mode": "Cash",
+    "completed_at": "2026-06-28T14:30:00Z"
+  }
+}

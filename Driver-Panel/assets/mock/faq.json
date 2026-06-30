@@ -1,0 +1,20 @@
+[
+  {
+    "id": "faq_001",
+    "question": "How do I go online?",
+    "answer": "Toggle the online switch on your dashboard to start receiving ride requests.",
+    "category": "Getting Started"
+  },
+  {
+    "id": "faq_002",
+    "question": "When will I receive my earnings?",
+    "answer": "Earnings are credited to your wallet instantly after each completed trip. Withdraw anytime to your bank account.",
+    "category": "Payments"
+  },
+  {
+    "id": "faq_003",
+    "question": "How do I update my documents?",
+    "answer": "Go to Profile > Documents and tap on the document you want to update.",
+    "category": "Documents"
+  }
+]
