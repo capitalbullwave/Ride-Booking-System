@@ -1,0 +1,17 @@
+{
+  "success": true,
+  "is_registered": true,
+  "is_verified": true,
+  "tokens": {
+    "access_token": "mock-user-access-token",
+    "refresh_token": "mock-user-refresh-token"
+  },
+  "user": {
+    "id": "user-001",
+    "name": "Muskan Sharma",
+    "phone": "+919876543210",
+    "email": "muskan.sharma@gmail.com",
+    "rating": 4.9,
+    "initial": "M"
+  }
+}

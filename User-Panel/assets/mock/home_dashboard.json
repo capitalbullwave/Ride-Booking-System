@@ -1,0 +1,26 @@
+{
+  "greeting_name": "Muskan",
+  "nearby_drivers_count": 24,
+  "banners": [
+    {
+      "id": "1",
+      "title": "Ride smarter with WaveGo",
+      "subtitle": "Book rides, send parcels, or request emergency ambulance — all in one app.",
+      "image_url": null,
+      "cta_label": null,
+      "cta_url": null,
+      "discount_percent": null
+    }
+  ],
+  "offers": [
+    {
+      "code": "WAVE20",
+      "title": "20% off your next ride",
+      "description": "Valid until Sunday",
+      "discount_percent": 20
+    }
+  ],
+  "vehicle_categories": [],
+  "recent_rides": [],
+  "active_ride": null
+}

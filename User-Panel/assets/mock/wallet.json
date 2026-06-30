@@ -1,0 +1,19 @@
+{
+  "balance": 1250.0,
+  "bonus_balance": 150.0,
+  "total": 1400.0,
+  "payment_methods": [
+    {
+      "id": "pm-1",
+      "type": "wallet",
+      "label": "WaveGo Wallet",
+      "last_four": null
+    },
+    {
+      "id": "pm-2",
+      "type": "upi",
+      "label": "UPI",
+      "last_four": "4321"
+    }
+  ]
+}

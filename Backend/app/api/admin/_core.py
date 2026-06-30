@@ -1,0 +1,456 @@
+"""Admin core routes — users, drivers, auth."""
+from datetime import datetime, timezone
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.auth.dependencies import get_current_admin
+from app.auth.service import AuthService
+from app.core.constants import DriverStatus, KYCStatus, RideStatus
+from app.core.exceptions import NotFoundException
+from app.database.session import get_db
+from app.models import AdminUser, Driver, DriverDocument, Ride, User, Vehicle, Wallet
+from app.schemas.admin import AdminLogin
+from app.schemas.user import RefreshTokenRequest
+from app.schemas.common import TokenResponse
+
+router = APIRouter(tags=["Admin"])
+
+
+class AdminLoginResponse(BaseModel):
+    user: dict
+    accessToken: str
+    expiresAt: int
+
+
+def _user_status(user: User) -> str:
+    if not user.is_active:
+        return "blocked"
+    if not user.is_verified:
+        return "inactive"
+    return "active"
+
+
+def _map_user(user: User, wallet_balance: float = 0.0, total_rides: int = 0) -> dict:
+    return {
+        "id": str(user.id),
+        "name": f"{user.first_name} {user.last_name}".strip(),
+        "mobile": user.phone,
+        "email": user.email,
+        "registrationDate": user.created_at.date().isoformat(),
+        "totalRides": total_rides,
+        "walletBalance": wallet_balance,
+        "status": _user_status(user),
+        "avatar": user.profile_photo,
+        "city": "",
+    }
+
+
+def _driver_status(driver: Driver) -> str:
+    if driver.kyc_status == KYCStatus.REJECTED.value:
+        return "rejected"
+    if driver.kyc_status in (KYCStatus.PENDING.value, KYCStatus.SUBMITTED.value):
+        return "pending"
+    if not driver.is_active:
+        return "suspended"
+    status_map = {
+        DriverStatus.ONLINE.value: "online",
+        DriverStatus.OFFLINE.value: "offline",
+        DriverStatus.ON_RIDE.value: "busy",
+        DriverStatus.BUSY.value: "busy",
+    }
+    return status_map.get(driver.status, "offline")
+
+
+def _map_driver(driver: Driver, vehicle: Vehicle | None = None) -> dict:
+    vehicle_type = "sedan"
+    vehicle_number = ""
+    if vehicle:
+        vehicle_number = vehicle.license_plate
+        if vehicle.vehicle_type:
+            vehicle_type = vehicle.vehicle_type.name.lower().replace(" ", "_")
+
+    return {
+        "id": str(driver.id),
+        "name": f"{driver.first_name} {driver.last_name}".strip(),
+        "phone": driver.phone,
+        "email": driver.email,
+        "vehicleType": vehicle_type,
+        "vehicleNumber": vehicle_number,
+        "rating": driver.rating_avg,
+        "totalTrips": driver.total_rides,
+        "earnings": 0.0,
+        "walletBalance": 0.0,
+        "status": _driver_status(driver),
+        "avatar": driver.profile_photo,
+        "city": "",
+        "joinedDate": driver.created_at.date().isoformat(),
+    }
+
+
+def _map_ride(ride: Ride, user: User | None = None, driver: Driver | None = None) -> dict:
+    status_map = {
+        RideStatus.REQUESTED.value: "requested",
+        RideStatus.SEARCHING.value: "requested",
+        RideStatus.ACCEPTED.value: "driver_assigned",
+        RideStatus.DRIVER_ARRIVED.value: "driver_arrived",
+        RideStatus.STARTED.value: "ride_started",
+        RideStatus.COMPLETED.value: "ride_completed",
+        RideStatus.CANCELLED.value: "cancelled",
+    }
+    return {
+        "id": str(ride.id),
+        "userId": str(ride.user_id),
+        "userName": f"{user.first_name} {user.last_name}" if user else "",
+        "driverId": str(ride.driver_id) if ride.driver_id else None,
+        "driverName": f"{driver.first_name} {driver.last_name}" if driver else None,
+        "vehicleType": "sedan",
+        "pickupLocation": ride.pickup_address,
+        "dropLocation": ride.dropoff_address,
+        "distance": ride.actual_distance_km or ride.estimated_distance_km,
+        "fare": ride.final_fare or ride.estimated_fare,
+        "status": status_map.get(ride.status, ride.status.lower()),
+        "date": ride.created_at.isoformat(),
+        "duration": int(ride.actual_duration_min or ride.estimated_duration_min),
+        "paymentMethod": ride.payment_method.lower(),
+    }
+
+
+@router.post("/login", response_model=AdminLoginResponse)
+async def admin_login(data: AdminLogin, db: AsyncSession = Depends(get_db)):
+    tokens = await AuthService(db).login_admin(data.email, data.password)
+    result = await db.execute(select(AdminUser).where(AdminUser.email == data.email))
+    admin = result.scalar_one_or_none()
+    return AdminLoginResponse(
+        user={
+            "email": admin.email if admin else data.email,
+            "name": f"{admin.first_name} {admin.last_name}" if admin else "Admin",
+            "role": "Super Admin",
+            "phone": "+91 00000 00000",
+        },
+        accessToken=tokens.access_token,
+        expiresAt=int(datetime.now(timezone.utc).timestamp()) + 86400,
+    )
+
+
+@router.get("/me")
+async def admin_me(admin: Annotated[AdminUser, Depends(get_current_admin)]):
+    return {
+        "email": admin.email,
+        "name": f"{admin.first_name} {admin.last_name}",
+        "role": "Super Admin",
+        "phone": "+91 00000 00000",
+    }
+
+
+@router.post("/logout")
+async def admin_logout(admin: Annotated[AdminUser, Depends(get_current_admin)]):
+    return {"message": "Logged out"}
+
+
+@router.post("/refresh-token", response_model=TokenResponse)
+async def admin_refresh(data: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    return await AuthService(db).refresh_token(data.refresh_token)
+
+
+@router.get("/users")
+async def list_users(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    query = select(User).where(User.is_deleted == False)
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(User.first_name.ilike(term), User.last_name.ilike(term), User.email.ilike(term), User.phone.ilike(term))
+        )
+    if status and status != "all":
+        if status == "active":
+            query = query.where(User.is_active == True, User.is_verified == True)
+        elif status == "blocked":
+            query = query.where(User.is_active == False)
+        elif status == "inactive":
+            query = query.where(User.is_verified == False)
+
+    total = (await db.execute(select(func.count()).select_from(User).where(User.is_deleted == False))).scalar_one()
+    result = await db.execute(query.order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit))
+    users = result.scalars().all()
+
+    items = []
+    for u in users:
+        wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == u.id))
+        wallet = wallet_result.scalar_one_or_none()
+        rides_count = (
+            await db.execute(select(func.count()).select_from(Ride).where(Ride.user_id == u.id))
+        ).scalar_one()
+        items.append(_map_user(u, wallet.balance if wallet else 0.0, rides_count))
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": max(1, (total + limit - 1) // limit),
+    }
+
+
+@router.get("/users/{user_id}")
+async def get_user(
+    user_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id, User.is_deleted == False))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFoundException("User not found")
+    wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user.id))
+    wallet = wallet_result.scalar_one_or_none()
+    rides_count = (await db.execute(select(func.count()).select_from(Ride).where(Ride.user_id == user.id))).scalar_one()
+    return _map_user(user, wallet.balance if wallet else 0.0, rides_count)
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFoundException("User not found")
+    if data.get("name"):
+        parts = str(data["name"]).split(" ", 1)
+        user.first_name = parts[0]
+        user.last_name = parts[1] if len(parts) > 1 else ""
+    if data.get("email"):
+        user.email = data["email"]
+    if data.get("mobile"):
+        user.phone = data["mobile"]
+    await db.flush()
+    return _map_user(user)
+
+
+async def _set_user_active(user_id: UUID, db: AsyncSession, active: bool, verified: bool | None = None) -> dict:
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise NotFoundException("User not found")
+    user.is_active = active
+    if verified is not None:
+        user.is_verified = verified
+    await db.flush()
+    return _map_user(user)
+
+
+@router.post("/users/{user_id}/suspend")
+async def suspend_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    return await _set_user_active(user_id, db, active=False)
+
+
+@router.post("/users/{user_id}/block")
+async def block_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    return await _set_user_active(user_id, db, active=False)
+
+
+@router.post("/users/{user_id}/activate")
+async def activate_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    return await _set_user_active(user_id, db, active=True, verified=True)
+
+
+@router.post("/users/{user_id}/reset")
+async def reset_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    return await get_user(user_id, admin, db)
+
+
+@router.get("/users/{user_id}/rides")
+async def user_rides(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Ride).where(Ride.user_id == user_id).order_by(Ride.created_at.desc()).limit(50)
+    )
+    rides = result.scalars().all()
+    return [_map_ride(r) for r in rides]
+
+
+@router.get("/users/{user_id}/wallet")
+async def user_wallet(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user_id))
+    wallet = wallet_result.scalar_one_or_none()
+    return {"balance": wallet.balance if wallet else 0.0, "transactions": []}
+
+
+@router.get("/users/{user_id}/support-tickets")
+async def user_tickets(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)]):
+    return []
+
+
+@router.get("/users/{user_id}/activity-logs")
+async def user_logs(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)]):
+    return []
+
+
+@router.get("/drivers")
+async def list_drivers(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    query = select(Driver).where(Driver.is_deleted == False)
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(Driver.first_name.ilike(term), Driver.last_name.ilike(term), Driver.email.ilike(term), Driver.phone.ilike(term))
+        )
+
+    total = (await db.execute(select(func.count()).select_from(Driver).where(Driver.is_deleted == False))).scalar_one()
+    result = await db.execute(query.order_by(Driver.created_at.desc()).offset((page - 1) * limit).limit(limit))
+    drivers = result.scalars().all()
+
+    items = []
+    for d in drivers:
+        vehicle_result = await db.execute(
+            select(Vehicle)
+            .options(selectinload(Vehicle.vehicle_type))
+            .where(Vehicle.driver_id == d.id, Vehicle.is_deleted == False)
+            .limit(1)
+        )
+        vehicle = vehicle_result.scalar_one_or_none()
+        mapped = _map_driver(d, vehicle)
+        if status and status != "all" and mapped["status"] != status:
+            continue
+        items.append(mapped)
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": max(1, (total + limit - 1) // limit),
+    }
+
+
+@router.get("/drivers/{driver_id}")
+async def get_driver(
+    driver_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id, Driver.is_deleted == False))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    vehicle_result = await db.execute(select(Vehicle).where(Vehicle.driver_id == driver.id).limit(1))
+    vehicle = vehicle_result.scalar_one_or_none()
+    return _map_driver(driver, vehicle)
+
+
+@router.patch("/drivers/{driver_id}")
+async def update_driver(
+    driver_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    if data.get("name"):
+        parts = str(data["name"]).split(" ", 1)
+        driver.first_name = parts[0]
+        driver.last_name = parts[1] if len(parts) > 1 else ""
+    if data.get("email"):
+        driver.email = data["email"]
+    if data.get("phone"):
+        driver.phone = data["phone"]
+    if data.get("status"):
+        status_map = {"online": DriverStatus.ONLINE.value, "offline": DriverStatus.OFFLINE.value, "busy": DriverStatus.ON_RIDE.value}
+        if data["status"] in status_map:
+            driver.status = status_map[data["status"]]
+    await db.flush()
+    return _map_driver(driver)
+
+
+@router.post("/drivers/{driver_id}/approve")
+async def approve_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    driver.kyc_status = KYCStatus.APPROVED.value
+    driver.is_verified = True
+    await db.flush()
+    return _map_driver(driver)
+
+
+@router.post("/drivers/{driver_id}/reject")
+async def reject_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    driver.kyc_status = KYCStatus.REJECTED.value
+    await db.flush()
+    return _map_driver(driver)
+
+
+@router.post("/drivers/{driver_id}/suspend")
+async def suspend_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    driver.is_active = False
+    await db.flush()
+    return _map_driver(driver)
+
+
+@router.post("/drivers/{driver_id}/reactivate")
+async def reactivate_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Driver).where(Driver.id == driver_id))
+    driver = result.scalar_one_or_none()
+    if not driver:
+        raise NotFoundException("Driver not found")
+    driver.is_active = True
+    await db.flush()
+    return _map_driver(driver)
+
+
+@router.get("/drivers/{driver_id}/rides")
+async def driver_rides(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Ride).where(Ride.driver_id == driver_id).order_by(Ride.created_at.desc()).limit(50))
+    return [_map_ride(r) for r in result.scalars().all()]
+
+
+@router.get("/drivers/{driver_id}/documents")
+async def driver_documents(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(DriverDocument).where(DriverDocument.driver_id == driver_id))
+    docs = result.scalars().all()
+    return {
+        "documents": [
+            {
+                "id": str(d.id),
+                "driverId": str(d.driver_id),
+                "type": d.document_type.lower(),
+                "name": d.document_type.replace("_", " ").title(),
+                "status": d.status.lower(),
+                "uploadedAt": d.created_at.isoformat(),
+                "url": d.document_url,
+            }
+            for d in docs
+        ]
+    }

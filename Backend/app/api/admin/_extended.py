@@ -1,0 +1,828 @@
+"""Admin extended routes — dashboard, finance, settings."""
+import csv
+import io
+from datetime import datetime, timedelta, timezone
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
+from sqlalchemy import and_, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.api.admin._core import _map_driver, _map_ride
+from app.auth.dependencies import get_current_admin
+from app.core.constants import DriverStatus, RideStatus, SupportTicketStatus
+from app.core.exceptions import NotFoundException
+from app.database.session import get_db
+from app.models import (
+    AdminUser,
+    AppSetting,
+    Driver,
+    Notification,
+    PromoCode,
+    Ride,
+    SupportTicket,
+    User,
+    Vehicle,
+    VehicleType,
+    Wallet,
+    WalletTransaction,
+)
+
+router = APIRouter(tags=["Admin"])
+
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+DEFAULT_SETTINGS = {
+    "appName": "WaveGo",
+    "logo": "",
+    "contactEmail": "support@ridebook.com",
+    "contactPhone": "+91 98765 43210",
+    "googleMapsApiKey": "",
+    "firebaseConfig": "",
+    "razorpayKey": "",
+    "stripeKey": "",
+    "driverCommission": 20,
+    "platformFee": 5,
+}
+
+DEFAULT_FAQS = [
+    {
+        "category": "Rides",
+        "question": "How do I book a ride?",
+        "answer": "Open the app, enter pickup and drop locations, choose a vehicle type, and confirm your booking.",
+    },
+    {
+        "category": "Payments",
+        "question": "What payment methods are supported?",
+        "answer": "You can pay using cash, wallet, UPI, or card depending on availability in your city.",
+    },
+    {
+        "category": "Safety",
+        "question": "How do I use SOS?",
+        "answer": "During an active ride, tap the SOS button to alert our emergency response team with your live location.",
+    },
+]
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _today_start() -> datetime:
+    now = _utc_now()
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _month_start() -> datetime:
+    now = _utc_now()
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def _relative_time(dt: datetime) -> str:
+    diff = _utc_now() - dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else _utc_now() - dt
+    minutes = int(diff.total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 60:
+        return f"{minutes} min ago"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hr ago"
+    return f"{hours // 24} days ago"
+
+
+def _map_vehicle_type(vt: VehicleType) -> dict:
+    slug = vt.name.lower().replace(" ", "_")
+    return {
+        "id": str(vt.id),
+        "type": slug,
+        "name": vt.name,
+        "baseFare": vt.base_fare,
+        "perKmFare": vt.per_km_rate,
+        "waitingCharge": vt.waiting_charge_per_min,
+        "cancellationCharge": max(vt.base_fare, 20.0),
+        "surgeMultiplier": 1.5,
+        "isActive": vt.is_active,
+        "icon": vt.icon or "car",
+    }
+
+
+def _map_coupon(p: PromoCode) -> dict:
+    now = _utc_now()
+    status = "active"
+    if not p.is_active:
+        status = "disabled"
+    elif p.valid_until.replace(tzinfo=timezone.utc) < now:
+        status = "expired"
+    discount_type = "percentage" if p.discount_type.upper() == "PERCENTAGE" else "flat"
+    return {
+        "id": str(p.id),
+        "code": p.code,
+        "discountType": discount_type,
+        "discountValue": p.discount_value,
+        "maxDiscount": p.max_discount or p.discount_value,
+        "expiryDate": p.valid_until.date().isoformat(),
+        "usageLimit": p.max_uses,
+        "usedCount": p.used_count,
+        "status": status,
+        "createdAt": p.created_at.date().isoformat(),
+    }
+
+
+def _map_support_ticket(ticket: SupportTicket, user: User | None = None, driver: Driver | None = None) -> dict:
+    if user:
+        user_type = "user"
+        user_id = str(user.id)
+        user_name = f"{user.first_name} {user.last_name}".strip()
+    elif driver:
+        user_type = "driver"
+        user_id = str(driver.id)
+        user_name = f"{driver.first_name} {driver.last_name}".strip()
+    else:
+        user_type = "user"
+        user_id = str(ticket.user_id or ticket.driver_id or "")
+        user_name = "Unknown"
+
+    status_map = {
+        SupportTicketStatus.OPEN.value: "open",
+        SupportTicketStatus.IN_PROGRESS.value: "in_progress",
+        SupportTicketStatus.RESOLVED.value: "resolved",
+        SupportTicketStatus.CLOSED.value: "closed",
+    }
+    return {
+        "id": str(ticket.id),
+        "subject": ticket.subject,
+        "description": ticket.description,
+        "userType": user_type,
+        "userId": user_id,
+        "userName": user_name,
+        "status": status_map.get(ticket.status, ticket.status.lower()),
+        "priority": ticket.priority.lower(),
+        "createdAt": ticket.created_at.isoformat(),
+        "updatedAt": ticket.updated_at.isoformat(),
+        "messages": [
+            {
+                "id": str(ticket.id),
+                "sender": user_name,
+                "senderType": user_type,
+                "message": ticket.description,
+                "timestamp": ticket.created_at.isoformat(),
+            }
+        ],
+    }
+
+
+def _map_wallet_transaction(tx: WalletTransaction, wallet: Wallet) -> dict:
+    tx_type = tx.transaction_type.lower()
+    if tx_type == "admin_adjustment":
+        tx_type = "debit"
+    return {
+        "id": str(tx.id),
+        "type": tx_type,
+        "amount": tx.amount,
+        "description": tx.description,
+        "userId": str(wallet.user_id) if wallet.user_id else None,
+        "driverId": str(wallet.driver_id) if wallet.driver_id else None,
+        "rideId": tx.reference_id if tx.reference_type == "ride" else None,
+        "status": "completed",
+        "date": tx.created_at.isoformat(),
+        "paymentMethod": None,
+    }
+
+
+async def _get_settings(db: AsyncSession) -> dict:
+    result = await db.execute(select(AppSetting))
+    settings = {row.key: row.value for row in result.scalars().all()}
+    merged = dict(DEFAULT_SETTINGS)
+    key_map = {
+        "app_name": "appName",
+        "contact_email": "contactEmail",
+        "contact_phone": "contactPhone",
+        "google_maps_api_key": "googleMapsApiKey",
+        "firebase_config": "firebaseConfig",
+        "razorpay_key": "razorpayKey",
+        "stripe_key": "stripeKey",
+        "driver_commission": "driverCommission",
+        "platform_fee": "platformFee",
+        "logo": "logo",
+    }
+    for db_key, front_key in key_map.items():
+        if db_key in settings:
+            value = settings[db_key]
+            if front_key in ("driverCommission", "platformFee"):
+                merged[front_key] = float(value)
+            else:
+                merged[front_key] = value
+    return merged
+
+
+async def _ride_with_names(db: AsyncSession, ride: Ride) -> dict:
+    user = await db.get(User, ride.user_id)
+    driver = await db.get(Driver, ride.driver_id) if ride.driver_id else None
+    mapped = _map_ride(ride, user, driver)
+    if ride.vehicle_type_id:
+        vt = await db.get(VehicleType, ride.vehicle_type_id)
+        if vt:
+            mapped["vehicleType"] = vt.name.lower().replace(" ", "_")
+    return mapped
+
+
+@router.get("/dashboard/stats")
+async def dashboard_stats(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    total_users = (await db.execute(select(func.count()).select_from(User).where(User.is_deleted == False))).scalar_one()
+    total_drivers = (await db.execute(select(func.count()).select_from(Driver).where(Driver.is_deleted == False))).scalar_one()
+    active_drivers = (
+        await db.execute(
+            select(func.count()).select_from(Driver).where(
+                Driver.is_deleted == False,
+                Driver.status.in_([DriverStatus.ONLINE.value, DriverStatus.ON_RIDE.value, DriverStatus.BUSY.value]),
+            )
+        )
+    ).scalar_one()
+    active_rides = (
+        await db.execute(
+            select(func.count()).select_from(Ride).where(
+                Ride.status.in_([
+                    RideStatus.REQUESTED.value,
+                    RideStatus.SEARCHING.value,
+                    RideStatus.ACCEPTED.value,
+                    RideStatus.DRIVER_ARRIVED.value,
+                    RideStatus.STARTED.value,
+                ])
+            )
+        )
+    ).scalar_one()
+    completed_rides = (
+        await db.execute(select(func.count()).select_from(Ride).where(Ride.status == RideStatus.COMPLETED.value))
+    ).scalar_one()
+    cancelled_rides = (
+        await db.execute(select(func.count()).select_from(Ride).where(Ride.status == RideStatus.CANCELLED.value))
+    ).scalar_one()
+
+    today = _today_start()
+    month = _month_start()
+    today_revenue = (
+        await db.execute(
+            select(func.coalesce(func.sum(Ride.final_fare), 0.0)).where(
+                Ride.status == RideStatus.COMPLETED.value,
+                Ride.completed_at >= today,
+            )
+        )
+    ).scalar_one()
+    monthly_revenue = (
+        await db.execute(
+            select(func.coalesce(func.sum(Ride.final_fare), 0.0)).where(
+                Ride.status == RideStatus.COMPLETED.value,
+                Ride.completed_at >= month,
+            )
+        )
+    ).scalar_one()
+
+    return {
+        "totalUsers": total_users,
+        "totalDrivers": total_drivers,
+        "activeDrivers": active_drivers,
+        "activeRides": active_rides,
+        "completedRides": completed_rides,
+        "cancelledRides": cancelled_rides,
+        "todayRevenue": float(today_revenue or 0),
+        "monthlyRevenue": float(monthly_revenue or 0),
+    }
+
+
+@router.get("/dashboard/charts")
+async def dashboard_charts(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    now = _utc_now()
+    ride_booking = []
+    for i in range(6, -1, -1):
+        day = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        next_day = day + timedelta(days=1)
+        count = (
+            await db.execute(
+                select(func.count()).select_from(Ride).where(Ride.created_at >= day, Ride.created_at < next_day)
+            )
+        ).scalar_one()
+        ride_booking.append({"name": DAY_NAMES[day.weekday()], "rides": count, "value": count})
+
+    revenue = []
+    for i in range(5, -1, -1):
+        month_dt = (now.replace(day=1) - timedelta(days=i * 28)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if i > 0:
+            next_month = (month_dt + timedelta(days=32)).replace(day=1)
+        else:
+            next_month = now.replace(day=1) + timedelta(days=32)
+            next_month = next_month.replace(day=1)
+        rev = (
+            await db.execute(
+                select(func.coalesce(func.sum(Ride.final_fare), 0.0)).where(
+                    Ride.status == RideStatus.COMPLETED.value,
+                    Ride.completed_at >= month_dt,
+                    Ride.completed_at < next_month,
+                )
+            )
+        ).scalar_one()
+        revenue.append({"name": MONTH_NAMES[month_dt.month - 1], "revenue": float(rev or 0), "value": float(rev or 0)})
+
+    total_users = (await db.execute(select(func.count()).select_from(User).where(User.is_deleted == False))).scalar_one()
+    total_drivers = (await db.execute(select(func.count()).select_from(Driver).where(Driver.is_deleted == False))).scalar_one()
+
+    user_growth = []
+    driver_growth = []
+    for i in range(5, -1, -1):
+        month_dt = (now.replace(day=1) - timedelta(days=i * 28)).replace(day=1)
+        user_count = (
+            await db.execute(
+                select(func.count()).select_from(User).where(User.is_deleted == False, User.created_at <= month_dt + timedelta(days=31))
+            )
+        ).scalar_one()
+        driver_count = (
+            await db.execute(
+                select(func.count()).select_from(Driver).where(Driver.is_deleted == False, Driver.created_at <= month_dt + timedelta(days=31))
+            )
+        ).scalar_one()
+        label = MONTH_NAMES[month_dt.month - 1]
+        user_growth.append({"name": label, "users": user_count, "value": user_count})
+        driver_growth.append({"name": label, "drivers": driver_count, "value": driver_count})
+
+    if total_users == 0:
+        user_growth[-1]["users"] = 0
+        user_growth[-1]["value"] = 0
+    if total_drivers == 0:
+        driver_growth[-1]["drivers"] = 0
+        driver_growth[-1]["value"] = 0
+
+    return {
+        "rideBooking": ride_booking,
+        "revenue": revenue,
+        "userGrowth": user_growth,
+        "driverGrowth": driver_growth,
+    }
+
+
+@router.get("/dashboard/activities")
+async def dashboard_activities(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    activities = []
+
+    rides = (
+        await db.execute(select(Ride).order_by(Ride.created_at.desc()).limit(5))
+    ).scalars().all()
+    for ride in rides:
+        user = await db.get(User, ride.user_id)
+        name = f"{user.first_name} {user.last_name}" if user else "User"
+        activities.append({
+            "id": f"ride-{ride.id}",
+            "type": "ride_request" if ride.status in (RideStatus.REQUESTED.value, RideStatus.SEARCHING.value) else "ongoing_ride",
+            "title": "New Ride Request" if ride.status in (RideStatus.REQUESTED.value, RideStatus.SEARCHING.value) else "Ongoing Ride",
+            "description": f"{name} — {ride.pickup_address} to {ride.dropoff_address}",
+            "timestamp": _relative_time(ride.created_at),
+            "status": ride.status.lower(),
+        })
+
+    users = (
+        await db.execute(select(User).where(User.is_deleted == False).order_by(User.created_at.desc()).limit(3))
+    ).scalars().all()
+    for user in users:
+        activities.append({
+            "id": f"user-{user.id}",
+            "type": "registration",
+            "title": "New User Registration",
+            "description": f"{user.first_name} {user.last_name} registered with {user.phone}",
+            "timestamp": _relative_time(user.created_at),
+        })
+
+    online = (
+        await db.execute(
+            select(Driver).where(Driver.status == DriverStatus.ONLINE.value, Driver.is_deleted == False).limit(3)
+        )
+    ).scalars().all()
+    for driver in online:
+        activities.append({
+            "id": f"driver-{driver.id}",
+            "type": "driver_online",
+            "title": "Driver Online",
+            "description": f"{driver.first_name} {driver.last_name} is now online",
+            "timestamp": _relative_time(driver.updated_at),
+            "status": "online",
+        })
+
+    return activities[:10]
+
+
+@router.get("/dashboard/online-drivers")
+async def online_drivers(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Driver)
+        .where(
+            Driver.is_deleted == False,
+            Driver.status.in_([DriverStatus.ONLINE.value, DriverStatus.ON_RIDE.value]),
+        )
+        .limit(10)
+    )
+    drivers = result.scalars().all()
+    items = []
+    for d in drivers:
+        vehicle_result = await db.execute(select(Vehicle).where(Vehicle.driver_id == d.id).limit(1))
+        vehicle = vehicle_result.scalar_one_or_none()
+        mapped = _map_driver(d, vehicle)
+        items.append({"id": mapped["id"], "name": mapped["name"], "vehicleType": mapped["vehicleType"], "status": mapped["status"]})
+    return items
+
+
+@router.get("/rides")
+async def list_rides(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    query = select(Ride)
+    if status and status != "all":
+        status_map = {
+            "requested": [RideStatus.REQUESTED.value, RideStatus.SEARCHING.value],
+            "driver_assigned": [RideStatus.ACCEPTED.value],
+            "driver_arrived": [RideStatus.DRIVER_ARRIVED.value],
+            "ride_started": [RideStatus.STARTED.value],
+            "ride_completed": [RideStatus.COMPLETED.value],
+            "cancelled": [RideStatus.CANCELLED.value],
+        }
+        if status in status_map:
+            query = query.where(Ride.status.in_(status_map[status]))
+    if search:
+        term = f"%{search}%"
+        query = query.where(or_(Ride.pickup_address.ilike(term), Ride.dropoff_address.ilike(term)))
+
+    count_query = select(func.count()).select_from(Ride)
+    if status and status != "all":
+        status_map = {
+            "requested": [RideStatus.REQUESTED.value, RideStatus.SEARCHING.value],
+            "driver_assigned": [RideStatus.ACCEPTED.value],
+            "driver_arrived": [RideStatus.DRIVER_ARRIVED.value],
+            "ride_started": [RideStatus.STARTED.value],
+            "ride_completed": [RideStatus.COMPLETED.value],
+            "cancelled": [RideStatus.CANCELLED.value],
+        }
+        if status in status_map:
+            count_query = count_query.where(Ride.status.in_(status_map[status]))
+    if search:
+        term = f"%{search}%"
+        count_query = count_query.where(or_(Ride.pickup_address.ilike(term), Ride.dropoff_address.ilike(term)))
+
+    total = (await db.execute(count_query)).scalar_one()
+    result = await db.execute(query.order_by(Ride.created_at.desc()).offset((page - 1) * limit).limit(limit))
+    rides = result.scalars().all()
+    items = [await _ride_with_names(db, r) for r in rides]
+    return {"items": items, "total": total, "page": page, "limit": limit, "total_pages": max(1, (total + limit - 1) // limit)}
+
+
+@router.get("/rides/export")
+async def export_rides(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Ride).order_by(Ride.created_at.desc()).limit(5000))
+    rides = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "User", "Driver", "Pickup", "Drop", "Fare", "Status", "Date"])
+    for ride in rides:
+        mapped = await _ride_with_names(db, ride)
+        writer.writerow([
+            mapped["id"], mapped["userName"], mapped.get("driverName", ""),
+            mapped["pickupLocation"], mapped["dropLocation"], mapped["fare"],
+            mapped["status"], mapped["date"],
+        ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=rides.csv"},
+    )
+
+
+@router.get("/rides/{ride_id}")
+async def get_ride(
+    ride_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    ride = await db.get(Ride, ride_id)
+    if not ride:
+        raise NotFoundException("Ride not found")
+    return await _ride_with_names(db, ride)
+
+
+@router.get("/users/export")
+async def export_users(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.is_deleted == False).order_by(User.created_at.desc()))
+    users = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "Registered"])
+    for u in users:
+        writer.writerow([str(u.id), f"{u.first_name} {u.last_name}", u.email, u.phone, "active" if u.is_active else "blocked", u.created_at.date()])
+    output.seek(0)
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=users.csv"})
+
+
+@router.get("/drivers/export")
+async def export_drivers(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Driver).where(Driver.is_deleted == False).order_by(Driver.created_at.desc()))
+    drivers = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "KYC", "Joined"])
+    for d in drivers:
+        writer.writerow([str(d.id), f"{d.first_name} {d.last_name}", d.email, d.phone, d.status, d.kyc_status, d.created_at.date()])
+    output.seek(0)
+    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=drivers.csv"})
+
+
+@router.get("/finance/transactions")
+async def finance_transactions(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    type: str | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+):
+    query = (
+        select(WalletTransaction, Wallet)
+        .join(Wallet, WalletTransaction.wallet_id == Wallet.id)
+        .order_by(WalletTransaction.created_at.desc())
+    )
+    result = await db.execute(query.offset((page - 1) * limit).limit(limit))
+    rows = result.all()
+    items = [_map_wallet_transaction(tx, wallet) for tx, wallet in rows]
+    if type and type != "all":
+        items = [i for i in items if i["type"] == type]
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/vehicle-categories")
+async def list_vehicle_categories(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(VehicleType).order_by(VehicleType.name))
+    return [_map_vehicle_type(vt) for vt in result.scalars().all()]
+
+
+@router.patch("/vehicle-categories/{category_id}")
+async def update_vehicle_category(
+    category_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    vt = await db.get(VehicleType, category_id)
+    if not vt:
+        raise NotFoundException("Vehicle category not found")
+    field_map = {
+        "baseFare": "base_fare",
+        "perKmFare": "per_km_rate",
+        "waitingCharge": "waiting_charge_per_min",
+        "isActive": "is_active",
+        "name": "name",
+    }
+    for front_key, db_key in field_map.items():
+        if front_key in data:
+            setattr(vt, db_key, data[front_key])
+    await db.flush()
+    return _map_vehicle_type(vt)
+
+
+@router.get("/coupons")
+async def list_coupons(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(PromoCode).order_by(PromoCode.created_at.desc()))
+    return [_map_coupon(p) for p in result.scalars().all()]
+
+
+@router.post("/coupons")
+async def create_coupon(
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    now = _utc_now()
+    promo = PromoCode(
+        code=data["code"].upper(),
+        discount_type="PERCENTAGE" if data.get("discountType") == "percentage" else "FIXED",
+        discount_value=float(data["discountValue"]),
+        max_discount=float(data.get("maxDiscount", data["discountValue"])),
+        max_uses=int(data.get("usageLimit", 100)),
+        valid_from=now,
+        valid_until=datetime.fromisoformat(data["expiryDate"]).replace(tzinfo=timezone.utc),
+        is_active=data.get("status", "active") == "active",
+    )
+    db.add(promo)
+    await db.flush()
+    return _map_coupon(promo)
+
+
+@router.patch("/coupons/{coupon_id}")
+async def update_coupon(
+    coupon_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    promo = await db.get(PromoCode, coupon_id)
+    if not promo:
+        raise NotFoundException("Coupon not found")
+    if "status" in data:
+        promo.is_active = data["status"] == "active"
+    if "discountValue" in data:
+        promo.discount_value = float(data["discountValue"])
+    if "usageLimit" in data:
+        promo.max_uses = int(data["usageLimit"])
+    await db.flush()
+    return _map_coupon(promo)
+
+
+@router.get("/support/tickets")
+async def list_support_tickets(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(SupportTicket).order_by(SupportTicket.created_at.desc()))
+    tickets = result.scalars().all()
+    items = []
+    for t in tickets:
+        user = await db.get(User, t.user_id) if t.user_id else None
+        driver = await db.get(Driver, t.driver_id) if t.driver_id else None
+        items.append(_map_support_ticket(t, user, driver))
+    return items
+
+
+@router.get("/support/tickets/{ticket_id}")
+async def get_support_ticket(
+    ticket_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await db.get(SupportTicket, ticket_id)
+    if not ticket:
+        raise NotFoundException("Ticket not found")
+    user = await db.get(User, ticket.user_id) if ticket.user_id else None
+    driver = await db.get(Driver, ticket.driver_id) if ticket.driver_id else None
+    return _map_support_ticket(ticket, user, driver)
+
+
+@router.patch("/support/tickets/{ticket_id}")
+async def update_support_ticket(
+    ticket_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await db.get(SupportTicket, ticket_id)
+    if not ticket:
+        raise NotFoundException("Ticket not found")
+    if "status" in data:
+        status_map = {
+            "open": SupportTicketStatus.OPEN.value,
+            "in_progress": SupportTicketStatus.IN_PROGRESS.value,
+            "resolved": SupportTicketStatus.RESOLVED.value,
+            "closed": SupportTicketStatus.CLOSED.value,
+        }
+        ticket.status = status_map.get(data["status"], ticket.status)
+    if "priority" in data:
+        ticket.priority = data["priority"].upper()
+    await db.flush()
+    user = await db.get(User, ticket.user_id) if ticket.user_id else None
+    driver = await db.get(Driver, ticket.driver_id) if ticket.driver_id else None
+    return _map_support_ticket(ticket, user, driver)
+
+
+@router.get("/notifications")
+async def list_notifications(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Notification).order_by(Notification.created_at.desc()).limit(100))
+    items = []
+    for n in result.scalars().all():
+        items.append({
+            "id": str(n.id),
+            "title": n.title,
+            "message": n.message,
+            "target": "all_users",
+            "type": "system_alert",
+            "channels": ["push"],
+            "sentAt": n.created_at.isoformat(),
+            "recipientCount": 1,
+        })
+    return items
+
+
+@router.get("/alerts")
+async def admin_alerts(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    alerts = []
+    pending_drivers = (
+        await db.execute(
+            select(func.count()).select_from(Driver).where(Driver.kyc_status.in_(["PENDING", "SUBMITTED"]), Driver.is_deleted == False)
+        )
+    ).scalar_one()
+    if pending_drivers:
+        alerts.append({
+            "id": "pending-drivers",
+            "title": "Pending Driver Approvals",
+            "message": f"{pending_drivers} driver(s) awaiting KYC approval",
+            "type": "driver_registration",
+            "time": "now",
+            "createdAt": _utc_now().isoformat(),
+            "unread": True,
+            "href": "/drivers",
+        })
+
+    open_tickets = (
+        await db.execute(
+            select(func.count()).select_from(SupportTicket).where(
+                SupportTicket.status.in_([SupportTicketStatus.OPEN.value, SupportTicketStatus.IN_PROGRESS.value])
+            )
+        )
+    ).scalar_one()
+    if open_tickets:
+        alerts.append({
+            "id": "open-tickets",
+            "title": "Open Support Tickets",
+            "message": f"{open_tickets} ticket(s) need attention",
+            "type": "support_ticket",
+            "time": "now",
+            "createdAt": _utc_now().isoformat(),
+            "unread": True,
+            "href": "/support",
+        })
+
+    active_rides = (
+        await db.execute(
+            select(func.count()).select_from(Ride).where(Ride.status.in_([RideStatus.REQUESTED.value, RideStatus.SEARCHING.value]))
+        )
+    ).scalar_one()
+    if active_rides:
+        alerts.append({
+            "id": "active-rides",
+            "title": "Pending Ride Requests",
+            "message": f"{active_rides} ride(s) waiting for drivers",
+            "type": "ride_update",
+            "time": "now",
+            "createdAt": _utc_now().isoformat(),
+            "unread": True,
+            "href": "/rides",
+        })
+
+    return alerts
+
+
+@router.get("/settings")
+async def get_settings(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    return await _get_settings(db)
+
+
+@router.patch("/settings")
+async def update_settings(
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    key_map = {
+        "appName": "app_name",
+        "contactEmail": "contact_email",
+        "contactPhone": "contact_phone",
+        "googleMapsApiKey": "google_maps_api_key",
+        "firebaseConfig": "firebase_config",
+        "razorpayKey": "razorpay_key",
+        "stripeKey": "stripe_key",
+        "driverCommission": "driver_commission",
+        "platformFee": "platform_fee",
+        "logo": "logo",
+    }
+    for front_key, db_key in key_map.items():
+        if front_key in data:
+            result = await db.execute(select(AppSetting).where(AppSetting.key == db_key))
+            setting = result.scalar_one_or_none()
+            value = str(data[front_key])
+            if setting:
+                setting.value = value
+            else:
+                db.add(AppSetting(key=db_key, value=value, is_public=db_key in ("app_name", "contact_email", "contact_phone")))
+    await db.flush()
+    return await _get_settings(db)

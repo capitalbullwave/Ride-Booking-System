@@ -1,0 +1,53 @@
+name: wavego_user
+description: WaveGo User - Mobile ride booking application.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  flutter_riverpod: ^2.6.1
+  go_router: ^14.8.1
+  dio: ^5.8.0+1
+
+  google_maps_flutter: ^2.12.1
+  geolocator: ^13.0.4
+
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.5.3
+
+  cached_network_image: ^3.4.1
+  lottie: ^3.3.1
+  intl: ^0.20.2
+  flutter_animate: ^4.5.2
+  country_picker: ^2.0.27
+  pin_code_fields: ^8.0.1
+  equatable: ^2.0.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/images/services/
+    - assets/images/features/
+    - assets/lottie/
+    - assets/mock/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/InterVariable.ttf
+    - family: Satoshi
+      fonts:
+        - asset: assets/fonts/Satoshi-Variable.ttf
