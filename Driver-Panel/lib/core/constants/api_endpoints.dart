@@ -15,6 +15,7 @@ class ApiEndpoints {
   static const String updateProfile = '/driver/profile';
   static const String uploadLicense = '/driver/upload-license';
   static const String uploadVehicle = '/driver/upload-vehicle';
+  static const String completeRegistration = '/drivers/complete-registration';
   static const String goOnline = '/driver/go-online';
   static const String goOffline = '/driver/go-offline';
   static const String driverLocation = '/driver/location';

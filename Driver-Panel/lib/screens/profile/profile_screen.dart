@@ -1,83 +1,313 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
+import 'package:wavego_driver/core/theme/app_radius.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
+import 'package:wavego_driver/core/utils/profile_completion.dart';
+import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
+import 'package:wavego_driver/widgets/common/document_status_badge.dart';
+import 'package:wavego_driver/widgets/common/online_toggle.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(dashboardViewModelProvider).profile;
+    final dashboard = ref.watch(dashboardViewModelProvider);
+    final profile = dashboard.profile;
+    final stats = switch (dashboard.statsState) {
+      ViewStateSuccess(:final data) => data,
+      _ => null,
+    };
+    final isOnline = dashboard.isOnline;
+    final completion = calculateProfileCompletion(
+      isVerified: profile?.verificationStatus == 'verified',
+      hasAvatar: profile?.avatar != null,
+    );
+    final isVerified = profile?.verificationStatus == 'verified';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 48,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                  child: Text(
-                    (profile?.name ?? 'D')[0].toUpperCase(),
-                    style: const TextStyle(fontSize: 36, color: AppColors.primary, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(profile?.name ?? 'Driver', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                Text(profile?.phone ?? '', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
-                if (profile?.rating != null)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.star, color: AppColors.warning, size: 18),
-                      Text(' ${profile!.rating} • ${profile.totalTrips} trips'),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withValues(alpha: 0.85),
+                      AppColors.secondary.withValues(alpha: 0.6),
                     ],
                   ),
-              ],
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 52,
+                              backgroundColor: Colors.white24,
+                              child: CircleAvatar(
+                                radius: 48,
+                                backgroundColor: AppColors.background,
+                                backgroundImage: profile?.avatar != null
+                                    ? CachedNetworkImageProvider(profile!.avatar!)
+                                    : null,
+                                child: profile?.avatar == null
+                                    ? Text(
+                                        (profile?.name ?? 'D')[0].toUpperCase(),
+                                        style: const TextStyle(
+                                          fontSize: 36,
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            if (isVerified)
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.success,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.verified, color: Colors.white, size: 18),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          profile?.name ?? 'Driver',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID · ${profile?.id.substring(0, 8).toUpperCase() ?? '—'}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Colors.white70,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _HeaderChip(
+                              icon: Icons.phone_outlined,
+                              label: profile?.phone ?? '',
+                            ),
+                            const SizedBox(width: 8),
+                            _HeaderChip(
+                              icon: Icons.star_rounded,
+                              label: '${profile?.rating ?? stats?.rating ?? 4.5}',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 32),
-          _MenuSection(
-            items: [
-              _MenuItem(Icons.edit, 'Edit Profile', RouteNames.editProfile),
-              _MenuItem(Icons.directions_car, 'Vehicle Details', RouteNames.documents),
-              _MenuItem(Icons.description, 'Documents', RouteNames.documents),
-              _MenuItem(Icons.account_balance, 'Bank Details', RouteNames.wallet),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => context.push(RouteNames.settings),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          _MenuSection(
-            items: [
-              _MenuItem(Icons.settings, 'Settings', RouteNames.settings),
-              _MenuItem(Icons.help_center, 'Help Center', RouteNames.support),
-              _MenuItem(Icons.emergency, 'SOS', RouteNames.sos, color: AppColors.error),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.error),
-            title: const Text('Logout', style: TextStyle(color: AppColors.error)),
-            onTap: () async {
-              final confirmed = await AppDialog.showConfirm(
-                context: context,
-                title: 'Logout',
-                message: 'Are you sure you want to logout?',
-                confirmVariant: AppButtonVariant.danger,
-              );
-              if (confirmed == true) {
-                await ref.read(authViewModelProvider.notifier).logout();
-                if (context.mounted) context.go(RouteNames.phoneLogin);
-              }
-            },
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatTile(
+                          label: 'Trips',
+                          value: '${profile?.totalTrips ?? stats?.completedTrips ?? 0}',
+                          icon: Icons.local_taxi_outlined,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _StatTile(
+                          label: 'Rating',
+                          value: '${profile?.rating ?? stats?.rating ?? 4.5}',
+                          icon: Icons.star_outline,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Availability',
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 8,
+                                          height: 8,
+                                          decoration: BoxDecoration(
+                                            color: isOnline ? AppColors.success : AppColors.textSecondary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(isOnline ? 'Online' : 'Offline'),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              OnlineToggle(
+                                isOnline: isOnline,
+                                isLoading: dashboard.isTogglingOnline,
+                                canGoOnline: dashboard.canGoOnline,
+                                onBlockedGoOnline: () => context.showSnackBar(
+                                  profile?.verificationStatus == 'rejected'
+                                      ? 'Your documents were rejected. Please update and resubmit.'
+                                      : 'Account verification is pending. You can go online after admin approval.',
+                                  isError: true,
+                                ),
+                                onChanged: (v) async {
+                                  final error = await ref
+                                      .read(dashboardViewModelProvider.notifier)
+                                      .toggleOnline(v);
+                                  if (error != null && context.mounted) {
+                                    context.showSnackBar(error, isError: true);
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionHeader(title: 'Profile Completion'),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('$completion% complete'),
+                              if (!isVerified)
+                                const DocumentStatusBadge(status: DocumentStatus.pending, compact: true),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
+                            child: LinearProgressIndicator(
+                              value: completion / 100,
+                              minHeight: 8,
+                              backgroundColor: AppColors.muted,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _SectionHeader(title: 'Account'),
+                  const SizedBox(height: 8),
+                  _MenuCard(
+                    items: [
+                      _ProfileMenuItem(Icons.person_outline, 'Personal Information', RouteNames.editProfile),
+                      _ProfileMenuItem(Icons.directions_car_outlined, 'Vehicle Details', RouteNames.documents),
+                      _ProfileMenuItem(Icons.badge_outlined, 'Driving License', RouteNames.documents),
+                      _ProfileMenuItem(Icons.folder_outlined, 'Documents', RouteNames.documents),
+                      _ProfileMenuItem(Icons.account_balance_outlined, 'Bank Details', RouteNames.wallet),
+                      _ProfileMenuItem(Icons.contact_emergency_outlined, 'Emergency Contact', RouteNames.sos),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionHeader(title: 'Performance'),
+                  const SizedBox(height: 8),
+                  _MenuCard(
+                    items: [
+                      _ProfileMenuItem(Icons.analytics_outlined, 'Ride Statistics', RouteNames.rideStatistics),
+                      _ProfileMenuItem(Icons.payments_outlined, 'Earnings', RouteNames.earnings),
+                      _ProfileMenuItem(Icons.account_balance_wallet_outlined, 'Wallet', RouteNames.wallet),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _SectionHeader(title: 'Support & Safety'),
+                  const SizedBox(height: 8),
+                  _MenuCard(
+                    items: [
+                      _ProfileMenuItem(Icons.help_center_outlined, 'Help Center', RouteNames.support),
+                      _ProfileMenuItem(Icons.emergency_outlined, 'SOS', RouteNames.sos, color: AppColors.error),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  AppButton(
+                    label: 'Logout',
+                    variant: AppButtonVariant.danger,
+                    icon: Icons.logout,
+                    onPressed: () async {
+                      final confirmed = await AppDialog.showConfirm(
+                        context: context,
+                        title: 'Logout',
+                        message: 'Are you sure you want to logout?',
+                        confirmVariant: AppButtonVariant.danger,
+                      );
+                      if (confirmed == true) {
+                        await ref.read(authViewModelProvider.notifier).logout();
+                        if (context.mounted) context.go(RouteNames.phoneLogin);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -85,29 +315,110 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _MenuSection extends StatelessWidget {
-  const _MenuSection({required this.items});
-  final List<_MenuItem> items;
+class _HeaderChip extends StatelessWidget {
+  const _HeaderChip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Column(
-        children: items.map((item) => ListTile(
-          leading: Icon(item.icon, color: item.color ?? AppColors.primary),
-          title: Text(item.label),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => context.push(item.route),
-        )).toList(),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+        ],
       ),
     );
   }
 }
 
-class _MenuItem {
-  const _MenuItem(this.icon, this.label, this.route, {this.color});
+class _StatTile extends StatelessWidget {
+  const _StatTile({required this.label, required this.value, required this.icon});
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(AppRadius.chip),
+              ),
+              child: Icon(icon, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+                Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+    );
+  }
+}
+
+class _ProfileMenuItem {
+  const _ProfileMenuItem(this.icon, this.label, this.route, {this.color});
   final IconData icon;
   final String label;
   final String route;
   final Color? color;
+}
+
+class _MenuCard extends StatelessWidget {
+  const _MenuCard({required this.items});
+  final List<_ProfileMenuItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            ListTile(
+              leading: Icon(items[i].icon, color: items[i].color ?? AppColors.primary),
+              title: Text(items[i].label),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () => context.push(items[i].route),
+            ),
+            if (i < items.length - 1)
+              Divider(height: 1, indent: 56, color: AppColors.border.withValues(alpha: 0.5)),
+          ],
+        ],
+      ),
+    );
+  }
 }

@@ -7,11 +7,15 @@ class OnlineToggle extends StatelessWidget {
     required this.isOnline,
     required this.onChanged,
     this.isLoading = false,
+    this.canGoOnline = true,
+    this.onBlockedGoOnline,
   });
 
   final bool isOnline;
   final ValueChanged<bool> onChanged;
   final bool isLoading;
+  final bool canGoOnline;
+  final VoidCallback? onBlockedGoOnline;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +59,15 @@ class OnlineToggle extends StatelessWidget {
           else
             Switch.adaptive(
               value: isOnline,
-              onChanged: onChanged,
+              onChanged: isLoading
+                  ? null
+                  : (value) {
+                      if (value && !canGoOnline) {
+                        onBlockedGoOnline?.call();
+                        return;
+                      }
+                      onChanged(value);
+                    },
               activeColor: AppColors.online,
             ),
         ],
@@ -69,10 +81,13 @@ class StepIndicator extends StatelessWidget {
     super.key,
     required this.currentStep,
     required this.totalSteps,
+    this.displayOffset = 1,
   });
 
   final int currentStep;
   final int totalSteps;
+  /// When registration starts after OTP (step 1), pass `displayOffset: 2`.
+  final int displayOffset;
 
   @override
   Widget build(BuildContext context) {

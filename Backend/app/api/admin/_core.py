@@ -15,6 +15,7 @@ from app.core.constants import DriverStatus, KYCStatus, RideStatus
 from app.core.exceptions import NotFoundException
 from app.database.session import get_db
 from app.models import AdminUser, Driver, DriverDocument, Ride, User, Vehicle, Wallet
+from app.drivers.models import DriverBankAccount
 from app.schemas.admin import AdminLogin
 from app.schemas.user import RefreshTokenRequest
 from app.schemas.common import TokenResponse
@@ -67,30 +68,80 @@ def _driver_status(driver: Driver) -> str:
     return status_map.get(driver.status, "offline")
 
 
-def _map_driver(driver: Driver, vehicle: Vehicle | None = None) -> dict:
+def _map_driver(
+    driver: Driver,
+    vehicle: Vehicle | None = None,
+    wallet_balance: float = 0.0,
+    bank: DriverBankAccount | None = None,
+) -> dict:
     vehicle_type = "sedan"
     vehicle_number = ""
+    vehicle_brand = ""
+    vehicle_model = ""
+    vehicle_color = ""
+    vehicle_year: int | None = None
+    vehicle_status = ""
     if vehicle:
         vehicle_number = vehicle.license_plate
+        vehicle_brand = vehicle.make
+        vehicle_model = vehicle.model
+        vehicle_color = vehicle.color
+        vehicle_year = vehicle.year
+        vehicle_status = vehicle.status
         if vehicle.vehicle_type:
             vehicle_type = vehicle.vehicle_type.name.lower().replace(" ", "_")
 
-    return {
+    payload = {
         "id": str(driver.id),
         "name": f"{driver.first_name} {driver.last_name}".strip(),
         "phone": driver.phone,
         "email": driver.email,
         "vehicleType": vehicle_type,
         "vehicleNumber": vehicle_number,
+        "vehicleBrand": vehicle_brand,
+        "vehicleModel": vehicle_model,
+        "vehicleColor": vehicle_color,
+        "vehicleYear": vehicle_year,
+        "vehicleStatus": vehicle_status,
         "rating": driver.rating_avg,
         "totalTrips": driver.total_rides,
         "earnings": 0.0,
-        "walletBalance": 0.0,
+        "walletBalance": wallet_balance,
         "status": _driver_status(driver),
         "avatar": driver.profile_photo,
-        "city": "",
+        "city": driver.city or "",
+        "state": driver.state or "",
+        "country": driver.country or "",
+        "pinCode": driver.pin_code or "",
+        "address": driver.address_line or "",
+        "licenseNumber": driver.license_number or "",
+        "dateOfBirth": driver.date_of_birth.isoformat() if driver.date_of_birth else None,
+        "gender": driver.gender or "",
+        "kycStatus": driver.kyc_status,
+        "isVerified": driver.is_verified,
+        "referralCode": driver.referral_code or "",
         "joinedDate": driver.created_at.date().isoformat(),
     }
+
+    if bank:
+        payload["bankDetails"] = {
+            "accountHolder": bank.account_holder_name,
+            "accountNumber": bank.account_number_masked,
+            "ifsc": bank.ifsc_code,
+            "bankName": bank.bank_name,
+            "upiId": bank.upi_id or "",
+            "isVerified": bank.is_verified,
+        }
+
+    return payload
+
+
+async def _driver_wallet_balance(db: AsyncSession, driver_id: UUID) -> float:
+    result = await db.execute(
+        select(Wallet.balance).where(Wallet.driver_id == driver_id, Wallet.is_active == True)
+    )
+    balance = result.scalar_one_or_none()
+    return float(balance or 0.0)
 
 
 def _map_ride(ride: Ride, user: User | None = None, driver: Driver | None = None) -> dict:
@@ -187,8 +238,10 @@ async def list_users(
 
     items = []
     for u in users:
-        wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == u.id))
-        wallet = wallet_result.scalar_one_or_none()
+        wallet_result = await db.execute(
+            select(Wallet).where(Wallet.user_id == u.id, Wallet.is_active == True).limit(1)
+        )
+        wallet = wallet_result.scalars().first()
         rides_count = (
             await db.execute(select(func.count()).select_from(Ride).where(Ride.user_id == u.id))
         ).scalar_one()
@@ -329,7 +382,8 @@ async def list_drivers(
             .limit(1)
         )
         vehicle = vehicle_result.scalar_one_or_none()
-        mapped = _map_driver(d, vehicle)
+        wallet_balance = await _driver_wallet_balance(db, d.id)
+        mapped = _map_driver(d, vehicle, wallet_balance)
         if status and status != "all" and mapped["status"] != status:
             continue
         items.append(mapped)
@@ -353,9 +407,22 @@ async def get_driver(
     driver = result.scalar_one_or_none()
     if not driver:
         raise NotFoundException("Driver not found")
-    vehicle_result = await db.execute(select(Vehicle).where(Vehicle.driver_id == driver.id).limit(1))
+    vehicle_result = await db.execute(
+        select(Vehicle)
+        .options(selectinload(Vehicle.vehicle_type))
+        .where(Vehicle.driver_id == driver.id, Vehicle.is_deleted == False)
+        .limit(1)
+    )
     vehicle = vehicle_result.scalar_one_or_none()
-    return _map_driver(driver, vehicle)
+    wallet_balance = await _driver_wallet_balance(db, driver.id)
+    bank_result = await db.execute(
+        select(DriverBankAccount)
+        .where(DriverBankAccount.driver_id == driver.id)
+        .order_by(DriverBankAccount.is_primary.desc())
+        .limit(1)
+    )
+    bank = bank_result.scalar_one_or_none()
+    return _map_driver(driver, vehicle, wallet_balance, bank)
 
 
 @router.patch("/drivers/{driver_id}")

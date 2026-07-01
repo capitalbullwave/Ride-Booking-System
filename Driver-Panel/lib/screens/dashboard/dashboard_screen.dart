@@ -5,6 +5,7 @@ import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
@@ -139,10 +140,52 @@ class _HomeTab extends ConsumerWidget {
                         OnlineToggle(
                           isOnline: state.isOnline,
                           isLoading: state.isTogglingOnline,
-                          onChanged: (v) => ref.read(dashboardViewModelProvider.notifier).toggleOnline(v),
+                          canGoOnline: state.canGoOnline,
+                          onBlockedGoOnline: () => context.showSnackBar(
+                            state.profile?.verificationStatus == 'rejected'
+                                ? 'Your documents were rejected. Please update and resubmit.'
+                                : 'Account verification is pending. You can go online after admin approval.',
+                            isError: true,
+                          ),
+                          onChanged: (v) async {
+                            final error = await ref
+                                .read(dashboardViewModelProvider.notifier)
+                                .toggleOnline(v);
+                            if (error != null && context.mounted) {
+                              context.showSnackBar(error, isError: true);
+                            }
+                          },
                         ),
                       ],
                     ),
+                    if (!state.canGoOnline) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified_user_outlined, color: AppColors.warning),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                state.profile?.verificationStatus == 'rejected'
+                                    ? 'Verification rejected. Update your documents to go online.'
+                                    : 'Verification in progress. You can go online after admin approval.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
                     if (state.isOnline) _SearchingAnimation(),
                     const SizedBox(height: 24),

@@ -14,8 +14,10 @@ class ApiException implements Exception {
 }
 
 class NetworkException extends ApiException {
-  const NetworkException([String message = 'No internet connection'])
-      : super(message: message);
+  const NetworkException([
+    String message =
+        'No internet connection. Check your network or enable mock mode for local testing.',
+  ]) : super(message: message);
 }
 
 class UnauthorizedException extends ApiException {

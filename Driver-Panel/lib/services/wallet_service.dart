@@ -1,12 +1,14 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/network/dio_client.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/models/wallet_model.dart';
 import 'package:wavego_driver/services/base_api_service.dart';
 
 class WalletService extends BaseApiService {
-  WalletService(super.dio);
+  WalletService(Dio dio, AuthTokenStore tokenStore) : super(dio, tokenStore);
 
   Future<WalletInfo> getWallet() async {
     if (useMock) {
@@ -49,5 +51,8 @@ class WalletService extends BaseApiService {
 }
 
 final walletServiceProvider = Provider<WalletService>((ref) {
-  return WalletService(ref.watch(dioClientProvider).dio);
+  return WalletService(
+    ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
+  );
 });

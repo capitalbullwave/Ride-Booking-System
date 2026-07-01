@@ -37,8 +37,12 @@ from app.schemas.user import (
     UserRegisterOTPSend,
     UserRegisterOTPVerify,
 )
+from app.core.config import settings
+from app.core.logging import get_logger
 from app.services.payment_service import WalletService
 from app.services.twilio_otp_service import get_twilio_otp_service
+
+logger = get_logger(__name__)
 
 
 class AuthService:
@@ -55,11 +59,9 @@ class AuthService:
         )
 
     def _otp_response(self, message: str, otp: str | None = None) -> dict:
-        from app.config.settings import settings
-
         response: dict = {"message": message, "success": True}
-        # Only expose OTP in debug when using local fallback (not Twilio)
-        if settings.debug and otp and not get_twilio_otp_service().is_configured:
+        # Expose OTP in development when Twilio SMS is not configured.
+        if settings.is_development and otp and not get_twilio_otp_service().is_configured:
             response["otp"] = otp
         return response
 
@@ -71,7 +73,17 @@ class AuthService:
         if self._twilio_otp().is_configured:
             self._twilio_otp().send_otp(phone)
             return None
-        return generate_otp()
+
+        otp = generate_otp()
+        if settings.is_development:
+            logger.warning(
+                "dev_otp_generated",
+                phone=phone,
+                otp=otp,
+                hint="Twilio is not configured — OTP is not sent via SMS. "
+                "Use the code shown in the app or API response.",
+            )
+        return otp
 
     def _validate_phone_otp(
         self,

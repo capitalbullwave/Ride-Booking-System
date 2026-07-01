@@ -60,6 +60,7 @@ class AppTextField extends StatelessWidget {
           onChanged: onChanged,
           inputFormatters: inputFormatters,
           textCapitalization: textCapitalization,
+          textDirection: TextDirection.ltr,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,

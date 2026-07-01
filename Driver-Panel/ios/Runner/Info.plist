@@ -61,6 +61,14 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required to capture selfies and upload verification documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Photo library access is required to upload verification documents.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Photo library access is required to save captured images.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is not required for photo capture.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

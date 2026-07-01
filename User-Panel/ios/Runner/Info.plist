@@ -66,5 +66,29 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>127.0.0.1</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>WaveGo needs your location to set pickup points and show your ride on the map.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>WaveGo needs your location to track rides in progress.</string>
+	<key>GMSApiKey</key>
+	<string>AIzaSyBTQ4ccqqhUUpjDsjkM_D4y0BPrJhHnLe0</string>
 </dict>
 </plist>

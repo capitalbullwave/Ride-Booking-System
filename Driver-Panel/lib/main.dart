@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/routes/app_router.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
+import 'package:wavego_driver/core/storage/secure_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_theme.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
+import 'package:wavego_driver/widgets/common/connectivity_banner.dart';
 import 'package:wavego_driver/widgets/common/phone_mode_shell.dart';
 
 Future<void> main() async {
@@ -26,11 +29,15 @@ Future<void> main() async {
   );
 
   final sharedPreferences = await SharedPreferences.getInstance();
+  final secureStorage = SecureStorageService();
+  final authTokenStore = AuthTokenStore(secureStorage, sharedPreferences);
+  await authTokenStore.hydrate();
 
   runApp(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        authTokenStoreProvider.overrideWithValue(authTokenStore),
       ],
       child: const WaveGoDriverApp(),
     ),
@@ -53,7 +60,9 @@ class WaveGoDriverApp extends ConsumerWidget {
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       routerConfig: router,
       builder: (context, child) => PhoneModeShell(
-        child: child ?? const SizedBox.shrink(),
+        child: ConnectivityBanner(
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

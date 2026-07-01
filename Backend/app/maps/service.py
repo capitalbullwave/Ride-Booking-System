@@ -331,15 +331,91 @@ class MapsService:
         return await self.resolve_address(address)
 
     async def reverse_geocode(self, lat: float, lng: float) -> Optional[str]:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{self.BASE_URL}/geocode/json",
-                params={"latlng": f"{lat},{lng}", "key": self.api_key},
-            )
-            data = response.json()
-            if data.get("results"):
-                return data["results"][0]["formatted_address"]
+        resolved = await self.reverse_geocode_location(lat, lng)
+        return resolved["address"] if resolved else None
+
+    async def reverse_geocode_location(self, lat: float, lng: float) -> Optional[dict]:
+        if self.api_key:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(
+                        f"{self.BASE_URL}/geocode/json",
+                        params={"latlng": f"{lat},{lng}", "key": self.api_key},
+                    )
+                    data = response.json()
+                    if data.get("results"):
+                        address = data["results"][0].get("formatted_address")
+                        if address:
+                            return {
+                                "address": address,
+                                "latitude": lat,
+                                "longitude": lng,
+                                "source": "google",
+                            }
+            except httpx.HTTPError:
+                pass
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    "https://nominatim.openstreetmap.org/reverse",
+                    params={"lat": lat, "lon": lng, "format": "json"},
+                    headers={"User-Agent": self.USER_AGENT},
+                )
+                data = response.json()
+                display = data.get("display_name")
+                if display:
+                    return {
+                        "address": display,
+                        "latitude": lat,
+                        "longitude": lng,
+                        "source": "nominatim",
+                    }
+        except httpx.HTTPError:
+            pass
+
         return None
+
+    async def get_place_details(self, place_id: str) -> Optional[dict]:
+        trimmed = place_id.strip()
+        if not trimmed or trimmed.startswith("osm-"):
+            return None
+
+        if not self.api_key:
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/place/details/json",
+                    params={
+                        "place_id": trimmed,
+                        "fields": "place_id,name,formatted_address,geometry",
+                        "key": self.api_key,
+                    },
+                )
+                data = response.json()
+        except httpx.HTTPError:
+            return None
+
+        if data.get("status") != "OK":
+            return None
+
+        result = data.get("result") or {}
+        location = (result.get("geometry") or {}).get("location") or {}
+        lat = location.get("lat")
+        lng = location.get("lng")
+        if lat is None or lng is None:
+            return None
+
+        return {
+            "id": result.get("place_id", trimmed),
+            "name": result.get("name", ""),
+            "address": result.get("formatted_address", ""),
+            "latitude": float(lat),
+            "longitude": float(lng),
+            "source": "google",
+        }
 
     async def get_directions(self, origin: str, destination: str) -> Optional[dict]:
         route = await self.get_route_between(origin, destination)

@@ -156,7 +156,7 @@ export default function LoginPage() {
                       <Input
                         id="email"
                         type="email"
-                        placeholder="admin@wavego.com"
+                        placeholder="admin@ridebook.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         className="h-11 pl-9"

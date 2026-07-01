@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/models/registration_model.dart';
+import 'package:wavego_driver/providers/app_providers.dart';
 import 'package:wavego_driver/repositories/notification_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
@@ -38,7 +39,15 @@ class _SosScreenState extends ConsumerState<SosScreen> {
     );
     if (confirmed != true) return;
 
-    await ref.read(supportRepositoryProvider).triggerSos(lat: 19.0760, lng: 72.8777);
+    double lat = 19.0760;
+    double lng = 72.8777;
+    try {
+      final position = await ref.read(locationServiceProvider).getCurrentPosition();
+      lat = position.latitude;
+      lng = position.longitude;
+    } catch (_) {}
+
+    await ref.read(supportRepositoryProvider).triggerSos(lat: lat, lng: lng);
     setState(() => _triggered = true);
   }
 

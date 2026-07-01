@@ -13,6 +13,8 @@ abstract class DriverRegistration with _$DriverRegistration {
     @JsonKey(name: 'date_of_birth') String? dateOfBirth,
     String? gender,
     @JsonKey(name: 'referral_code') String? referralCode,
+    @JsonKey(name: 'languages_spoken') String? languagesSpoken,
+    @JsonKey(name: 'alternate_phone') String? alternatePhone,
     // Step 2 - Address
     String? country,
     String? state,
@@ -32,6 +34,9 @@ abstract class DriverRegistration with _$DriverRegistration {
     @JsonKey(name: 'vehicle_model') String? vehicleModel,
     @JsonKey(name: 'vehicle_color') String? vehicleColor,
     @JsonKey(name: 'manufacturing_year') int? manufacturingYear,
+    String? variant,
+    @JsonKey(name: 'fuel_type') String? fuelType,
+    String? transmission,
     // Step 5 - Documents
     @JsonKey(name: 'rc_url') String? rcUrl,
     @JsonKey(name: 'insurance_url') String? insuranceUrl,
@@ -41,14 +46,30 @@ abstract class DriverRegistration with _$DriverRegistration {
     @JsonKey(name: 'vehicle_front_url') String? vehicleFrontUrl,
     @JsonKey(name: 'vehicle_back_url') String? vehicleBackUrl,
     @JsonKey(name: 'vehicle_side_url') String? vehicleSideUrl,
-    // Step 6 - Selfie
+    @JsonKey(name: 'vehicle_left_url') String? vehicleLeftUrl,
+    @JsonKey(name: 'vehicle_right_url') String? vehicleRightUrl,
+    // Step 6 - Profile photo / selfie
     @JsonKey(name: 'selfie_url') String? selfieUrl,
-    // Step 7 - Bank
+    @JsonKey(name: 'profile_photo_url') String? profilePhotoUrl,
+    // Step 7 - KYC
+    @JsonKey(name: 'aadhaar_number') String? aadhaarNumber,
+    @JsonKey(name: 'pan_number') String? panNumber,
+    @JsonKey(name: 'aadhaar_front_url') String? aadhaarFrontUrl,
+    @JsonKey(name: 'aadhaar_back_url') String? aadhaarBackUrl,
+    @JsonKey(name: 'pan_url') String? panUrl,
+    // Step 8 - Bank
     @JsonKey(name: 'account_holder') String? accountHolder,
     @JsonKey(name: 'account_number') String? accountNumber,
     String? ifsc,
     @JsonKey(name: 'bank_name') String? bankName,
+    @JsonKey(name: 'bank_branch') String? bankBranch,
     @JsonKey(name: 'upi_id') String? upiId,
+    @JsonKey(name: 'confirm_account_number') String? confirmAccountNumber,
+    // Step 9 - Emergency contact
+    @JsonKey(name: 'emergency_contact_name') String? emergencyContactName,
+    @JsonKey(name: 'emergency_contact_relation') String? emergencyContactRelation,
+    @JsonKey(name: 'emergency_contact_phone') String? emergencyContactPhone,
+    @JsonKey(name: 'emergency_secondary_phone') String? emergencySecondaryPhone,
   }) = _DriverRegistration;
 
   factory DriverRegistration.fromJson(Map<String, dynamic> json) =>
@@ -80,6 +101,10 @@ abstract class DashboardStats with _$DashboardStats {
     @Default(4.5) double rating,
     @JsonKey(name: 'acceptance_rate') @Default(0) double acceptanceRate,
     @JsonKey(name: 'cancellation_rate') @Default(0) double cancellationRate,
+    @JsonKey(name: 'weekly_trips') @Default(0) int weeklyTrips,
+    @JsonKey(name: 'monthly_trips') @Default(0) int monthlyTrips,
+    @JsonKey(name: 'cancelled_trips') @Default(0) int cancelledTrips,
+    @JsonKey(name: 'online_hours') @Default(0) double onlineHours,
     @JsonKey(name: 'current_location') String? currentLocation,
   }) = _DashboardStats;
 

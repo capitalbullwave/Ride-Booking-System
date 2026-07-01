@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,8 +10,10 @@ import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/models/api_response.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
+import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -32,6 +35,16 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   void initState() {
     super.initState();
     _startTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _applyDevOtpHint());
+  }
+
+  void _applyDevOtpHint() {
+    final devHint = ref.read(authViewModelProvider).devOtpHint;
+    if (!mounted || devHint == null || devHint.isEmpty) return;
+
+    if (kDebugMode) {
+      _otpController.text = devHint;
+    }
   }
 
   void _startTimer() {
@@ -75,6 +88,18 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       return;
     }
 
+    final hasToken = await ref.read(authRepositoryProvider).isLoggedIn();
+    if (!mounted) return;
+    if (!hasToken) {
+      setState(() {
+        _errorMessage = 'Login failed to save your session. Please try again.';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = false);
+
     if (!response.isRegistered) {
       context.go(RouteNames.registration);
     } else if (!response.isVerified) {
@@ -91,6 +116,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
           authState.countryCode,
         );
     _startTimer();
+    _applyDevOtpHint();
   }
 
   @override
@@ -105,6 +131,17 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     final authState = ref.watch(authViewModelProvider);
     final padding = Responsive.pagePadding(context);
     final devHint = authState.devOtpHint;
+
+    ref.listen<AuthState>(authViewModelProvider, (previous, next) {
+      final hint = next.devOtpHint;
+      if (hint == null || hint.isEmpty || hint == previous?.devOtpHint) return;
+      if (kDebugMode) {
+        _otpController.text = hint;
+      }
+      if (mounted) {
+        context.showSnackBar('Dev OTP: $hint (SMS not configured locally)');
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(),
@@ -127,6 +164,42 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       color: AppColors.textSecondary,
                     ),
               ),
+              if (devHint != null && devHint.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.warning),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.sms_failed_outlined,
+                        color: AppColors.warning,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          AppConfig.enableMockApi
+                              ? 'Mock mode — use OTP: $devHint'
+                              : 'SMS is not configured on the server. '
+                                  'Use this code to continue: $devHint',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppColors.foreground,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
               PinCodeTextField(
                 appContext: context,
@@ -176,19 +249,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         child: const Text('Resend OTP'),
                       ),
               ),
-              const Spacer(),
-              if (devHint != null && devHint.isNotEmpty)
-                Center(
-                  child: Text(
-                    AppConfig.enableMockApi
-                        ? 'Mock OTP: $devHint'
-                        : 'Dev OTP (SMS not configured): $devHint',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textLight,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
             ],
           ),
         ),

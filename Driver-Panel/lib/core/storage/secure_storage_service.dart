@@ -6,6 +6,10 @@ class SecureStorageService {
       : _storage = const FlutterSecureStorage(
           aOptions: AndroidOptions(encryptedSharedPreferences: true),
           iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+          webOptions: WebOptions(
+            dbName: 'wavego_driver_secure',
+            publicKey: 'wavego_driver_public_key',
+          ),
         );
 
   final FlutterSecureStorage _storage;

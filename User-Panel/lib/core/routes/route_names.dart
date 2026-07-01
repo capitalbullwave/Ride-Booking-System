@@ -13,6 +13,7 @@ class RouteNames {
 
   static const String notifications = '/notifications';
   static const String location = '/location';
+  static const String mapPicker = '/location/map';
   static const String book = '/book';
   static const String bookSearching = '/book/searching';
   static const String bookTracking = '/book/tracking';

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/app_constants.dart';
+import 'package:wavego_user/core/network/api_exception.dart';
 import 'package:wavego_user/core/storage/local_storage_service.dart';
 import 'package:wavego_user/core/storage/secure_storage_service.dart';
 import 'package:wavego_user/models/otp_send_result.dart';
@@ -79,6 +80,35 @@ class AuthRepository {
   Future<bool> isLoggedIn() async {
     final token = await _secureStorage.read(AppConstants.accessTokenKey);
     return token != null && token.isNotEmpty;
+  }
+
+  /// Returns true when access token works or was refreshed successfully.
+  Future<bool> ensureValidSession() async {
+    final access = await _secureStorage.read(AppConstants.accessTokenKey);
+    if (access == null || access.isEmpty) return false;
+
+    try {
+      await _authService.getMe();
+      return true;
+    } on UnauthorizedException {
+      return refreshSession();
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<bool> refreshSession() async {
+    final refresh = await _secureStorage.read(AppConstants.refreshTokenKey);
+    if (refresh == null || refresh.isEmpty) return false;
+
+    try {
+      final tokens = await _authService.refreshTokens(refresh);
+      await _secureStorage.write(AppConstants.accessTokenKey, tokens.accessToken);
+      await _secureStorage.write(AppConstants.refreshTokenKey, tokens.refreshToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> isOnboardingComplete() async =>

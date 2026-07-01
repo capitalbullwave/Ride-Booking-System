@@ -1,7 +1,14 @@
 import { getApiBaseUrl } from "@/lib/api";
+import { getStoredSession } from "@/lib/auth";
 
 export async function downloadCsv(exportPath: string, filename: string) {
-  const response = await fetch(`${getApiBaseUrl()}${exportPath}`);
+  const session = getStoredSession();
+  const response = await fetch(`${getApiBaseUrl()}${exportPath}`, {
+    credentials: "include",
+    headers: session?.token
+      ? { Authorization: `Bearer ${session.token}` }
+      : {},
+  });
 
   if (!response.ok) {
     let message = "Failed to export CSV";

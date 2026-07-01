@@ -39,15 +39,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     final authRepo = ref.read(authRepositoryProvider);
     final onboardingDone = await authRepo.isOnboardingComplete();
-    final isLoggedIn = await authRepo.isLoggedIn();
 
     if (!onboardingDone) {
       context.go(RouteNames.onboarding);
-    } else if (!isLoggedIn) {
-      context.go(RouteNames.phoneLogin);
-    } else {
-      context.go(RouteNames.home);
+      return;
     }
+
+    final hasToken = await authRepo.isLoggedIn();
+    if (!hasToken) {
+      context.go(RouteNames.phoneLogin);
+      return;
+    }
+
+    final sessionOk = await authRepo.ensureValidSession();
+    if (!mounted) return;
+
+    if (!sessionOk) {
+      await authRepo.logout();
+      context.go(RouteNames.phoneLogin);
+      return;
+    }
+
+    context.go(RouteNames.home);
   }
 
   @override

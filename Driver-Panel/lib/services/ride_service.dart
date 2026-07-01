@@ -1,15 +1,18 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/network/api_exception.dart';
 import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/network/dio_client.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/services/base_api_service.dart';
 
 class RideService extends BaseApiService {
-  RideService(this._localStorage, super.dio);
+  RideService(this._localStorage, Dio dio, AuthTokenStore tokenStore)
+      : super(dio, tokenStore);
 
   final LocalStorageService _localStorage;
 
@@ -162,5 +165,6 @@ final rideServiceProvider = Provider<RideService>((ref) {
   return RideService(
     ref.watch(localStorageProvider),
     ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
   );
 });

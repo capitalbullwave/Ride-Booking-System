@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wavego_user/core/network/api_exception.dart';
 import 'package:wavego_user/core/utils/view_state.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
@@ -25,13 +24,14 @@ class AuthState {
     String? phone,
     String? countryCode,
     String? devOtpHint,
+    bool clearDevOtpHint = false,
   }) =>
       AuthState(
         otpState: otpState ?? this.otpState,
         loginState: loginState ?? this.loginState,
         phone: phone ?? this.phone,
         countryCode: countryCode ?? this.countryCode,
-        devOtpHint: devOtpHint ?? this.devOtpHint,
+        devOtpHint: clearDevOtpHint ? null : (devOtpHint ?? this.devOtpHint),
       );
 }
 
@@ -45,6 +45,7 @@ class AuthViewModel extends StateNotifier<AuthState> {
       otpState: const ViewStateLoading(),
       phone: phone,
       countryCode: countryCode,
+      clearDevOtpHint: true,
     );
     try {
       final result = await _repo.sendOtp(phone: phone, countryCode: countryCode);
@@ -53,7 +54,7 @@ class AuthViewModel extends StateNotifier<AuthState> {
         devOtpHint: result.devOtpHint,
       );
     } catch (e) {
-      state = state.copyWith(otpState: ViewStateError(_message(e)));
+      state = state.copyWith(otpState: ViewStateError(e.toString()));
     }
   }
 
@@ -64,14 +65,9 @@ class AuthViewModel extends StateNotifier<AuthState> {
       state = state.copyWith(loginState: ViewStateSuccess(response));
       return response;
     } catch (e) {
-      state = state.copyWith(loginState: ViewStateError(_message(e)));
+      state = state.copyWith(loginState: ViewStateError(e.toString()));
       return null;
     }
-  }
-
-  String _message(Object e) {
-    if (e is ApiException) return e.message;
-    return 'Something went wrong. Please try again.';
   }
 }
 

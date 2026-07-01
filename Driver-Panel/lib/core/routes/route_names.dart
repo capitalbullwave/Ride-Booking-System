@@ -19,6 +19,7 @@ class RouteNames {
   static const String notifications = '/notifications';
   static const String profile = '/profile';
   static const String editProfile = '/profile/edit';
+  static const String rideStatistics = '/profile/statistics';
   static const String documents = '/documents';
   static const String settings = '/settings';
   static const String support = '/support';

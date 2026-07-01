@@ -60,6 +60,7 @@ class BackendMappers {
       case 'REJECTED':
         return 'rejected';
       case 'UNDER_REVIEW':
+      case 'SUBMITTED':
         return 'pending';
       default:
         return 'pending';

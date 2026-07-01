@@ -33,3 +33,19 @@ class DirectionsResponse(BaseModel):
     duration_min: float
     path: list[LatLngPoint]
     source: str = Field(description="google or osrm")
+
+
+class ReverseGeocodeResponse(BaseModel):
+    address: str
+    latitude: float
+    longitude: float
+    source: str = Field(description="google or nominatim")
+
+
+class PlaceDetailsResponse(BaseModel):
+    id: str
+    name: str
+    address: str
+    latitude: float
+    longitude: float
+    source: str = Field(description="google or nominatim")

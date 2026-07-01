@@ -18,6 +18,8 @@ async def seed():
         existing = await db.execute(select(VehicleType))
         if not existing.scalars().first():
             types = [
+                VehicleType(name="Bike", slug="bike", description="Two-wheeler rides", base_fare=25, per_km_rate=8, per_minute_rate=1.5, capacity=1),
+                VehicleType(name="Auto", slug="auto", description="Three-wheeler auto rickshaw", base_fare=30, per_km_rate=10, per_minute_rate=1.5, capacity=3),
                 VehicleType(name="Economy", slug="economy", description="Affordable everyday rides", base_fare=40, per_km_rate=12, per_minute_rate=2, capacity=4),
                 VehicleType(name="Comfort", slug="comfort", description="Extra legroom and comfort", base_fare=60, per_km_rate=16, per_minute_rate=2.5, capacity=4),
                 VehicleType(name="Premium", slug="premium", description="Luxury vehicles", base_fare=100, per_km_rate=25, per_minute_rate=3, capacity=4),

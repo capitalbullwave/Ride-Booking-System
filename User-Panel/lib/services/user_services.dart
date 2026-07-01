@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/api_exception.dart';
@@ -75,7 +76,7 @@ class AuthService extends BaseApiService {
 
     try {
       final profile = await get<Map<String, dynamic>>(
-        '/auth/me',
+        ApiEndpoints.me,
         parser: (data) => data as Map<String, dynamic>,
       );
       return BackendMappers.loginWithProfile(tokens, profile);
@@ -89,6 +90,37 @@ class AuthService extends BaseApiService {
     try {
       await post(ApiEndpoints.logout);
     } catch (_) {}
+  }
+
+  Future<AuthTokens> refreshTokens(String refreshToken) async {
+    if (useMock) {
+      return AuthTokens(
+        accessToken: 'mock-refreshed-access',
+        refreshToken: refreshToken,
+      );
+    }
+
+    final data = await post<Map<String, dynamic>>(
+      ApiEndpoints.refreshToken,
+      data: {'refresh_token': refreshToken},
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+
+    return AuthTokens.fromJson(data);
+  }
+
+  Future<UserProfile> getMe() async {
+    if (useMock) {
+      return UserProfile.fromJson(
+        (await loadMockJson('login_response.json'))['user'] as Map<String, dynamic>,
+      );
+    }
+
+    final data = await get<Map<String, dynamic>>(
+      ApiEndpoints.me,
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+    return BackendMappers.userProfile(data);
   }
 }
 
@@ -125,20 +157,35 @@ class WalletService extends BaseApiService {
 class NotificationService extends BaseApiService {
   NotificationService(super.dio);
 
+  Future<List<AppNotification>> _loadMockNotifications() async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final list = await loadMockJsonList('notifications.json');
+    return list
+        .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<AppNotification>> getNotifications() async {
     if (useMock) {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      final list = await loadMockJsonList('notifications.json');
-      return list
-          .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
-          .toList();
+      return _loadMockNotifications();
     }
-    return get(
-      ApiEndpoints.notifications,
-      parser: (data) => (data as List<dynamic>)
-          .map((e) => AppNotification.fromJson(e as Map<String, dynamic>))
-          .toList(),
-    );
+
+    try {
+      return await get(
+        ApiEndpoints.notifications,
+        parser: (data) => (data as List<dynamic>)
+            .map((e) =>
+                BackendMappers.notificationFromBackend(e as Map<String, dynamic>))
+            .toList(),
+      );
+    } on ApiException catch (e) {
+      if (kDebugMode &&
+          (e is NetworkException ||
+              e.message.toLowerCase().contains('timeout'))) {
+        return _loadMockNotifications();
+      }
+      rethrow;
+    }
   }
 }
 
@@ -160,17 +207,8 @@ class ActivityService extends BaseApiService {
     }
     return get(
       ApiEndpoints.rides,
-      parser: (data) {
-        final map = data as Map<String, dynamic>;
-        return map.map(
-          (key, value) => MapEntry(
-            key,
-            (value as List<dynamic>)
-                .map((e) => ActivityItem.fromJson(e as Map<String, dynamic>))
-                .toList(),
-          ),
-        );
-      },
+      parser: (data) =>
+          BackendMappers.ridesListFromBackend(data as Map<String, dynamic>),
     );
   }
 }

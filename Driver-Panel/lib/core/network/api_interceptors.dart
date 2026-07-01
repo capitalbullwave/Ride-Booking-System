@@ -1,23 +1,77 @@
 import 'package:dio/dio.dart';
-import 'package:wavego_driver/core/constants/app_constants.dart';
+import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/api_exception.dart';
-import 'package:wavego_driver/core/storage/secure_storage_service.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 
 class AuthInterceptor extends Interceptor {
-  AuthInterceptor(this._storage);
+  AuthInterceptor(this._tokenStore);
 
-  final SecureStorageService _storage;
+  final AuthTokenStore _tokenStore;
 
   @override
   Future<void> onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await _storage.read(AppConstants.accessTokenKey);
+    final token = _tokenStore.accessToken ?? await _tokenStore.readAccessToken();
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
+  }
+}
+
+/// Retries failed requests once after refreshing the access token on 401.
+class TokenRefreshInterceptor extends Interceptor {
+  TokenRefreshInterceptor(this._tokenStore, this._dio);
+
+  final AuthTokenStore _tokenStore;
+  final Dio _dio;
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    if (err.response?.statusCode != 401) {
+      return handler.next(err);
+    }
+
+    final path = err.requestOptions.path;
+    if (path.contains(ApiEndpoints.refreshToken) ||
+        path.contains(ApiEndpoints.verifyOtp)) {
+      return handler.next(err);
+    }
+
+    try {
+      final refreshToken = await _tokenStore.readRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        return handler.next(err);
+      }
+
+      final response = await _dio.post<Map<String, dynamic>>(
+        ApiEndpoints.refreshToken,
+        data: {'refresh_token': refreshToken},
+        options: Options(headers: {'Authorization': null}),
+      );
+
+      final data = response.data;
+      final access = data?['access_token'] as String? ?? data?['data']?['access_token'] as String?;
+      final refresh = data?['refresh_token'] as String? ?? data?['data']?['refresh_token'] as String? ?? refreshToken;
+
+      if (access == null || access.isEmpty) {
+        return handler.next(err);
+      }
+
+      await _tokenStore.setTokens(accessToken: access, refreshToken: refresh);
+
+      final retryOptions = err.requestOptions;
+      retryOptions.headers['Authorization'] = 'Bearer $access';
+      final retryResponse = await _dio.fetch<dynamic>(retryOptions);
+      return handler.resolve(retryResponse);
+    } catch (_) {
+      return handler.next(err);
+    }
   }
 }
 
@@ -62,8 +116,27 @@ class ErrorInterceptor extends Interceptor {
     if (data is Map<String, dynamic>) {
       message = data['message'] as String? ??
           data['error'] as String? ??
-          data['detail'] as String? ??
+          (data['detail'] is String ? data['detail'] as String : null) ??
           message;
+
+      final details = data['details'];
+      if (details is List && details.isNotEmpty) {
+        final messages = <String>[];
+        for (final item in details) {
+          if (item is! Map<String, dynamic>) continue;
+          final field = item['field'] as String?;
+          final detailMessage = item['message'] as String?;
+          if (detailMessage == null || detailMessage.isEmpty) continue;
+          messages.add(
+            field != null && field.isNotEmpty
+                ? '$field: $detailMessage'
+                : detailMessage,
+          );
+        }
+        if (messages.isNotEmpty) {
+          message = messages.take(3).join('\n');
+        }
+      }
     } else if (data is String && data.isNotEmpty) {
       message = data.length > 120 ? 'Server error. Please try again.' : data;
     }

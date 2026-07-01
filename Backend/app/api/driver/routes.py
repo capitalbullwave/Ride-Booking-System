@@ -8,13 +8,22 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.driver.dependencies import get_current_driver
-from app.core.constants import DriverStatus, RideStatus
+from app.core.constants import DriverStatus, KYCStatus, RideStatus
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.database.session import get_db
 from app.models import Driver, DriverDocument, Ride, Vehicle
 from app.repositories.driver_repository import DriverRepository
 from app.repositories.ride_repository import RideRepository
-from app.schemas.driver import DriverDocumentCreate, DriverEarningsResponse, DriverLocationUpdate, DriverResponse, DriverUpdate
+from app.schemas.driver import (
+    DriverDocumentCreate,
+    DriverEarningsResponse,
+    DriverLocationUpdate,
+    DriverRegistrationComplete,
+    DriverResponse,
+    DriverUpdate,
+    DriverVehicleCreate,
+)
+from app.services.driver_registration_service import DriverRegistrationService
 from app.schemas.ride import RideOTPVerify, RideResponse
 from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import PaymentService
@@ -81,25 +90,48 @@ async def upload_license(
 
 @router.post("/upload-vehicle")
 async def upload_vehicle(
-    payload: dict,
+    data: DriverVehicleCreate,
     driver: Annotated[Driver, Depends(get_current_driver)],
     db: AsyncSession = Depends(get_db),
 ):
     vehicle = Vehicle(
         driver_id=driver.id,
-        vehicle_type_id=payload.get("vehicle_type_id"),
-        license_plate=payload.get("license_plate", ""),
-        model=payload.get("model", ""),
-        color=payload.get("color", ""),
-        year=payload.get("year"),
+        vehicle_type_id=data.vehicle_type_id,
+        license_plate=data.license_plate,
+        make=data.make or data.model,
+        model=data.model,
+        color=data.color,
+        year=data.year,
     )
     db.add(vehicle)
     await db.flush()
     return {"id": str(vehicle.id), "license_plate": vehicle.license_plate}
 
 
+@router.post("/complete-registration")
+async def complete_registration(
+    data: DriverRegistrationComplete,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationService(db).complete_registration(driver, data)
+
+
 @router.put("/go-online")
 async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
+    if driver.kyc_status != KYCStatus.APPROVED.value:
+        if driver.kyc_status == KYCStatus.REJECTED.value:
+            raise ForbiddenException(
+                "Your documents were rejected. Please update and resubmit before going online."
+            )
+        raise ForbiddenException(
+            "Account verification is pending. You can go online after admin approval."
+        )
+    if not driver.is_verified:
+        raise ForbiddenException(
+            "Phone verification is required before going online."
+        )
+
     driver.status = DriverStatus.ONLINE.value
     await DriverRepository(db).update(driver)
     return {"status": driver.status}

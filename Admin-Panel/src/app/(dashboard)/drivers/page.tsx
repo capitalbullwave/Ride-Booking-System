@@ -56,6 +56,7 @@ import {
 } from "@/lib/drivers-api";
 import { toast } from "sonner";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import { useAuth } from "@/components/providers/auth-provider";
 
 type DriverFormData = {
   name: string;
@@ -165,6 +166,7 @@ function buildDriverUpdatePayload(form: DriverFormData) {
 }
 
 export default function DriversPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [driverList, setDriverList] = useState<Driver[]>([]);
@@ -210,13 +212,24 @@ export default function DriversPage() {
   }, [search, statusFilter]);
 
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      setDriverList([]);
+      setIsLoading(false);
+      return;
+    }
+
     const timer = setTimeout(() => {
       void loadDrivers();
     }, 300);
     return () => clearTimeout(timer);
-  }, [loadDrivers]);
+  }, [loadDrivers, authLoading, isAuthenticated]);
 
-  useAutoRefresh(() => loadDrivers({ silent: true }));
+  useAutoRefresh(() => {
+    if (!isAuthenticated) return;
+    void loadDrivers({ silent: true });
+  });
 
   const filteredDrivers = useMemo(() => driverList, [driverList]);
 
@@ -225,7 +238,7 @@ export default function DriversPage() {
     if (search) query.set("search", search);
     if (statusFilter !== "all") query.set("status", statusFilter);
     const qs = query.toString();
-    return `/api/v1/drivers/export${qs ? `?${qs}` : ""}`;
+    return `/api/v1/admin/drivers/export${qs ? `?${qs}` : ""}`;
   }, [search, statusFilter]);
 
   const openEdit = (driver: Driver) => {
@@ -336,6 +349,7 @@ export default function DriversPage() {
       sortable: true,
     },
     { key: "phone", header: "Phone", cell: (d) => d.phone },
+    { key: "city", header: "City", cell: (d) => d.city || "—" },
     { key: "vehicleType", header: "Vehicle", cell: (d) => capitalize(d.vehicleType) },
     { key: "vehicleNumber", header: "Vehicle No.", cell: (d) => <span className="font-mono text-xs">{d.vehicleNumber}</span> },
     { key: "rating", header: "Rating", cell: (d) => <span className="font-medium">⭐ {d.rating}</span>, sortable: true },

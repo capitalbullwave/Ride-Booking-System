@@ -1,9 +1,9 @@
 """Driver ORM models."""
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,14 @@ class Driver(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     profile_photo: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     license_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
+    date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    gender: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    referral_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    address_line: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    pin_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     kyc_status: Mapped[str] = mapped_column(String(20), default=KYCStatus.PENDING.value, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default=DriverStatus.OFFLINE.value, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -110,6 +118,7 @@ class DriverBankAccount(UUIDMixin, TimestampMixin, Base):
     account_number_masked: Mapped[str] = mapped_column(String(30), nullable=False)
     ifsc_code: Mapped[str] = mapped_column(String(20), nullable=False)
     bank_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    upi_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

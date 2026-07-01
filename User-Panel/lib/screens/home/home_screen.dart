@@ -5,8 +5,11 @@ import 'package:wavego_user/core/constants/services.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
+import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
+import 'package:wavego_user/services/places_service.dart';
 import 'package:wavego_user/widgets/home/location_card.dart';
 import 'package:wavego_user/widgets/home/service_tile.dart';
 
@@ -18,19 +21,48 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  String _pickup = '';
-  String _dropoff = '';
+  bool _resolvingPickup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillPickupIfNeeded());
+  }
+
+  Future<void> _prefillPickupIfNeeded() async {
+    final trip = ref.read(tripBookingProvider);
+    if (trip.pickup != null) return;
+
+    setState(() => _resolvingPickup = true);
+
+    final position = await ref.read(locationServiceProvider).tryGetCurrentPosition();
+    if (position == null || !mounted) {
+      setState(() => _resolvingPickup = false);
+      return;
+    }
+
+    final place = await ref.read(placesServiceProvider).reverseGeocode(
+          position.latitude,
+          position.longitude,
+        );
+
+    if (mounted) {
+      ref.read(tripBookingProvider.notifier).setPickup(place);
+      setState(() => _resolvingPickup = false);
+    }
+  }
 
   void _swapLocations() {
-    setState(() {
-      final temp = _pickup;
-      _pickup = _dropoff;
-      _dropoff = temp;
-    });
+    ref.read(tripBookingProvider.notifier).swapLocations();
   }
 
   @override
   Widget build(BuildContext context) {
+    final trip = ref.watch(tripBookingProvider);
+    final pickup = _resolvingPickup
+        ? 'Getting your location...'
+        : (trip.pickup?.label ?? '');
+    final dropoff = trip.dropoff?.label ?? '';
     final dashboardAsync = ref.watch(homeDashboardProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
@@ -72,14 +104,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: LocationCard(
-                        pickup: _pickup,
-                        dropoff: _dropoff,
+                        pickup: pickup,
+                        dropoff: dropoff,
                         onSwap: _swapLocations,
                         onPickupTap: () => _openLocation(context, isPickup: true),
                         onDropoffTap: () => _openLocation(context, isPickup: false),
                         onFindRide: () {
-                          if (_pickup.isEmpty || _dropoff.isEmpty) {
-                            _openLocation(context, isPickup: _pickup.isEmpty);
+                          if (trip.pickup == null || trip.dropoff == null) {
+                            _openLocation(context, isPickup: trip.pickup == null);
                             return;
                           }
                           context.push(RouteNames.book);
@@ -168,18 +200,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _openLocation(BuildContext context, {required bool isPickup}) async {
-    final result = await context.push<String>(
+    final result = await context.push<SelectedPlace>(
       RouteNames.location,
       extra: isPickup ? 'pickup' : 'dropoff',
     );
     if (result == null || !mounted) return;
-    setState(() {
-      if (isPickup) {
-        _pickup = result;
-      } else {
-        _dropoff = result;
-      }
-    });
+
+    final notifier = ref.read(tripBookingProvider.notifier);
+    if (isPickup) {
+      notifier.setPickup(result);
+    } else {
+      notifier.setDropoff(result);
+    }
   }
 }
 

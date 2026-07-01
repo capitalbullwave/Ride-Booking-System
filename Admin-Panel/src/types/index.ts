@@ -37,6 +37,11 @@ export interface Driver {
   email: string;
   vehicleType: VehicleType;
   vehicleNumber: string;
+  vehicleBrand?: string;
+  vehicleModel?: string;
+  vehicleColor?: string;
+  vehicleYear?: number | null;
+  vehicleStatus?: string;
   rating: number;
   totalTrips: number;
   earnings: number;
@@ -44,7 +49,25 @@ export interface Driver {
   status: DriverStatus;
   avatar?: string;
   city: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  address?: string;
+  licenseNumber?: string;
+  dateOfBirth?: string | null;
+  gender?: string;
+  kycStatus?: string;
+  isVerified?: boolean;
+  referralCode?: string;
   joinedDate: string;
+  bankDetails?: {
+    accountHolder: string;
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+    upiId?: string;
+    isVerified?: boolean;
+  };
 }
 
 export interface DriverDocument {

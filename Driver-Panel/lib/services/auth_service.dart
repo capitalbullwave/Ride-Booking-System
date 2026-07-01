@@ -1,15 +1,21 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/api_exception.dart';
 import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/network/dio_client.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/core/utils/phone_utils.dart';
 import 'package:wavego_driver/models/api_response.dart';
 import 'package:wavego_driver/models/otp_send_result.dart';
 import 'package:wavego_driver/services/base_api_service.dart';
 
 class AuthService extends BaseApiService {
-  AuthService(super.dio);
+  AuthService(AuthTokenStore tokenStore, Dio dio)
+      : _tokenStore = tokenStore,
+        super(dio, tokenStore);
+
+  final AuthTokenStore _tokenStore;
 
   Future<OtpSendResult> sendOtp({
     required String phone,
@@ -51,9 +57,14 @@ class AuthService extends BaseApiService {
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 1000));
-      return LoginResponse.fromJson(
+      final mockResponse = LoginResponse.fromJson(
         await loadMockJson('login_response.json'),
       );
+      await _tokenStore.setTokens(
+        accessToken: mockResponse.tokens.accessToken,
+        refreshToken: mockResponse.tokens.refreshToken,
+      );
+      return mockResponse;
     }
 
     if (otp.trim().length < 4) {
@@ -71,6 +82,20 @@ class AuthService extends BaseApiService {
         'purpose': 'login',
       },
       parser: (data) => data as Map<String, dynamic>,
+    );
+
+    final accessToken = tokens['access_token'] as String?;
+    final refreshToken = tokens['refresh_token'] as String?;
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      throw const UnauthorizedException('Login failed. Please try again.');
+    }
+
+    await _tokenStore.setTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
     );
 
     try {
@@ -95,5 +120,8 @@ class AuthService extends BaseApiService {
 }
 
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService(ref.watch(dioClientProvider).dio);
+  return AuthService(
+    ref.watch(authTokenStoreProvider),
+    ref.watch(dioClientProvider).dio,
+  );
 });

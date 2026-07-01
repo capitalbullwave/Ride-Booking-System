@@ -55,7 +55,7 @@ class ProfileScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
                 child: InkWell(
-                  onTap: () => context.push(RouteNames.profileEdit),
+                  onTap: () => context.push(RouteNames.profileSettings),
                   borderRadius: BorderRadius.circular(24),
                   child: Container(
                     padding: const EdgeInsets.all(20),

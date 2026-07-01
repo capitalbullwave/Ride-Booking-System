@@ -42,6 +42,12 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
 
     final state = ref.read(authViewModelProvider);
     if (state.otpState is ViewStateSuccess && mounted) {
+      final devOtp = state.devOtpHint;
+      if (devOtp != null && devOtp.isNotEmpty) {
+        context.showSnackBar(
+          'Dev OTP: $devOtp — SMS is not configured on the server.',
+        );
+      }
       context.push(RouteNames.otpVerification);
     } else if (state.otpState is ViewStateError && mounted) {
       context.showSnackBar(

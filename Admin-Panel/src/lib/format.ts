@@ -34,3 +34,12 @@ export function formatDateTime(date: string): string {
 export function capitalize(str: string): string {
   return str.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+export function formatShortId(
+  id: string,
+  prefixLength = 8,
+  suffixLength = 4,
+): string {
+  if (id.length <= prefixLength + suffixLength + 1) return id;
+  return `${id.slice(0, prefixLength)}…${id.slice(-suffixLength)}`;
+}

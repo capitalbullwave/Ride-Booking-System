@@ -5,6 +5,8 @@ class AppConstants {
   static const String accessTokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String driverProfileKey = 'driver_profile';
+  static const String driverPhoneKey = 'driver_phone';
+  static const String driverRegisteredKey = 'driver_registered';
   static const String driverStatusKey = 'driver_status';
   static const String isOnlineKey = 'is_online';
   static const String vehicleIdKey = 'vehicle_id';
@@ -20,6 +22,45 @@ class AppConstants {
   ];
 
   static const List<String> genders = ['Male', 'Female', 'Other'];
+
+  static const List<String> fuelTypes = [
+    'Petrol',
+    'Diesel',
+    'CNG',
+    'Electric',
+    'Hybrid',
+  ];
+
+  static const List<String> transmissionTypes = [
+    'Manual',
+    'Automatic',
+  ];
+
+  static const List<String> languages = [
+    'English',
+    'Hindi',
+    'Tamil',
+    'Telugu',
+    'Kannada',
+    'Malayalam',
+    'Marathi',
+    'Bengali',
+    'Gujarati',
+    'Punjabi',
+  ];
+
+  static const List<String> relationships = [
+    'Spouse',
+    'Parent',
+    'Sibling',
+    'Friend',
+    'Other',
+  ];
+
+  static const List<String> navigationApps = [
+    'Google Maps',
+    'MapMyIndia',
+  ];
 
   static const List<String> documentTypes = [
     'Driving License',

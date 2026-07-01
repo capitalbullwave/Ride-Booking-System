@@ -2,10 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/config/app_config.dart';
 import 'package:wavego_driver/core/network/api_interceptors.dart';
-import 'package:wavego_driver/core/storage/secure_storage_service.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 
 class DioClient {
-  DioClient(this._storage) {
+  DioClient(this._tokenStore) {
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,
@@ -19,18 +19,20 @@ class DioClient {
     );
 
     _dio.interceptors.addAll([
-      AuthInterceptor(_storage),
+      AuthInterceptor(_tokenStore),
+      TokenRefreshInterceptor(_tokenStore, _dio),
       ErrorInterceptor(),
       LoggingInterceptor(),
     ]);
   }
 
   late final Dio _dio;
-  final SecureStorageService _storage;
+  final AuthTokenStore _tokenStore;
 
   Dio get dio => _dio;
 }
 
 final dioClientProvider = Provider<DioClient>((ref) {
-  return DioClient(ref.watch(secureStorageProvider));
+  ref.keepAlive();
+  return DioClient(ref.watch(authTokenStoreProvider));
 });

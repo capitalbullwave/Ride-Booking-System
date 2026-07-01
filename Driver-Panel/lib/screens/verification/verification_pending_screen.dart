@@ -77,15 +77,15 @@ class VerificationPendingScreen extends ConsumerWidget {
               ),
               const Spacer(),
               AppButton(
+                label: 'Back to Home',
+                onPressed: () => context.go(RouteNames.dashboard),
+              ),
+              const SizedBox(height: 12),
+              AppButton(
                 label: 'Contact Support',
                 variant: AppButtonVariant.outline,
                 icon: Icons.support_agent,
                 onPressed: () => context.push(RouteNames.support),
-              ),
-              const SizedBox(height: 12),
-              AppButton(
-                label: 'Go to Dashboard',
-                onPressed: () => context.go(RouteNames.dashboard),
               ),
               const SizedBox(height: 24),
             ],

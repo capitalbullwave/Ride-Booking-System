@@ -3,8 +3,8 @@ export const AUTH_PASSWORD_KEY = "wavego_admin_password";
 export const AUTH_COOKIE_NAME = "wavego_authenticated";
 
 export const DEMO_CREDENTIALS = {
-  email: "admin@wavego.com",
-  password: "admin123",
+  email: "admin@ridebook.com",
+  password: "Admin@123456",
 } as const;
 
 export const DEFAULT_ADMIN_PHONE = "+91 98765 00000";
@@ -31,6 +31,11 @@ export function createSession(user: AuthUser): AuthSession {
   };
 }
 
+function normalizeExpiresAt(expiresAt: number): number {
+  // Support legacy sessions that stored Unix seconds instead of milliseconds.
+  return expiresAt > 1_000_000_000_000 ? expiresAt : expiresAt * 1000;
+}
+
 export function getStoredSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
 
@@ -40,9 +45,14 @@ export function getStoredSession(): AuthSession | null {
     if (!raw) return null;
 
     const session = JSON.parse(raw) as AuthSession;
-    if (session.expiresAt < Date.now()) {
+    const expiresAt = normalizeExpiresAt(session.expiresAt);
+    if (expiresAt < Date.now()) {
       clearSession();
       return null;
+    }
+
+    if (session.expiresAt !== expiresAt) {
+      session.expiresAt = expiresAt;
     }
 
     let shouldPersist = false;

@@ -59,15 +59,19 @@ flutter run -d macos
 
 ## Mock API Mode
 
-By default `ENABLE_MOCK_API=true` uses JSON fixtures in `assets/mock/`.
+**Debug builds** (`flutter run`) use mock data by default — no backend required. JSON fixtures live in `assets/mock/`.
+
+- **OTP in mock mode:** any 6 digits work (except `000000`); dev hint is `123456`
+
+To hit a real API:
 
 ```bash
-flutter run --dart-define=ENABLE_MOCK_API=false --dart-define=API_BASE_URL=https://your-api.com/api/v1
+flutter run --dart-define=ENABLE_MOCK_API=false --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1
 ```
 
-## Test Credentials
+Start the backend first (`cd Backend && uvicorn app.main:app --reload`).
 
-- **OTP:** any 6 digits work in mock mode (except `000000`)
+> After changing mock/API settings, stop the app and run `flutter run` again (hot reload is not enough).
 
 ## WaveGo Design System
 

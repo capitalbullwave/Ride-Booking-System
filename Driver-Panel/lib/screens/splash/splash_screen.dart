@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/config/app_config.dart';
+import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -46,7 +48,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     } else if (!isLoggedIn) {
       context.go(RouteNames.phoneLogin);
     } else {
-      context.go(RouteNames.dashboard);
+      final localStorage = ref.read(localStorageProvider);
+      final isRegistered =
+          localStorage.getBool(AppConstants.driverRegisteredKey) ?? false;
+
+      context.go(
+        isRegistered ? RouteNames.dashboard : RouteNames.registration,
+      );
     }
   }
 

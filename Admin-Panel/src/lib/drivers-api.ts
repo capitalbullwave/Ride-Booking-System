@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveMediaUrl } from "@/lib/api";
 import { Driver, DriverStatus, VehicleType } from "@/types";
 
 export interface PaginatedDriversResponse {
@@ -59,6 +59,7 @@ function normalizeDriver(
     earnings: Number(driver.earnings),
     walletBalance: Number(driver.walletBalance),
     rating: Number(driver.rating),
+    avatar: resolveMediaUrl(driver.avatar) ?? driver.avatar,
   };
 }
 
@@ -76,12 +77,14 @@ export async function fetchDrivers(params?: {
 
   const qs = query.toString();
   const response = await apiFetch<PaginatedDriversResponse>(
-    `/api/v1/drivers${qs ? `?${qs}` : ""}`,
+    `/api/v1/admin/drivers${qs ? `?${qs}` : ""}`,
   );
+
+  const items = Array.isArray(response.items) ? response.items : [];
 
   return {
     ...response,
-    items: response.items.map(normalizeDriver),
+    items: items.map(normalizeDriver),
   };
 }
 
@@ -92,7 +95,7 @@ export async function fetchDriver(driverId: string): Promise<Driver> {
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}`);
+  >(`/api/v1/admin/drivers/${driverId}`);
   return normalizeDriver(driver);
 }
 
@@ -106,7 +109,7 @@ export async function updateDriver(
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}`, {
+  >(`/api/v1/admin/drivers/${driverId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -120,7 +123,7 @@ export async function approveDriver(driverId: string): Promise<Driver> {
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}/approve`, { method: "POST" });
+  >(`/api/v1/admin/drivers/${driverId}/approve`, { method: "POST" });
   return normalizeDriver(driver);
 }
 
@@ -131,7 +134,7 @@ export async function rejectDriver(driverId: string): Promise<Driver> {
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}/reject`, { method: "POST" });
+  >(`/api/v1/admin/drivers/${driverId}/reject`, { method: "POST" });
   return normalizeDriver(driver);
 }
 
@@ -142,7 +145,7 @@ export async function suspendDriver(driverId: string): Promise<Driver> {
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}/suspend`, { method: "POST" });
+  >(`/api/v1/admin/drivers/${driverId}/suspend`, { method: "POST" });
   return normalizeDriver(driver);
 }
 
@@ -153,7 +156,7 @@ export async function reactivateDriver(driverId: string): Promise<Driver> {
       walletBalance?: number | string;
       rating?: number | string;
     }
-  >(`/api/v1/drivers/${driverId}/reactivate`, { method: "POST" });
+  >(`/api/v1/admin/drivers/${driverId}/reactivate`, { method: "POST" });
   return normalizeDriver(driver);
 }
 
@@ -167,7 +170,7 @@ export async function setDriverStatus(
 export async function fetchDriverRides(driverId: string): Promise<DriverRide[]> {
   const rides = await apiFetch<
     (DriverRide & { fare?: number | string; distance?: number | string })[]
-  >(`/api/v1/drivers/${driverId}/rides`);
+  >(`/api/v1/admin/drivers/${driverId}/rides`);
   return rides.map((ride) => ({
     ...ride,
     fare: Number(ride.fare),
@@ -179,7 +182,10 @@ export async function fetchDriverDocuments(
   driverId: string,
 ): Promise<DriverDocument[]> {
   const response = await apiFetch<{ documents: DriverDocument[] }>(
-    `/api/v1/drivers/${driverId}/documents`,
+    `/api/v1/admin/drivers/${driverId}/documents`,
   );
-  return response.documents;
+  return response.documents.map((doc) => ({
+    ...doc,
+    url: resolveMediaUrl(doc.url) ?? undefined,
+  }));
 }

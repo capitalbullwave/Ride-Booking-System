@@ -71,6 +71,20 @@ class Validators {
     if (value == null || value.trim().isEmpty) {
       return 'Vehicle number is required';
     }
+    final plate = value.trim().toUpperCase();
+    if (plate.length > 20) {
+      return 'Vehicle number must be at most 20 characters (e.g. DL-08-AB-1234)';
+    }
+    return null;
+  }
+
+  static String? maxLength(String? value, int max, String field) {
+    if (value == null || value.trim().isEmpty) {
+      return '$field is required';
+    }
+    if (value.trim().length > max) {
+      return '$field must be at most $max characters';
+    }
     return null;
   }
 

@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     aws_s3_bucket: str = "ridebooking-uploads"
     aws_region: str = "us-east-1"
+    upload_dir: str = "uploads"
 
     # Firebase
     firebase_credentials_path: str = "./firebase-credentials.json"

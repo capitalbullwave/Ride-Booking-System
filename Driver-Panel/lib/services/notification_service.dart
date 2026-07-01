@@ -1,12 +1,14 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/dio_client.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/models/notification_model.dart';
 import 'package:wavego_driver/models/registration_model.dart';
 import 'package:wavego_driver/services/base_api_service.dart';
 
 class NotificationService extends BaseApiService {
-  NotificationService(super.dio);
+  NotificationService(Dio dio, AuthTokenStore tokenStore) : super(dio, tokenStore);
 
   Future<List<AppNotification>> getNotifications() async {
     if (useMock) {
@@ -36,7 +38,7 @@ class NotificationService extends BaseApiService {
 }
 
 class DocumentService extends BaseApiService {
-  DocumentService(super.dio);
+  DocumentService(Dio dio, AuthTokenStore tokenStore) : super(dio, tokenStore);
 
   Future<List<DocumentInfo>> getDocuments() async {
     if (useMock) {
@@ -61,7 +63,7 @@ class DocumentService extends BaseApiService {
 }
 
 class SupportService extends BaseApiService {
-  SupportService(super.dio);
+  SupportService(Dio dio, AuthTokenStore tokenStore) : super(dio, tokenStore);
 
   Future<List<FaqItem>> getFaq() async {
     if (useMock) {
@@ -144,13 +146,22 @@ class SupportService extends BaseApiService {
 }
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
-  return NotificationService(ref.watch(dioClientProvider).dio);
+  return NotificationService(
+    ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
+  );
 });
 
 final documentServiceProvider = Provider<DocumentService>((ref) {
-  return DocumentService(ref.watch(dioClientProvider).dio);
+  return DocumentService(
+    ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
+  );
 });
 
 final supportServiceProvider = Provider<SupportService>((ref) {
-  return SupportService(ref.watch(dioClientProvider).dio);
+  return SupportService(
+    ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
+  );
 });

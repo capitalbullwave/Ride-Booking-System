@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,7 +24,7 @@ class AdminUser(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         UUID(as_uuid=True), ForeignKey("admin_roles.id"), nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     role: Mapped["AdminRole"] = relationship("AdminRole", back_populates="admin_users")
     logs: Mapped[List["AdminLog"]] = relationship("AdminLog", back_populates="admin_user")

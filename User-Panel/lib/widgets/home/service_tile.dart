@@ -36,24 +36,23 @@ class ServiceTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 80,
+                height: 80,
                 decoration: BoxDecoration(
                   color: isEmergency
-                      ? AppColors.error.withValues(alpha: 0.08)
-                      : AppColors.secondary.withValues(alpha: 0.22),
+                      ? AppColors.error.withValues(alpha: 0.1)
+                      : AppColors.secondary.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
                   child: Image.asset(
                     service.imageAsset,
-                    fit: BoxFit.contain,
+                    fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Icon(
                       isEmergency ? Icons.medical_services : Icons.directions_car,
                       color: isEmergency ? AppColors.error : AppColors.primary,
-                      size: 32,
+                      size: 36,
                     ),
                   ),
                 ),

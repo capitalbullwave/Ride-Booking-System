@@ -39,12 +39,14 @@ export async function fetchUsers(params?: {
 
   const qs = query.toString();
   const response = await apiFetch<PaginatedUsersResponse>(
-    `/api/v1/users${qs ? `?${qs}` : ""}`,
+    `/api/v1/admin/users${qs ? `?${qs}` : ""}`,
   );
+
+  const items = Array.isArray(response.items) ? response.items : [];
 
   return {
     ...response,
-    items: response.items.map(normalizeUser),
+    items: items.map(normalizeUser),
   };
 }
 
@@ -53,7 +55,7 @@ export async function updateUser(
   data: UserUpdatePayload,
 ): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}`,
+    `/api/v1/admin/users/${userId}`,
     {
       method: "PATCH",
       body: JSON.stringify(data),
@@ -64,7 +66,7 @@ export async function updateUser(
 
 export async function suspendUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}/suspend`,
+    `/api/v1/admin/users/${userId}/suspend`,
     { method: "POST" },
   );
   return normalizeUser(user);
@@ -72,7 +74,7 @@ export async function suspendUser(userId: string): Promise<User> {
 
 export async function blockUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}/block`,
+    `/api/v1/admin/users/${userId}/block`,
     { method: "POST" },
   );
   return normalizeUser(user);
@@ -80,7 +82,7 @@ export async function blockUser(userId: string): Promise<User> {
 
 export async function activateUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}/activate`,
+    `/api/v1/admin/users/${userId}/activate`,
     { method: "POST" },
   );
   return normalizeUser(user);
@@ -88,14 +90,14 @@ export async function activateUser(userId: string): Promise<User> {
 
 export async function fetchUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}`,
+    `/api/v1/admin/users/${userId}`,
   );
   return normalizeUser(user);
 }
 
 export async function resetUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
-    `/api/v1/users/${userId}/reset`,
+    `/api/v1/admin/users/${userId}/reset`,
     { method: "POST" },
   );
   return normalizeUser(user);
@@ -154,7 +156,7 @@ export interface UserActivityLog {
 export async function fetchUserRides(userId: string): Promise<UserRide[]> {
   const rides = await apiFetch<
     (UserRide & { fare?: number | string; distance?: number | string })[]
-  >(`/api/v1/users/${userId}/rides`);
+  >(`/api/v1/admin/users/${userId}/rides`);
   return rides.map((ride) => ({
     ...ride,
     fare: Number(ride.fare),
@@ -166,7 +168,7 @@ export async function fetchUserWallet(userId: string): Promise<UserWallet> {
   const wallet = await apiFetch<{
     balance: number | string;
     transactions: (WalletTransaction & { amount?: number | string })[];
-  }>(`/api/v1/users/${userId}/wallet`);
+  }>(`/api/v1/admin/users/${userId}/wallet`);
   return {
     balance: Number(wallet.balance),
     transactions: wallet.transactions.map((tx) => ({
@@ -179,11 +181,11 @@ export async function fetchUserWallet(userId: string): Promise<UserWallet> {
 export async function fetchUserSupportTickets(
   userId: string,
 ): Promise<UserSupportTicket[]> {
-  return apiFetch<UserSupportTicket[]>(`/api/v1/users/${userId}/support-tickets`);
+  return apiFetch<UserSupportTicket[]>(`/api/v1/admin/users/${userId}/support-tickets`);
 }
 
 export async function fetchUserActivityLogs(
   userId: string,
 ): Promise<UserActivityLog[]> {
-  return apiFetch<UserActivityLog[]>(`/api/v1/users/${userId}/activity-logs`);
+  return apiFetch<UserActivityLog[]>(`/api/v1/admin/users/${userId}/activity-logs`);
 }

@@ -95,7 +95,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authViewModelProvider);
     final padding = Responsive.pagePadding(context);
-    final devHint = authState.devOtpHint;
+    final devOtpHint = authState.devOtpHint;
 
     return Scaffold(
       appBar: AppBar(),
@@ -168,16 +168,33 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       ),
               ),
               const Spacer(),
-              if (devHint != null && devHint.isNotEmpty)
+              if (devOtpHint != null && devOtpHint.isNotEmpty)
+                Center(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                    ),
+                    child: Text(
+                      'Development OTP: $devOtpHint',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                )
+              else if (AppConfig.enableMockApi)
                 Center(
                   child: Text(
-                    AppConfig.enableMockApi
-                        ? 'Mock OTP: $devHint'
-                        : 'Dev OTP (SMS not configured): $devHint',
+                    'Mock mode OTP: ${AppConfig.mockOtp}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textLight,
                         ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
             ],

@@ -440,6 +440,7 @@ export default function DriverDetailPage({
           <TabsTrigger value="personal">Personal Info</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="vehicle">Vehicle</TabsTrigger>
+          <TabsTrigger value="bank">Bank Details</TabsTrigger>
           <TabsTrigger value="rides">Ride History</TabsTrigger>
         </TabsList>
 
@@ -456,9 +457,18 @@ export default function DriverDetailPage({
                 ["Full Name", driver.name],
                 ["Email", driver.email],
                 ["Phone", driver.phone],
-                ["City", driver.city],
+                ["Date of Birth", driver.dateOfBirth ? formatDate(driver.dateOfBirth) : "—"],
+                ["Gender", driver.gender ? capitalize(driver.gender) : "—"],
+                ["License Number", driver.licenseNumber || "—"],
+                ["Address", driver.address || "—"],
+                ["City", driver.city || "—"],
+                ["State", driver.state || "—"],
+                ["PIN Code", driver.pinCode || "—"],
+                ["Country", driver.country || "—"],
+                ["KYC Status", driver.kycStatus ? capitalize(driver.kycStatus) : "—"],
+                ["Referral Code", driver.referralCode || "—"],
                 ["Joined Date", formatDate(driver.joinedDate)],
-                ["Status", capitalize(driver.status)],
+                ["Account Status", capitalize(driver.status)],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border p-4">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -493,6 +503,24 @@ export default function DriverDetailPage({
                         </div>
                         <StatusBadge status={doc.status} />
                       </div>
+                      {doc.url ? (
+                        <a
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-3 inline-block text-xs font-medium text-primary hover:underline"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            window.open(doc.url, "_blank", "noopener,noreferrer");
+                          }}
+                        >
+                          View document
+                        </a>
+                      ) : (
+                        <p className="mt-3 text-xs text-muted-foreground">
+                          Document file unavailable
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -507,15 +535,46 @@ export default function DriverDetailPage({
             <CardContent className="grid gap-4 sm:grid-cols-2">
               {[
                 ["Vehicle Type", capitalize(driver.vehicleType)],
-                ["Vehicle Number", driver.vehicleNumber],
-                ["City", driver.city],
-                ["Status", capitalize(driver.status)],
+                ["Registration Number", driver.vehicleNumber || "—"],
+                ["Brand", driver.vehicleBrand || "—"],
+                ["Model", driver.vehicleModel || "—"],
+                ["Color", driver.vehicleColor || "—"],
+                ["Year", driver.vehicleYear ? String(driver.vehicleYear) : "—"],
+                ["Vehicle Status", driver.vehicleStatus ? capitalize(driver.vehicleStatus) : "—"],
+                ["City", driver.city || "—"],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border p-4">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <p className="mt-1 font-medium">{value}</p>
                 </div>
               ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="bank" className="mt-6">
+          <Card>
+            <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              {driver.bankDetails ? (
+                [
+                  ["Account Holder", driver.bankDetails.accountHolder],
+                  ["Bank Name", driver.bankDetails.bankName],
+                  ["Account Number", driver.bankDetails.accountNumber],
+                  ["IFSC Code", driver.bankDetails.ifsc],
+                  ["UPI ID", driver.bankDetails.upiId || "—"],
+                  ["Verified", driver.bankDetails.isVerified ? "Yes" : "No"],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border p-4">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 font-medium">{value}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground sm:col-span-2">
+                  No bank details submitted yet.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

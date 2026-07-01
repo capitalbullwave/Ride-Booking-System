@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/app_constants.dart';
+import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/models/api_response.dart';
 import 'package:wavego_driver/models/registration_model.dart';
@@ -31,7 +33,15 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
     try {
       final stats = await _profileRepo.getDashboardStats();
       final profile = await _profileRepo.getProfile();
-      final isOnline = profile.isOnline;
+      var isOnline = profile.isOnline;
+
+      if (isOnline && !BackendMappers.isDriverVerified(profile)) {
+        isOnline = false;
+        try {
+          await _profileRepo.setOnlineStatus(false);
+        } catch (_) {}
+      }
+
       await _localStorage.setBool(AppConstants.isOnlineKey, isOnline);
       state = state.copyWith(
         statsState: ViewStateSuccess(stats),
@@ -48,7 +58,16 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
     }
   }
 
-  Future<void> toggleOnline(bool value) async {
+  Future<String?> toggleOnline(bool value) async {
+    final profile = state.profile;
+    if (value &&
+        profile != null &&
+        !BackendMappers.isDriverVerified(profile)) {
+      return profile.verificationStatus == 'rejected'
+          ? 'Your documents were rejected. Please update and resubmit.'
+          : 'Account verification is pending. You can go online after admin approval.';
+    }
+
     state = state.copyWith(isOnline: value, isTogglingOnline: true);
     try {
       await _profileRepo.setOnlineStatus(value);
@@ -59,8 +78,10 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
         _stopLocationSync();
       }
       state = state.copyWith(isTogglingOnline: false);
+      return null;
     } catch (e) {
       state = state.copyWith(isOnline: !value, isTogglingOnline: false);
+      return e.userMessage;
     }
   }
 
@@ -117,6 +138,9 @@ class DashboardState {
       isTogglingOnline: isTogglingOnline ?? this.isTogglingOnline,
     );
   }
+
+  bool get canGoOnline =>
+      profile != null && BackendMappers.isDriverVerified(profile!);
 }
 
 final dashboardViewModelProvider =

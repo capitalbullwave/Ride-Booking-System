@@ -11,6 +11,7 @@ import 'package:wavego_driver/screens/notifications/notifications_screen.dart';
 import 'package:wavego_driver/screens/onboarding/onboarding_screen.dart';
 import 'package:wavego_driver/screens/profile/edit_profile_screen.dart';
 import 'package:wavego_driver/screens/profile/profile_screen.dart';
+import 'package:wavego_driver/screens/profile/ride_statistics_screen.dart';
 import 'package:wavego_driver/screens/registration/registration_screen.dart';
 import 'package:wavego_driver/screens/ride/active_trip_screen.dart';
 import 'package:wavego_driver/screens/ride/payment_screen.dart';
@@ -112,6 +113,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.editProfile,
         builder: (_, __) => const EditProfileScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.rideStatistics,
+        builder: (_, __) => const RideStatisticsScreen(),
       ),
       GoRoute(
         path: RouteNames.documents,

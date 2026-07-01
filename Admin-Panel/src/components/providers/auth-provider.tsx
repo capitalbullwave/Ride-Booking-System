@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const currentUser = await apiFetch<AuthUser>("/api/v1/auth/me", {
+        const currentUser = await apiFetch<AuthUser>("/api/v1/admin/me", {
           headers: {
             Authorization: `Bearer ${session.token}`,
           },
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: AuthUser;
         accessToken: string;
         expiresAt: number;
-      }>("/api/v1/auth/login", {
+      }>("/api/v1/admin/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
       });
@@ -90,10 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const session: AuthSession = {
         user: data.user,
         token: data.accessToken,
-        expiresAt: data.expiresAt * 1000,
+        expiresAt:
+          data.expiresAt > 1_000_000_000_000
+            ? data.expiresAt
+            : data.expiresAt * 1000,
       };
 
       storeSession(session, remember);
+      storePassword(password);
       setAuthCookie(remember);
       setUser(data.user);
       return { success: true };
@@ -106,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     const session = getStoredSession();
     if (session?.token) {
-      void apiFetch("/api/v1/auth/logout", {
+      void apiFetch("/api/v1/admin/logout", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.token}`,

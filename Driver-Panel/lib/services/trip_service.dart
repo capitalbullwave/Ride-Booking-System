@@ -1,12 +1,14 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/network/dio_client.dart';
+import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/models/trip_model.dart';
 import 'package:wavego_driver/services/base_api_service.dart';
 
 class TripService extends BaseApiService {
-  TripService(super.dio);
+  TripService(Dio dio, AuthTokenStore tokenStore) : super(dio, tokenStore);
 
   Future<List<Trip>> getTrips({
     int page = 1,
@@ -85,5 +87,8 @@ class TripService extends BaseApiService {
 }
 
 final tripServiceProvider = Provider<TripService>((ref) {
-  return TripService(ref.watch(dioClientProvider).dio);
+  return TripService(
+    ref.watch(dioClientProvider).dio,
+    ref.watch(authTokenStoreProvider),
+  );
 });

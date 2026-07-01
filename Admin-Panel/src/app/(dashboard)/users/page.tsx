@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatShortId } from "@/lib/format";
 import {
   activateUser,
   blockUser,
@@ -44,6 +44,7 @@ import {
 } from "@/lib/users-api";
 import { toast } from "sonner";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import { useAuth } from "@/components/providers/auth-provider";
 
 type UserFormData = {
   name: string;
@@ -104,6 +105,7 @@ function buildUserUpdatePayload(form: UserFormData) {
 }
 
 export default function UsersPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [userList, setUserList] = useState<User[]>([]);
@@ -149,14 +151,24 @@ export default function UsersPage() {
   }, [search, statusFilter]);
 
   useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      setUserList([]);
+      setIsLoading(false);
+      return;
+    }
+
     const timer = setTimeout(() => {
       void loadUsers();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [loadUsers]);
+  }, [loadUsers, authLoading, isAuthenticated]);
 
-  useAutoRefresh(() => loadUsers({ silent: true }));
+  useAutoRefresh(() => loadUsers({ silent: true }), {
+    enabled: isAuthenticated && !authLoading,
+  });
 
   const filteredUsers = useMemo(() => userList, [userList]);
 
@@ -165,7 +177,7 @@ export default function UsersPage() {
     if (search) query.set("search", search);
     if (statusFilter !== "all") query.set("status", statusFilter);
     const qs = query.toString();
-    return `/api/v1/users/export${qs ? `?${qs}` : ""}`;
+    return `/api/v1/admin/users/export${qs ? `?${qs}` : ""}`;
   }, [search, statusFilter]);
 
   const openEdit = (user: User) => {
@@ -250,7 +262,9 @@ export default function UsersPage() {
   };
 
   const columns: Column<User>[] = [
-    { key: "id", header: "User ID", cell: (u) => <span className="font-mono text-xs">{u.id}</span>, sortable: true },
+    { key: "id", header: "User ID", cell: (u) => (
+      <span className="font-mono text-xs" title={u.id}>{formatShortId(u.id)}</span>
+    ), sortable: true },
     { key: "name", header: "Name", cell: (u) => (
       <Link href={`/users/${u.id}`} className="font-medium text-primary hover:underline">
         {u.name}

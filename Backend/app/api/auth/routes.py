@@ -66,7 +66,7 @@ class UnifiedOtpSendRequest(BaseModel):
 class UnifiedOtpVerifyRequest(BaseModel):
     role: Literal["user", "driver"] = "user"
     phone: str
-    otp: str
+    otp: str = Field(..., min_length=4, max_length=6)
     purpose: Literal["login", "register"] = "login"
     first_name: str | None = None
     last_name: str | None = None

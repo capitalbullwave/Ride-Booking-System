@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.public.schemas import (
     DirectionsResponse,
     LatLngPoint,
+    PlaceDetailsResponse,
     PlaceSearchResponse,
     PlaceSuggestion,
+    ReverseGeocodeResponse,
     RoutePoint,
 )
 from app.database.session import get_db
@@ -53,6 +55,31 @@ async def get_directions(
         path=[LatLngPoint(**point) for point in route["path"]],
         source=route["source"],
     )
+
+
+@router.get("/places/reverse", response_model=ReverseGeocodeResponse)
+async def reverse_geocode(
+    lat: float = Query(..., ge=-90, le=90),
+    lng: float = Query(..., ge=-180, le=180),
+    maps: MapsService = Depends(get_maps_service),
+):
+    result = await maps.reverse_geocode_location(lat, lng)
+    if not result:
+        raise HTTPException(status_code=404, detail="Could not resolve address for these coordinates")
+
+    return ReverseGeocodeResponse(**result)
+
+
+@router.get("/places/details", response_model=PlaceDetailsResponse)
+async def place_details(
+    place_id: str = Query(..., min_length=3, max_length=300),
+    maps: MapsService = Depends(get_maps_service),
+):
+    result = await maps.get_place_details(place_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Place details not found")
+
+    return PlaceDetailsResponse(**result)
 
 @router.get("/privacy-policy")
 async def privacy_policy(db: AsyncSession = Depends(get_db)):

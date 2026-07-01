@@ -1,9 +1,12 @@
 import uuid
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -69,15 +72,24 @@ def create_app() -> FastAPI:
     application.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     register_exception_handlers(application)
 
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins_list,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    cors_kwargs: dict = {
+        "allow_credentials": True,
+        "allow_methods": ["*"],
+        "allow_headers": ["*"],
+    }
+    if settings.is_development:
+        # Flutter web, Vite, and other local dev servers use random localhost ports.
+        cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+    else:
+        cors_kwargs["allow_origins"] = settings.cors_origins_list
+
+    application.add_middleware(CORSMiddleware, **cors_kwargs)
     application.add_middleware(SecurityHeadersMiddleware)
     application.add_middleware(RequestContextMiddleware)
+
+    upload_path = Path(settings.upload_dir)
+    upload_path.mkdir(parents=True, exist_ok=True)
+    application.mount("/uploads", StaticFiles(directory=str(upload_path)), name="uploads")
 
     api_prefix = settings.api_v1_prefix
     application.include_router(api_router, prefix=api_prefix)

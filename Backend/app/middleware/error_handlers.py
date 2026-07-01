@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from jose import JWTError
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.exceptions import AppException
 from app.core.logging import get_logger
@@ -34,6 +34,17 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"success": False, "message": "Invalid or expired token", "details": {}},
+        )
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_exception_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+        logger.warning("integrity_error", error=str(exc.orig))
+        message = "A record with this value already exists"
+        if "license_plate" in str(exc.orig).lower() or "unique" in str(exc.orig).lower():
+            message = "This vehicle number is already registered"
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"success": False, "message": message, "details": {}},
         )
 
     @app.exception_handler(SQLAlchemyError)
