@@ -1,0 +1,34 @@
+[
+  {
+    "id": "tx-1",
+    "title": "Ride payment",
+    "subtitle": "Connaught Place → Airport",
+    "amount": -142.0,
+    "date": "Today, 09:30 AM",
+    "type": "debit"
+  },
+  {
+    "id": "tx-2",
+    "title": "Wallet top-up",
+    "subtitle": "UPI •••• 4321",
+    "amount": 500.0,
+    "date": "Yesterday, 06:15 PM",
+    "type": "credit"
+  },
+  {
+    "id": "tx-3",
+    "title": "Bonus credited",
+    "subtitle": "WAVE20 promo reward",
+    "amount": 50.0,
+    "date": "12 Jun, 08:00 PM",
+    "type": "bonus"
+  },
+  {
+    "id": "tx-4",
+    "title": "Parcel delivery",
+    "subtitle": "Sunset Blvd → Tech Park",
+    "amount": -85.0,
+    "date": "10 Jun, 02:15 PM",
+    "type": "debit"
+  }
+]

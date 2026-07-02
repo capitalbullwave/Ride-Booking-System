@@ -1,0 +1,14 @@
+[
+  {
+    "id": "ec_001",
+    "name": "Emergency Contact 1",
+    "phone": "+919876543211",
+    "relation": "Family"
+  },
+  {
+    "id": "ec_002",
+    "name": "Emergency Contact 2",
+    "phone": "+919876543212",
+    "relation": "Friend"
+  }
+]

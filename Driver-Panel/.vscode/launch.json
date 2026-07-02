@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "WaveGo — iPhone Simulator",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "-d",
+        "B7309CC1-9C83-4C46-8C38-24D3621B668E"
+      ]
+    },
+    {
+      "name": "WaveGo — macOS Phone Frame (fallback)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": [
+        "-d",
+        "macos"
+      ]
+    }
+  ]
+}

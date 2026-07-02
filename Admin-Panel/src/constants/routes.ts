@@ -1,0 +1,30 @@
+export const ROUTES = {
+  home: "/",
+  login: "/login",
+  users: "/users",
+  userDetail: (id: string) => `/users/${id}`,
+  drivers: "/drivers",
+  driverDetail: (id: string) => `/drivers/${id}`,
+  rides: "/rides",
+  rideDetail: (id: string) => `/rides/${id}`,
+  vehicles: "/vehicles",
+  vehicleApproval: "/vehicles/approval",
+  finance: "/finance",
+  financeTransactions: "/finance/transactions",
+  financePayouts: "/finance/payouts",
+  financeRefunds: "/finance/refunds",
+  financeWallet: "/finance/wallet",
+  financeCommission: "/finance/commission",
+  coupons: "/coupons",
+  support: "/support",
+  supportDetail: (id: string) => `/support/${id}`,
+  alerts: "/alerts",
+  notifications: "/notifications",
+  profile: "/profile",
+  help: "/help",
+  reports: "/reports",
+  settings: "/settings",
+} as const;
+
+export const APP_NAME = "WaveGo";
+export const APP_TAGLINE = "Rides & ambulance mobility";

@@ -1,0 +1,272 @@
+import 'package:wavego_driver/models/api_response.dart';
+import 'package:wavego_driver/models/registration_model.dart';
+import 'package:wavego_driver/models/ride_model.dart';
+import 'package:wavego_driver/models/trip_model.dart';
+import 'package:wavego_driver/models/wallet_model.dart';
+
+class BackendMappers {
+  BackendMappers._();
+
+  static LoginResponse loginFromToken(
+    Map<String, dynamic> json, {
+    DriverProfile? driver,
+  }) {
+    return LoginResponse(
+      tokens: AuthTokens.fromJson(json),
+      driver: driver,
+      isRegistered: driver != null &&
+          (driver.verificationStatus != 'pending' ||
+              (driver.vehicle?.id?.isNotEmpty ?? false)),
+      isVerified: driver?.verificationStatus == 'approved' ||
+          driver?.verificationStatus == 'verified',
+    );
+  }
+
+  static OtpResponse otpFromMessage(Map<String, dynamic> json) {
+    return OtpResponse(
+      success: json['success'] as bool? ?? true,
+      message: json['message'] as String?,
+      sessionId: null,
+    );
+  }
+
+  static String? devOtpHintFromMessage(Map<String, dynamic> json) {
+    return json['otp'] as String?;
+  }
+
+  static DriverProfile driverProfile(Map<String, dynamic> json) {
+    final firstName = json['first_name'] as String? ?? '';
+    final lastName = json['last_name'] as String? ?? '';
+    final status = (json['status'] as String? ?? 'OFFLINE').toUpperCase();
+    final kyc = (json['kyc_status'] as String? ?? 'PENDING').toLowerCase();
+
+    return DriverProfile(
+      id: json['id']?.toString() ?? '',
+      name: '$firstName $lastName'.trim().isEmpty ? 'Driver' : '$firstName $lastName'.trim(),
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String?,
+      avatar: json['profile_photo'] as String?,
+      rating: (json['rating_avg'] as num?)?.toDouble(),
+      totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
+      isOnline: status == 'ONLINE',
+      verificationStatus: _mapKycStatus(kyc),
+    );
+  }
+
+  static String _mapKycStatus(String kyc) {
+    switch (kyc.toUpperCase()) {
+      case 'APPROVED':
+        return 'approved';
+      case 'REJECTED':
+        return 'rejected';
+      case 'UNDER_REVIEW':
+      case 'SUBMITTED':
+        return 'pending';
+      default:
+        return 'pending';
+    }
+  }
+
+  static bool isDriverRegistered(DriverProfile profile) {
+    return profile.verificationStatus != 'pending' || profile.totalTrips > 0;
+  }
+
+  static bool isDriverVerified(DriverProfile profile) {
+    return profile.verificationStatus == 'approved' ||
+        profile.verificationStatus == 'verified';
+  }
+
+  static LoginResponse loginWithProfile(
+    Map<String, dynamic> tokenJson,
+    Map<String, dynamic> profileJson,
+  ) {
+    final driver = driverProfile(profileJson);
+    return LoginResponse(
+      tokens: AuthTokens.fromJson(tokenJson),
+      driver: driver,
+      isRegistered: _hasCompletedRegistration(profileJson),
+      isVerified: _isKycApproved(profileJson),
+    );
+  }
+
+  static bool _isKycApproved(Map<String, dynamic> profileJson) {
+    final kyc = (profileJson['kyc_status'] as String? ?? 'PENDING').toUpperCase();
+    return kyc == 'APPROVED';
+  }
+
+  static bool _hasCompletedRegistration(Map<String, dynamic> profileJson) {
+    final license = profileJson['license_number'] as String?;
+    return license != null &&
+        license.isNotEmpty &&
+        license.toUpperCase() != 'PENDING';
+  }
+
+  static String rideStatusToApp(String backendStatus) {
+    switch (backendStatus.toUpperCase()) {
+      case 'DRIVER_ASSIGNED':
+        return 'heading_to_pickup';
+      case 'DRIVER_ARRIVED':
+        return 'arrived';
+      case 'OTP_VERIFIED':
+      case 'STARTED':
+      case 'IN_PROGRESS':
+        return 'started';
+      case 'COMPLETED':
+        return 'completed';
+      case 'CANCELLED':
+        return 'cancelled';
+      default:
+        return 'heading_to_pickup';
+    }
+  }
+
+  static RideRequest? rideRequestFromList(dynamic data) {
+    if (data is! List || data.isEmpty) return null;
+    return rideRequestFromJson(data.first as Map<String, dynamic>);
+  }
+
+  static RideRequest rideRequestFromJson(Map<String, dynamic> json) {
+    return RideRequest(
+      id: json['id']?.toString() ?? '',
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      destinationAddress: json['dropoff_address'] as String? ?? '',
+      pickupLat: (json['pickup_lat'] as num?)?.toDouble() ?? 0,
+      pickupLng: (json['pickup_lng'] as num?)?.toDouble() ?? 0,
+      destinationLat: (json['dropoff_lat'] as num?)?.toDouble() ?? 0,
+      destinationLng: (json['dropoff_lng'] as num?)?.toDouble() ?? 0,
+      distance: (json['estimated_distance_km'] as num?)?.toDouble() ?? 0,
+      estimatedTime:
+          ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
+      estimatedFare: (json['estimated_fare'] as num?)?.toDouble() ?? 0,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      passengerName: json['passenger_name'] as String? ?? 'Passenger',
+      passengerPhone: json['passenger_phone'] as String?,
+      expiresIn: 15,
+    );
+  }
+
+  static ActiveRide activeRideFromJson(Map<String, dynamic> json) {
+    return ActiveRide(
+      id: json['id']?.toString() ?? '',
+      status: rideStatusToApp(json['status'] as String? ?? ''),
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      destinationAddress: json['dropoff_address'] as String? ?? '',
+      pickupLat: (json['pickup_lat'] as num?)?.toDouble() ?? 0,
+      pickupLng: (json['pickup_lng'] as num?)?.toDouble() ?? 0,
+      destinationLat: (json['dropoff_lat'] as num?)?.toDouble() ?? 0,
+      destinationLng: (json['dropoff_lng'] as num?)?.toDouble() ?? 0,
+      passengerName: json['passenger_name'] as String? ?? 'Passenger',
+      passengerPhone: json['passenger_phone'] as String?,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      estimatedFare:
+          (json['final_fare'] as num?)?.toDouble() ??
+          (json['estimated_fare'] as num?)?.toDouble() ??
+          0,
+      distance: (json['estimated_distance_km'] as num?)?.toDouble(),
+      startedAt: json['started_at']?.toString(),
+    );
+  }
+
+  static PaymentBreakdown paymentFromRide(Map<String, dynamic> json) {
+    final fare = (json['final_fare'] as num?)?.toDouble() ??
+        (json['estimated_fare'] as num?)?.toDouble() ??
+        0;
+    final commission = fare * 0.2;
+    return PaymentBreakdown(
+      tripFare: fare,
+      commission: commission,
+      totalEarnings: fare - commission,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+    );
+  }
+
+  static RideSummary rideSummaryFromJson(Map<String, dynamic> json) {
+    final fare = (json['final_fare'] as num?)?.toDouble() ??
+        (json['estimated_fare'] as num?)?.toDouble() ??
+        0;
+    final commission = fare * 0.2;
+    return RideSummary(
+      id: json['id']?.toString() ?? '',
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      destinationAddress: json['dropoff_address'] as String? ?? '',
+      distance: (json['estimated_distance_km'] as num?)?.toDouble() ?? 0,
+      duration:
+          ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
+      fare: fare,
+      commission: commission,
+      netEarnings: fare - commission,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      completedAt: json['completed_at']?.toString(),
+    );
+  }
+
+  static Trip tripFromRideJson(Map<String, dynamic> json) {
+    final fare = (json['final_fare'] as num?)?.toDouble() ??
+        (json['estimated_fare'] as num?)?.toDouble() ??
+        0;
+    return Trip(
+      id: json['id']?.toString() ?? '',
+      status: (json['status'] as String? ?? '').toLowerCase(),
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      destinationAddress: json['dropoff_address'] as String? ?? '',
+      distance: (json['estimated_distance_km'] as num?)?.toDouble() ?? 0,
+      duration:
+          ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
+      fare: fare,
+      netEarnings: fare * 0.8,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      createdAt: json['created_at']?.toString() ?? '',
+    );
+  }
+
+  static TripDetail tripDetailFromRideJson(Map<String, dynamic> json) {
+    final fare = (json['final_fare'] as num?)?.toDouble() ??
+        (json['estimated_fare'] as num?)?.toDouble() ??
+        0;
+    final commission = fare * 0.2;
+    return TripDetail(
+      id: json['id']?.toString() ?? '',
+      status: (json['status'] as String? ?? '').toLowerCase(),
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      destinationAddress: json['dropoff_address'] as String? ?? '',
+      distance: (json['estimated_distance_km'] as num?)?.toDouble() ?? 0,
+      duration:
+          ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
+      fare: fare,
+      commission: commission,
+      netEarnings: fare - commission,
+      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      createdAt: json['created_at']?.toString() ?? '',
+      completedAt: json['completed_at']?.toString(),
+    );
+  }
+
+  static EarningsSummary earningsFromJson(Map<String, dynamic> json) {
+    return EarningsSummary(
+      todayEarnings: (json['net_earnings'] as num?)?.toDouble() ?? 0,
+      weeklyEarnings: (json['total_earnings'] as num?)?.toDouble() ?? 0,
+      monthlyEarnings: (json['total_earnings'] as num?)?.toDouble() ?? 0,
+      totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  static WalletInfo walletFromJson(Map<String, dynamic> json) {
+    return WalletInfo(
+      currentBalance: (json['balance'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  static DashboardStats dashboardStats({
+    required DriverProfile profile,
+    double walletBalance = 0,
+    double todayEarnings = 0,
+  }) {
+    return DashboardStats(
+      todayEarnings: todayEarnings,
+      walletBalance: walletBalance,
+      completedTrips: profile.totalTrips,
+      todayTrips: 0,
+      rating: profile.rating ?? 0,
+    );
+  }
+}

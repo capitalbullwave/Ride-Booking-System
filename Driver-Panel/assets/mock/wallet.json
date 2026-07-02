@@ -1,0 +1,15 @@
+{
+  "data": {
+    "current_balance": 12450.00,
+    "pending_balance": 850.00,
+    "total_earnings": 485000.00,
+    "total_withdrawn": 472550.00,
+    "bank": {
+      "account_holder": "Rajesh Kumar",
+      "account_number": "****4567",
+      "ifsc": "HDFC0001234",
+      "bank_name": "HDFC Bank",
+      "upi_id": "rajesh@upi"
+    }
+  }
+}

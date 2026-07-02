@@ -1,0 +1,18 @@
+{
+  "data": {
+    "id": "ride_001",
+    "status": "heading_to_pickup",
+    "pickup_address": "Andheri Railway Station, Mumbai",
+    "destination_address": "Bandra Kurla Complex, Mumbai",
+    "pickup_lat": 19.1197,
+    "pickup_lng": 72.8464,
+    "destination_lat": 19.0596,
+    "destination_lng": 72.8656,
+    "passenger_name": "Priya Sharma",
+    "passenger_phone": "+919876543210",
+    "passenger_rating": 4.7,
+    "payment_mode": "Cash",
+    "estimated_fare": 285.0,
+    "distance": 8.5
+  }
+}

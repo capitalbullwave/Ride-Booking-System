@@ -1,0 +1,31 @@
+{
+  "data": {
+    "id": "drv_001",
+    "name": "Rajesh Kumar",
+    "phone": "9876543210",
+    "email": "rajesh@example.com",
+    "avatar": null,
+    "date_of_birth": "1990-05-15",
+    "gender": "Male",
+    "rating": 4.8,
+    "total_trips": 1247,
+    "is_online": false,
+    "verification_status": "approved",
+    "vehicle": {
+      "id": "veh_001",
+      "vehicle_type": "Sedan",
+      "vehicle_number": "MH12AB1234",
+      "brand": "Maruti",
+      "model": "Swift Dzire",
+      "color": "White",
+      "manufacturing_year": 2022
+    },
+    "bank_details": {
+      "account_holder": "Rajesh Kumar",
+      "account_number": "****4567",
+      "ifsc": "HDFC0001234",
+      "bank_name": "HDFC Bank",
+      "upi_id": "rajesh@upi"
+    }
+  }
+}
