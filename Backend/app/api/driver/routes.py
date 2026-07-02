@@ -134,6 +134,9 @@ async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: 
 
     driver.status = DriverStatus.ONLINE.value
     await DriverRepository(db).update(driver)
+    matching = DriverMatchingService(db)
+    lat, lng = await matching.driver_default_location(driver.id)
+    await matching.ensure_driver_online(driver, lat, lng)
     return {"status": driver.status}
 
 
@@ -141,6 +144,7 @@ async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: 
 async def go_offline(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
     driver.status = DriverStatus.OFFLINE.value
     await DriverRepository(db).update(driver)
+    await DriverMatchingService(db).set_driver_offline(driver.id)
     return {"status": driver.status}
 
 
@@ -151,24 +155,48 @@ async def update_location(
     db: AsyncSession = Depends(get_db),
 ):
     await DriverMatchingService(db).update_driver_location(driver.id, data.lat, data.lng, data.heading, data.speed)
+    if driver.status == DriverStatus.ONLINE.value:
+        await DriverMatchingService(db).ensure_driver_online(driver, data.lat, data.lng)
     return {"message": "Location updated"}
 
 
 @router.get("/ride-requests")
 async def ride_requests(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Ride)
-        .where(Ride.status.in_([RideStatus.REQUESTED.value, RideStatus.SEARCHING_DRIVER.value]))
-        .order_by(Ride.created_at.desc())
-        .limit(20)
-    )
+    from sqlalchemy.orm import selectinload
+
+    matching = DriverMatchingService(db)
+    pending_ids = await matching.get_pending_ride_ids(driver.id)
+
+    query = select(Ride).options(selectinload(Ride.user))
+    if pending_ids:
+        query = query.where(
+            Ride.id.in_(pending_ids),
+            Ride.status == RideStatus.SEARCHING_DRIVER.value,
+        )
+    else:
+        query = query.where(
+            Ride.status.in_([RideStatus.REQUESTED.value, RideStatus.SEARCHING_DRIVER.value])
+        )
+    query = query.order_by(Ride.created_at.desc()).limit(20)
+
+    result = await db.execute(query)
     return [
         {
             "id": str(r.id),
             "pickup_address": r.pickup_address,
             "dropoff_address": r.dropoff_address,
+            "pickup_lat": r.pickup_lat,
+            "pickup_lng": r.pickup_lng,
+            "dropoff_lat": r.dropoff_lat,
+            "dropoff_lng": r.dropoff_lng,
             "estimated_fare": r.estimated_fare,
             "estimated_distance_km": r.estimated_distance_km,
+            "estimated_duration_min": r.estimated_duration_min,
+            "payment_method": r.payment_method,
+            "passenger_name": (
+                f"{r.user.first_name} {r.user.last_name}".strip() if r.user else "Passenger"
+            ),
+            "passenger_phone": r.user.phone if r.user else None,
             "status": r.status,
             "created_at": r.created_at.isoformat(),
         }
@@ -183,12 +211,18 @@ async def accept_ride(
     db: AsyncSession = Depends(get_db),
 ):
     ride = await RideService(db).accept_ride(data.ride_id, driver.id, data.vehicle_id)
+    await DriverMatchingService(db).clear_driver_pending(driver.id, data.ride_id)
     await manager.broadcast_ride(str(data.ride_id), {"event": "ride_accepted", "ride_id": str(data.ride_id), "driver_id": str(driver.id)})
     return RideResponse.model_validate(ride)
 
 
 @router.post("/reject-ride")
-async def reject_ride(data: RejectRideRequest, driver: Annotated[Driver, Depends(get_current_driver)]):
+async def reject_ride(
+    data: RejectRideRequest,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    await DriverMatchingService(db).clear_driver_pending(driver.id, data.ride_id)
     return {"ride_id": str(data.ride_id), "status": "rejected", "reason": data.reason}
 
 

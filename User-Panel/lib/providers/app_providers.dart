@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/utils/view_state.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
+import 'package:wavego_user/services/places_service.dart';
 
 class AuthState {
   const AuthState({
@@ -78,6 +79,12 @@ final authViewModelProvider =
 
 final homeDashboardProvider = FutureProvider<HomeDashboard>((ref) async {
   return ref.watch(homeRepositoryProvider).getDashboard();
+});
+
+final activeRideProvider = FutureProvider<UserActiveRide?>((ref) async {
+  final data = await ref.watch(rideBookingServiceProvider).getActiveRide();
+  if (data == null) return null;
+  return UserActiveRide.fromJson(data);
 });
 
 final walletProvider = FutureProvider<WalletSummary>((ref) async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,10 +8,13 @@ import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/models/place_models.dart';
+import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
+import 'package:wavego_user/widgets/home/active_ride_card.dart';
 import 'package:wavego_user/widgets/home/location_card.dart';
 import 'package:wavego_user/widgets/home/service_tile.dart';
 
@@ -22,11 +27,39 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _resolvingPickup = false;
+  bool _cancellingRide = false;
+  Timer? _activeRidePollTimer;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _prefillPickupIfNeeded());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefillPickupIfNeeded();
+      ref.invalidate(activeRideProvider);
+      _startActiveRidePolling();
+    });
+  }
+
+  @override
+  void dispose() {
+    _activeRidePollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startActiveRidePolling() {
+    _activeRidePollTimer?.cancel();
+    _activeRidePollTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) ref.invalidate(activeRideProvider);
+    });
+  }
+
+  void _openActiveRide(UserActiveRide ride) {
+    ref.read(tripBookingProvider.notifier).setActiveRideId(ride.id);
+    if (ride.isSearching) {
+      context.push(RouteNames.bookSearching);
+    } else {
+      context.push(RouteNames.bookTracking);
+    }
   }
 
   Future<void> _prefillPickupIfNeeded() async {
@@ -56,16 +89,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(tripBookingProvider.notifier).swapLocations();
   }
 
+  void _findRide(TripBookingState trip) {
+    if (trip.pickup == null || trip.dropoff == null) {
+      _openLocation(context, isPickup: trip.pickup == null);
+      return;
+    }
+    context.push(RouteNames.book);
+  }
+
   @override
   Widget build(BuildContext context) {
     final trip = ref.watch(tripBookingProvider);
-    final pickup = _resolvingPickup
+    final pickup = _resolvingPickup == true
         ? 'Getting your location...'
         : (trip.pickup?.label ?? '');
     final dropoff = trip.dropoff?.label ?? '';
     final dashboardAsync = ref.watch(homeDashboardProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
+    final activeRideAsync = ref.watch(activeRideProvider);
 
     final displayName = dashboardAsync.maybeWhen(
       data: (d) => d.greetingName,
@@ -103,18 +145,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     offset: const Offset(0, -20),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: LocationCard(
-                        pickup: pickup,
-                        dropoff: dropoff,
-                        onSwap: _swapLocations,
-                        onPickupTap: () => _openLocation(context, isPickup: true),
-                        onDropoffTap: () => _openLocation(context, isPickup: false),
-                        onFindRide: () {
-                          if (trip.pickup == null || trip.dropoff == null) {
-                            _openLocation(context, isPickup: trip.pickup == null);
-                            return;
+                      child: activeRideAsync.when(
+                        loading: () => const ActiveRideCardShimmer(),
+                        error: (e, st) => LocationCard(
+                          pickup: pickup,
+                          dropoff: dropoff,
+                          onSwap: _swapLocations,
+                          onPickupTap: () => _openLocation(context, isPickup: true),
+                          onDropoffTap: () => _openLocation(context, isPickup: false),
+                          onFindRide: () => _findRide(trip),
+                        ),
+                        data: (activeRide) {
+                          if (activeRide != null) {
+                            return ActiveRideCard(
+                              ride: activeRide,
+                              onTrack: () => _openActiveRide(activeRide),
+                              isCancelling: _cancellingRide == true,
+                              onCancel: () async {
+                                setState(() => _cancellingRide = true);
+                                await cancelRideWithConfirmation(
+                                  context: context,
+                                  ref: ref,
+                                  rideId: activeRide.id,
+                                );
+                                if (mounted) setState(() => _cancellingRide = false);
+                              },
+                            );
                           }
-                          context.push(RouteNames.book);
+                          return LocationCard(
+                            pickup: pickup,
+                            dropoff: dropoff,
+                            onSwap: _swapLocations,
+                            onPickupTap: () => _openLocation(context, isPickup: true),
+                            onDropoffTap: () => _openLocation(context, isPickup: false),
+                            onFindRide: () => _findRide(trip),
+                          );
                         },
                       ),
                     ),
@@ -128,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 delegate: SliverChildListDelegate([
                   dashboardAsync.when(
                     loading: () => const _BannerShimmer(),
-                    error: (_, __) => const _PromoBanner(),
+                    error: (e, st) => const _PromoBanner(),
                     data: (dashboard) => _PromoBanner(
                       title: dashboard.banners.isNotEmpty
                           ? dashboard.banners.first.title

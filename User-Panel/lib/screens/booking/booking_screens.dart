@@ -11,6 +11,7 @@ import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/screens/booking/map_picker_screen.dart';
 import 'package:wavego_user/services/location_service.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
@@ -360,7 +361,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
     }
 
     try {
-      await ref.read(rideBookingServiceProvider).bookRide(
+      final result = await ref.read(rideBookingServiceProvider).bookRide(
             pickupAddress: pickup.label,
             dropoffAddress: dropoff.label,
             pickupLat: route.pickup.lat,
@@ -368,6 +369,10 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             dropoffLat: route.dropoff.lat,
             dropoffLng: route.dropoff.lng,
           );
+      final rideId = result['id']?.toString();
+      if (rideId != null && rideId.isNotEmpty) {
+        ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
+      }
       if (mounted) context.push('/book/searching');
     } catch (e) {
       if (mounted) {
@@ -541,29 +546,92 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   }
 }
 
-class RideSearchingScreen extends StatefulWidget {
+class RideSearchingScreen extends ConsumerStatefulWidget {
   const RideSearchingScreen({super.key});
 
   @override
-  State<RideSearchingScreen> createState() => _RideSearchingScreenState();
+  ConsumerState<RideSearchingScreen> createState() => _RideSearchingScreenState();
 }
 
-class _RideSearchingScreenState extends State<RideSearchingScreen> {
+class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
+  Timer? _pollTimer;
+  String? _rideId;
+
+  bool _isDriverAssigned(String? status) {
+    if (status == null) return false;
+    const assigned = {
+      'DRIVER_ASSIGNED',
+      'DRIVER_ARRIVED',
+      'OTP_VERIFIED',
+      'STARTED',
+      'IN_PROGRESS',
+    };
+    return assigned.contains(status.toUpperCase());
+  }
+
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(seconds: 3), () {
-      if (mounted) context.pushReplacement('/book/tracking');
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _checkRideStatus());
+    Future.microtask(() async {
+      await _loadRideId();
+      await _checkRideStatus();
     });
+  }
+
+  Future<void> _loadRideId() async {
+    final fromState = ref.read(tripBookingProvider).activeRideId;
+    if (fromState != null && fromState.isNotEmpty) {
+      if (mounted) setState(() => _rideId = fromState);
+      return;
+    }
+    final active = await ref.read(rideBookingServiceProvider).getActiveRide();
+    final id = active?['id']?.toString();
+    if (id != null && id.isNotEmpty && mounted) {
+      ref.read(tripBookingProvider.notifier).setActiveRideId(id);
+      setState(() => _rideId = id);
+    }
+  }
+
+  Future<void> _checkRideStatus() async {
+    try {
+      final active = await ref.read(rideBookingServiceProvider).getActiveRide();
+      final status = active?['status']?.toString();
+      if (_isDriverAssigned(status) && mounted) {
+        _pollTimer?.cancel();
+        context.pushReplacement('/book/tracking');
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final rideId = _rideId ?? ref.watch(tripBookingProvider).activeRideId ?? '';
+
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Finding captain'),
+        actions: [
+          if (rideId.isNotEmpty)
+            CancelRideButton(
+              rideId: rideId,
+              navigateHome: true,
+              compact: true,
+            ),
+        ],
+      ),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
             const SizedBox(
               width: 64,
               height: 64,
@@ -571,32 +639,71 @@ class _RideSearchingScreenState extends State<RideSearchingScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Finding your captain...',
+              'Notifying nearby captains...',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Matching with nearby drivers',
+              'Live tracking will start once a captain accepts',
               style: TextStyle(color: AppColors.mutedForeground),
             ),
-          ],
+            if (rideId.isNotEmpty) ...[
+              const SizedBox(height: 28),
+              CancelRideButton(rideId: rideId, navigateHome: true),
+            ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class RideTrackingScreen extends ConsumerWidget {
+class RideTrackingScreen extends ConsumerStatefulWidget {
   const RideTrackingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RideTrackingScreen> createState() => _RideTrackingScreenState();
+}
+
+class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
+  String? _rideId;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_loadRideId);
+  }
+
+  Future<void> _loadRideId() async {
+    final fromState = ref.read(tripBookingProvider).activeRideId;
+    if (fromState != null && fromState.isNotEmpty) {
+      if (mounted) setState(() => _rideId = fromState);
+      return;
+    }
+    final active = await ref.read(rideBookingServiceProvider).getActiveRide();
+    if (mounted) setState(() => _rideId = active?['id']?.toString());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final route = ref.watch(tripBookingProvider).route;
+    final rideId = _rideId ?? ref.watch(tripBookingProvider).activeRideId ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live tracking')),
+      appBar: AppBar(
+        title: const Text('Live tracking'),
+        actions: [
+          if (rideId.isNotEmpty)
+            CancelRideButton(
+              rideId: rideId,
+              navigateHome: true,
+              compact: true,
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -653,6 +760,10 @@ class RideTrackingScreen extends ConsumerWidget {
                       ),
                   ],
                 ),
+                if (rideId.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  CancelRideButton(rideId: rideId, navigateHome: true),
+                ],
               ],
             ),
           ),

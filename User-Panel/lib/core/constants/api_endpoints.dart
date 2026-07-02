@@ -14,6 +14,7 @@ class ApiEndpoints {
   static const String notifications = '/user/notifications';
   static const String rides = '/user/rides';
   static const String bookRide = '/user/book-ride';
+  static const String cancelRide = '/user/cancel-ride';
 
   // Public / maps (no auth)
   static const String placesSearch = '/public/places/search';

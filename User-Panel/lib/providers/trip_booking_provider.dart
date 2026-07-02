@@ -17,11 +17,24 @@ class TripBookingNotifier extends StateNotifier<TripBookingState> {
     state = TripBookingState(
       pickup: state.dropoff,
       dropoff: state.pickup,
+      activeRideId: state.activeRideId,
     );
   }
 
   void setRoute(DirectionsResult route) {
     state = state.copyWith(route: route);
+  }
+
+  void setActiveRideId(String rideId) {
+    state = state.copyWith(activeRideId: rideId);
+  }
+
+  void clearActiveRideId() {
+    state = TripBookingState(
+      pickup: state.pickup,
+      dropoff: state.dropoff,
+      route: state.route,
+    );
   }
 
   void clear() => state = const TripBookingState();

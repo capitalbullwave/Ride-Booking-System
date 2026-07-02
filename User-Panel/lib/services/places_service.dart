@@ -271,6 +271,36 @@ class RideBookingService extends BaseApiService {
       parser: (raw) => raw as Map<String, dynamic>,
     );
   }
+
+  Future<Map<String, dynamic>?> getActiveRide() async {
+    if (useMock) return null;
+
+    final data = await get<Map<String, dynamic>>(
+      ApiEndpoints.rides,
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+    final active = data['active'];
+    if (active is Map<String, dynamic>) return active;
+    return null;
+  }
+
+  Future<void> cancelRide(
+    String rideId, {
+    String reason = 'Cancelled by user',
+  }) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      return;
+    }
+
+    await post(
+      ApiEndpoints.cancelRide,
+      data: {
+        'ride_id': rideId,
+        'reason': reason,
+      },
+    );
+  }
 }
 
 final placesServiceProvider = Provider<PlacesService>((ref) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,11 +26,25 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _navIndex = 0;
+  Timer? _ridePollTimer;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(dashboardViewModelProvider.notifier).loadDashboard());
+    Future.microtask(() async {
+      await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
+      if (!mounted) return;
+      if (ref.read(dashboardViewModelProvider).isOnline) {
+        _pollForRides();
+        _startRidePolling();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _stopRidePolling();
+    super.dispose();
   }
 
   @override
@@ -38,6 +54,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ref.listen(dashboardStateProvider(dashboardState.isOnline), (prev, next) {
       if (next && mounted) {
         _pollForRides();
+        _startRidePolling();
+      } else {
+        _stopRidePolling();
       }
     });
 
@@ -81,10 +100,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  void _startRidePolling() {
+    _ridePollTimer?.cancel();
+    _ridePollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _pollForRides());
+  }
+
+  void _stopRidePolling() {
+    _ridePollTimer?.cancel();
+    _ridePollTimer = null;
+  }
+
   void _pollForRides() async {
+    if (!ref.read(dashboardViewModelProvider).isOnline) return;
+
+    final hadRequest = ref.read(rideViewModelProvider).incomingRequest != null;
     await ref.read(rideViewModelProvider.notifier).pollForRideRequest();
     final rideState = ref.read(rideViewModelProvider);
-    if (rideState.incomingRequest != null && mounted) {
+    if (rideState.incomingRequest != null && mounted && !hadRequest) {
+      context.showSnackBar('New ride request nearby!');
       context.push(RouteNames.rideRequest);
     }
   }

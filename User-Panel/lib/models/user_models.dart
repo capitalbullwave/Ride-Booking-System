@@ -229,3 +229,68 @@ class ActivityItem {
         status: json['status'] as String? ?? '',
       );
 }
+
+class UserActiveRide {
+  const UserActiveRide({
+    required this.id,
+    required this.pickupAddress,
+    required this.dropoffAddress,
+    required this.status,
+    this.fareEstimate,
+  });
+
+  final String id;
+  final String pickupAddress;
+  final String dropoffAddress;
+  final String status;
+  final double? fareEstimate;
+
+  factory UserActiveRide.fromJson(Map<String, dynamic> json) => UserActiveRide(
+        id: json['id']?.toString() ?? '',
+        pickupAddress: json['pickup_address'] as String? ?? '',
+        dropoffAddress: json['dropoff_address'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        fareEstimate: (json['fare_estimate'] as num?)?.toDouble(),
+      );
+
+  bool get isSearching {
+    final normalized = status.toUpperCase();
+    return normalized == 'REQUESTED' || normalized == 'SEARCHING_DRIVER';
+  }
+
+  String get statusLabel {
+    switch (status.toUpperCase()) {
+      case 'REQUESTED':
+      case 'SEARCHING_DRIVER':
+        return 'Finding captain';
+      case 'DRIVER_ASSIGNED':
+        return 'Captain on the way';
+      case 'DRIVER_ARRIVED':
+        return 'Captain arrived';
+      case 'OTP_VERIFIED':
+      case 'STARTED':
+      case 'IN_PROGRESS':
+        return 'Ride in progress';
+      default:
+        return 'Active ride';
+    }
+  }
+
+  String get statusSubtitle {
+    switch (status.toUpperCase()) {
+      case 'REQUESTED':
+      case 'SEARCHING_DRIVER':
+        return 'We are notifying nearby captains';
+      case 'DRIVER_ASSIGNED':
+        return 'Your captain is heading to pickup';
+      case 'DRIVER_ARRIVED':
+        return 'Meet your captain at pickup';
+      case 'OTP_VERIFIED':
+      case 'STARTED':
+      case 'IN_PROGRESS':
+        return 'Enjoy your trip';
+      default:
+        return 'Tap to view live updates';
+    }
+  }
+}

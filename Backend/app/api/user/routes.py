@@ -17,6 +17,7 @@ from app.repositories.ride_repository import RideRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import WalletTopUp, WalletTransactionResponse
 from app.schemas.ride import RideCancel, RideCreate, RideDetailResponse, RideResponse
+from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import WalletService
 from app.services.ride_service import RideService
 from app.api.websocket.manager import manager
@@ -230,8 +231,16 @@ async def book_ride(
         payment_method=data.payment_method,
     )
     ride = await RideService(db).create_ride(user.id, ride_data)
-    await manager.broadcast_ride(str(ride.id), {"event": "ride_requested", "ride_id": str(ride.id), "status": ride.status})
-    return _ride_summary(ride)
+    notified = await DriverMatchingService(db).dispatch_ride_to_online_drivers(ride, manager)
+    await manager.broadcast_ride(str(ride.id), {
+        "event": "ride_requested",
+        "ride_id": str(ride.id),
+        "status": ride.status,
+        "drivers_notified": notified,
+    })
+    summary = _ride_summary(ride)
+    summary["drivers_notified"] = notified
+    return summary
 
 
 @router.get("/rides")
@@ -282,7 +291,9 @@ async def cancel_ride(
     ride = await RideService(db).get_ride(data.ride_id)
     if ride.user_id != user.id:
         raise ForbiddenException("Access denied")
-    ride = await RideService(db).cancel_ride(data.ride_id, "USER", data.reason)
+    ride = await RideService(db).cancel_ride(
+        data.ride_id, "USER", data.reason or "Cancelled by user"
+    )
     await manager.broadcast_ride(str(data.ride_id), {"event": "ride_cancelled", "ride_id": str(data.ride_id)})
     return RideResponse.model_validate(ride)
 

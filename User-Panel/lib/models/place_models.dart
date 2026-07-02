@@ -107,21 +107,25 @@ class TripBookingState {
     this.pickup,
     this.dropoff,
     this.route,
+    this.activeRideId,
   });
 
   final SelectedPlace? pickup;
   final SelectedPlace? dropoff;
   final DirectionsResult? route;
+  final String? activeRideId;
 
   TripBookingState copyWith({
     SelectedPlace? pickup,
     SelectedPlace? dropoff,
     DirectionsResult? route,
+    String? activeRideId,
     bool clearRoute = false,
   }) =>
       TripBookingState(
         pickup: pickup ?? this.pickup,
         dropoff: dropoff ?? this.dropoff,
         route: clearRoute ? null : (route ?? this.route),
+        activeRideId: activeRideId ?? this.activeRideId,
       );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -15,34 +15,110 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { rides } from "@/data/mock-data";
 import { Ride } from "@/types";
-import { formatCurrency, formatDateTime, capitalize } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatShortId, capitalize } from "@/lib/format";
+import { fetchRides } from "@/lib/rides-api";
+import { toast } from "sonner";
+import { useAutoRefresh } from "@/hooks/use-auto-refresh";
+import { useAuth } from "@/components/providers/auth-provider";
 
 export default function RidesPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [rideList, setRideList] = useState<Ride[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filteredRides = useMemo(() => {
-    return rides.filter((ride) => {
-      const matchesSearch =
-        ride.id.toLowerCase().includes(search.toLowerCase()) ||
-        ride.userName.toLowerCase().includes(search.toLowerCase()) ||
-        (ride.driverName?.toLowerCase().includes(search.toLowerCase()) ?? false) ||
-        ride.pickupLocation.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === "all" || ride.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
+  const loadRides = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
+
+    try {
+      const response = await fetchRides({
+        search: search || undefined,
+        status: statusFilter,
+        limit: 100,
+      });
+      setRideList(response.items);
+    } catch (error) {
+      if (!options?.silent) {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load rides",
+        );
+        setRideList([]);
+      }
+    } finally {
+      if (!options?.silent) {
+        setIsLoading(false);
+      }
+    }
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (!isAuthenticated) {
+      setRideList([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void loadRides();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [loadRides, authLoading, isAuthenticated]);
+
+  useAutoRefresh(() => loadRides({ silent: true }), {
+    enabled: isAuthenticated && !authLoading,
+  });
+
+  const filteredRides = useMemo(() => rideList, [rideList]);
+
+  const ridesExportPath = useMemo(() => {
+    const query = new URLSearchParams();
+    if (search) query.set("search", search);
+    if (statusFilter !== "all") query.set("status", statusFilter);
+    const qs = query.toString();
+    return `/api/v1/admin/rides/export${qs ? `?${qs}` : ""}`;
   }, [search, statusFilter]);
 
   const columns: Column<Ride>[] = [
-    { key: "id", header: "Ride ID", cell: (r) => <span className="font-mono text-xs">{r.id}</span>, sortable: true },
+    {
+      key: "id",
+      header: "Ride ID",
+      cell: (r) => (
+        <span className="font-mono text-xs" title={r.id}>
+          {formatShortId(r.id)}
+        </span>
+      ),
+      sortable: true,
+    },
     { key: "userName", header: "User", cell: (r) => r.userName, sortable: true },
     { key: "driverName", header: "Driver", cell: (r) => r.driverName ?? "—" },
     { key: "vehicleType", header: "Vehicle", cell: (r) => capitalize(r.vehicleType) },
-    { key: "pickupLocation", header: "Pickup", cell: (r) => <span className="max-w-[150px] truncate block">{r.pickupLocation}</span> },
-    { key: "dropLocation", header: "Drop", cell: (r) => <span className="max-w-[150px] truncate block">{r.dropLocation}</span> },
-    { key: "distance", header: "Distance", cell: (r) => `${r.distance} km`, sortable: true },
+    {
+      key: "pickupLocation",
+      header: "Pickup",
+      cell: (r) => (
+        <span className="max-w-[150px] truncate block">{r.pickupLocation}</span>
+      ),
+    },
+    {
+      key: "dropLocation",
+      header: "Drop",
+      cell: (r) => (
+        <span className="max-w-[150px] truncate block">{r.dropLocation}</span>
+      ),
+    },
+    {
+      key: "distance",
+      header: "Distance",
+      cell: (r) => `${r.distance} km`,
+      sortable: true,
+    },
     { key: "fare", header: "Fare", cell: (r) => formatCurrency(r.fare), sortable: true },
     { key: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
     { key: "date", header: "Date", cell: (r) => formatDateTime(r.date), sortable: true },
@@ -60,7 +136,7 @@ export default function RidesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Ride Management" description="Monitor and manage all ride bookings">
-        <ExportButton filename="wavego-rides" />
+        <ExportButton filename="wavego-rides" exportPath={ridesExportPath} />
       </PageHeader>
 
       <div className="flex flex-col gap-4 sm:flex-row">
@@ -81,7 +157,16 @@ export default function RidesPage() {
         </Select>
       </div>
 
-      <DataTable data={filteredRides} columns={columns} />
+      <DataTable
+        data={filteredRides}
+        columns={columns}
+        emptyTitle={isLoading ? "Loading rides..." : "No rides found"}
+        emptyDescription={
+          isLoading
+            ? "Fetching ride data from the server."
+            : "Try adjusting your search or filters."
+        }
+      />
     </div>
   );
 }

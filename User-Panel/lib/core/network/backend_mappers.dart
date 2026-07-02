@@ -61,7 +61,7 @@ class BackendMappers {
       title: json['title'] as String? ?? '',
       message: json['body'] as String? ?? json['message'] as String? ?? '',
       time: _relativeTime(json['created_at'] as String?),
-      read: json['is_read'] as bool? ?? json['read'] as bool? ?? false,
+      read: _parseBool(json['is_read'] ?? json['read']),
     );
   }
 
@@ -91,6 +91,17 @@ class BackendMappers {
       price: fare != null ? '₹${fare.toStringAsFixed(0)}' : '',
       status: json['status'] as String? ?? '',
     );
+  }
+
+  static bool _parseBool(dynamic value, {bool defaultValue = false}) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.toLowerCase();
+      if (normalized == 'true' || normalized == '1') return true;
+      if (normalized == 'false' || normalized == '0') return false;
+    }
+    return defaultValue;
   }
 
   static String _notificationType(String raw) {

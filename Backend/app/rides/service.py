@@ -398,3 +398,18 @@ class RideService:
         if not ride.driver_id:
             raise ValidationException("Driver not assigned")
         return await self.complete(ride_id, ride.driver_id, actual_distance_km)
+
+    # --- Legacy user panel API compatibility ---
+
+    async def create_ride(self, user_id: UUID, data: RideBookRequest) -> Ride:
+        return await self.book(user_id, data)
+
+    async def cancel_ride(self, ride_id: UUID, cancelled_by: str, reason: str) -> Ride:
+        ride = await self.get_ride(ride_id)
+        actor_id = ride.user_id if cancelled_by == "USER" else (ride.driver_id or ride.user_id)
+        return await self.cancel(
+            ride_id,
+            cancelled_by=cancelled_by,
+            actor_id=actor_id,
+            reason=reason,
+        )
