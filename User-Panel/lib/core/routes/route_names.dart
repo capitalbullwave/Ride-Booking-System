@@ -18,6 +18,11 @@ class RouteNames {
   static const String bookSearching = '/book/searching';
   static const String bookTracking = '/book/tracking';
   static const String ambulance = '/ambulance';
+  static const String rental = '/rental';
+  static const String rentalVehicles = '/rental/vehicles';
+  static const String rentalPickup = '/rental/pickup';
+  static const String rentalDropoff = '/rental/dropoff';
+  static const String rentalConfirm = '/rental/confirm';
 
   static const String profileSettings = '/profile/settings';
   static const String profileSavedPlaces = '/profile/saved-places';
@@ -36,6 +41,10 @@ class RouteNames {
   static const String profileEmail = '/profile/email';
   static const String profileNotifications = '/profile/notifications';
   static const String profileHelpTopic = '/profile/help/topic';
+
+  static const String supportTickets = '/profile/help/tickets';
+  static const String supportCreateTicket = '/profile/help/create-ticket';
+  static const String supportTicketDetail = '/profile/help/tickets/detail';
 
   static const String bookingDetail = '/bookings/detail';
   static const String notificationDetail = '/notifications/detail';

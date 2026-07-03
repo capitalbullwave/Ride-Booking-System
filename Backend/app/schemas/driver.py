@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
@@ -206,6 +206,54 @@ class DriverBankCreate(BaseModel):
         return code
 
 
+class DriverBankUpsert(BaseModel):
+    payment_type: Literal["bank", "upi"] = "bank"
+    account_holder_name: str = Field(..., min_length=2, max_length=150)
+    account_number: Optional[str] = Field(default=None, min_length=9, max_length=30)
+    ifsc_code: Optional[str] = Field(default=None, min_length=11, max_length=11)
+    bank_name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+    upi_id: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("ifsc_code")
+    @classmethod
+    def validate_ifsc_optional(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or not str(v).strip():
+            return None
+        import re
+
+        code = str(v).strip().upper()
+        if not re.match(r"^[A-Z]{4}0[A-Z0-9]{6}$", code):
+            raise ValueError("Invalid IFSC code format (e.g. SBIN0001234)")
+        return code
+
+
+class DriverBankResponse(BaseSchema):
+    account_holder: str
+    account_number: str
+    ifsc: str
+    bank_name: str
+    upi_id: Optional[str] = None
+
+
+class EmergencyContactCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    phone: str = Field(..., min_length=10, max_length=20)
+    relation: Optional[str] = Field(default=None, max_length=50)
+
+
+class EmergencyContactUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    phone: Optional[str] = Field(default=None, min_length=10, max_length=20)
+    relation: Optional[str] = Field(default=None, max_length=50)
+
+
+class EmergencyContactResponse(BaseSchema):
+    id: uuid.UUID
+    name: str
+    phone: str
+    relation: Optional[str] = None
+
+
 class DriverRegistrationDocument(BaseModel):
     document_type: str = Field(..., max_length=30)
     document_url: str = Field(
@@ -243,3 +291,96 @@ class DriverRegistrationComplete(BaseModel):
     @classmethod
     def parse_registration_dates(cls, value: object) -> date | None:
         return _parse_flexible_date(value)
+
+
+class RegistrationStepInfo(BaseModel):
+    id: str
+    completed: bool
+    status: str = "pending"
+    subtitle: Optional[str] = None
+
+
+class AccountItemStatus(BaseModel):
+    id: str
+    verified: bool
+
+
+class SavedDocumentInfo(BaseModel):
+    url: str
+    number: Optional[str] = None
+    status: str = "PENDING"
+
+
+class DriverSavedRegistrationData(BaseModel):
+    first_name: str
+    last_name: str = ""
+    email: str
+    phone: str
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    profile_photo: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    country: Optional[str] = None
+    license_number: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    vehicle_type_id: Optional[str] = None
+    vehicle_type_name: Optional[str] = None
+    documents: dict[str, SavedDocumentInfo] = Field(default_factory=dict)
+
+
+class DriverRegistrationProgressResponse(BaseModel):
+    kyc_status: str
+    submitted: bool
+    steps: list[RegistrationStepInfo]
+    account_items: list[AccountItemStatus] = Field(default_factory=list)
+
+
+class SaveLicenseUpload(BaseModel):
+    document_url: str = Field(
+        ...,
+        description="Base64 data URL or http(s) URL",
+    )
+    side: Literal["front", "back"] = "front"
+
+
+class SaveLicenseNumber(BaseModel):
+    license_number: str = Field(..., min_length=2, max_length=50)
+
+
+class SaveProfileStep(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=100)
+    last_name: str = Field(default="", max_length=100)
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = Field(default=None, max_length=20)
+    profile_photo: Optional[str] = Field(
+        default=None,
+        description="Base64 data URL or http(s) URL",
+    )
+    city: Optional[str] = Field(default=None, max_length=100)
+    state: Optional[str] = Field(default=None, max_length=100)
+    country: Optional[str] = Field(default=None, max_length=100)
+
+    @field_validator("date_of_birth", mode="before")
+    @classmethod
+    def parse_dob(cls, value: object) -> date | None:
+        return _parse_flexible_date(value)
+
+
+class SaveVehicleNumberStep(BaseModel):
+    license_plate: str = Field(..., min_length=2, max_length=20)
+    vehicle_type_id: Optional[uuid.UUID] = None
+    rc_front_url: Optional[str] = None
+    rc_back_url: Optional[str] = None
+
+    @field_validator("license_plate")
+    @classmethod
+    def normalize_plate(cls, v: str) -> str:
+        return v.strip().upper()
+
+
+class SaveKycStep(BaseModel):
+    id_type: Literal["AADHAAR", "PAN"]
+    front_url: str
+    back_url: Optional[str] = None
+    document_number: str = Field(..., min_length=4, max_length=100)

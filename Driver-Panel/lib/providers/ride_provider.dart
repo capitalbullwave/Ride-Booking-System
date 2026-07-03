@@ -37,9 +37,21 @@ class RideViewModel extends StateNotifier<RideState> {
     }
   }
 
-  Future<void> declineRide(String rideId) async {
-    await _repository.declineRide(rideId);
+  Future<void> declineRide(String rideId, {String? reason}) async {
+    await _repository.declineRide(rideId, reason: reason);
     state = state.copyWith(incomingRequest: null);
+  }
+
+  Future<ActiveRide?> restoreActiveRide() async {
+    try {
+      final ride = await _repository.getActiveRide();
+      if (ride != null) {
+        state = state.copyWith(activeRide: ride);
+      }
+      return ride;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> updateStatus(String rideId, String status, {String? otp}) async {

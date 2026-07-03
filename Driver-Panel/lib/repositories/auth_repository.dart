@@ -106,6 +106,66 @@ class ProfileRepository {
       _service.updateProfile(data);
   Future<void> submitRegistration(DriverRegistration registration) =>
       _service.submitRegistration(registration);
+  Future<Map<String, dynamic>> getRegistrationProgress() =>
+      _service.getRegistrationProgress();
+
+  Future<Map<String, dynamic>> getRegistrationData() =>
+      _service.getRegistrationData();
+  Future<void> saveLicenseUpload({
+    required String documentUrl,
+    required String side,
+  }) =>
+      _service.saveLicenseUpload(documentUrl: documentUrl, side: side);
+  Future<void> saveLicenseNumber({required String licenseNumber}) =>
+      _service.saveLicenseNumber(licenseNumber: licenseNumber);
+  Future<void> saveProfileStep({
+    required String firstName,
+    String lastName = '',
+    String? dateOfBirth,
+    String? gender,
+    String? profilePhoto,
+    String? city,
+    String? state,
+    String? country,
+  }) =>
+      _service.saveProfileStep(
+        firstName: firstName,
+        lastName: lastName,
+        dateOfBirth: dateOfBirth,
+        gender: gender,
+        profilePhoto: profilePhoto,
+        city: city,
+        state: state,
+        country: country,
+      );
+  Future<void> saveVehicleNumber({
+    required String licensePlate,
+    String? vehicleTypeId,
+    String? rcFrontUrl,
+    String? rcBackUrl,
+  }) =>
+      _service.saveVehicleNumber(
+        licensePlate: licensePlate,
+        vehicleTypeId: vehicleTypeId,
+        rcFrontUrl: rcFrontUrl,
+        rcBackUrl: rcBackUrl,
+      );
+  Future<void> saveKyc({
+    required String idType,
+    required String frontUrl,
+    String? backUrl,
+    required String documentNumber,
+  }) =>
+      _service.saveKyc(
+        idType: idType,
+        frontUrl: frontUrl,
+        backUrl: backUrl,
+        documentNumber: documentNumber,
+      );
+  Future<void> submitRegistrationProgress() =>
+      _service.submitRegistrationProgress();
+  Future<String?> resolveVehicleTypeId(String? vehicleType) =>
+      _service.resolveVehicleTypeId(vehicleType);
   Future<void> setOnlineStatus(bool isOnline) =>
       _service.setOnlineStatus(isOnline);
   Future<DashboardStats> getDashboardStats() => _service.getDashboardStats();

@@ -46,15 +46,26 @@ class ServiceTile extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: Image.asset(
-                    service.imageAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Icon(
-                      isEmergency ? Icons.medical_services : Icons.directions_car,
-                      color: isEmergency ? AppColors.error : AppColors.primary,
-                      size: 36,
-                    ),
-                  ),
+                  child: service.imageUrl != null
+                      ? Image.network(
+                          service.imageUrl!,
+                          fit: BoxFit.cover,
+                          width: 80,
+                          height: 80,
+                          errorBuilder: (_, __, ___) => Image.asset(
+                            service.imageAsset,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : Image.asset(
+                          service.imageAsset,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Icon(
+                            isEmergency ? Icons.medical_services : Icons.directions_car,
+                            color: isEmergency ? AppColors.error : AppColors.primary,
+                            size: 36,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(width: 16),

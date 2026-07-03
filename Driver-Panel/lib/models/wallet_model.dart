@@ -46,6 +46,33 @@ abstract class WalletTransaction with _$WalletTransaction {
       _$WalletTransactionFromJson(json);
 }
 
+class BankDetailsRequest {
+  const BankDetailsRequest({
+    required this.paymentType,
+    required this.accountHolderName,
+    this.accountNumber,
+    this.ifscCode,
+    this.bankName,
+    this.upiId,
+  });
+
+  final String paymentType;
+  final String accountHolderName;
+  final String? accountNumber;
+  final String? ifscCode;
+  final String? bankName;
+  final String? upiId;
+
+  Map<String, dynamic> toJson() => {
+        'payment_type': paymentType,
+        'account_holder_name': accountHolderName,
+        if (accountNumber != null) 'account_number': accountNumber,
+        if (ifscCode != null) 'ifsc_code': ifscCode,
+        if (bankName != null) 'bank_name': bankName,
+        if (upiId != null) 'upi_id': upiId,
+      };
+}
+
 @freezed
 abstract class WithdrawRequest with _$WithdrawRequest {
   const factory WithdrawRequest({

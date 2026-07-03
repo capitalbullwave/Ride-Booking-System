@@ -106,11 +106,11 @@ export const rides: Ride[] = [
 ];
 
 export const vehicleCategories: VehicleCategory[] = [
-  { id: "VEH-001", type: "bike", name: "Bike", baseFare: 25, perKmFare: 8, waitingCharge: 2, cancellationCharge: 20, surgeMultiplier: 1.5, isActive: true, icon: "bike" },
-  { id: "VEH-002", type: "auto", name: "Auto", baseFare: 35, perKmFare: 12, waitingCharge: 3, cancellationCharge: 30, surgeMultiplier: 1.3, isActive: true, icon: "car" },
-  { id: "VEH-003", type: "mini_cab", name: "Mini Cab", baseFare: 50, perKmFare: 15, waitingCharge: 4, cancellationCharge: 50, surgeMultiplier: 1.4, isActive: true, icon: "car" },
-  { id: "VEH-004", type: "sedan", name: "Sedan", baseFare: 80, perKmFare: 18, waitingCharge: 5, cancellationCharge: 75, surgeMultiplier: 1.6, isActive: true, icon: "car" },
-  { id: "VEH-005", type: "suv", name: "SUV", baseFare: 120, perKmFare: 22, waitingCharge: 6, cancellationCharge: 100, surgeMultiplier: 1.8, isActive: true, icon: "truck" },
+  { id: "VEH-001", type: "bike", name: "Bike", baseFare: 25, perKmFare: 8, includedDistanceKm: 2, waitingCharge: 2, cancellationCharge: 20, surgeMultiplier: 1.5, isActive: true, icon: "bike" },
+  { id: "VEH-002", type: "auto", name: "Auto", baseFare: 35, perKmFare: 12, includedDistanceKm: 2, waitingCharge: 3, cancellationCharge: 30, surgeMultiplier: 1.3, isActive: true, icon: "car" },
+  { id: "VEH-003", type: "mini_cab", name: "Mini Cab", baseFare: 50, perKmFare: 15, includedDistanceKm: 2, waitingCharge: 4, cancellationCharge: 50, surgeMultiplier: 1.4, isActive: true, icon: "car" },
+  { id: "VEH-004", type: "sedan", name: "Sedan", baseFare: 80, perKmFare: 18, includedDistanceKm: 2, waitingCharge: 5, cancellationCharge: 75, surgeMultiplier: 1.6, isActive: true, icon: "car" },
+  { id: "VEH-005", type: "suv", name: "SUV", baseFare: 120, perKmFare: 22, includedDistanceKm: 2, waitingCharge: 6, cancellationCharge: 100, surgeMultiplier: 1.8, isActive: true, icon: "truck" },
 ];
 
 export const transactions: Transaction[] = [

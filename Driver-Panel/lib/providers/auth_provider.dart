@@ -2,12 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/models/api_response.dart';
+import 'package:wavego_driver/providers/auth_session_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 
 class AuthViewModel extends StateNotifier<AuthState> {
-  AuthViewModel(this._repository) : super(const AuthState());
+  AuthViewModel(this._repository, this._ref) : super(const AuthState());
 
   final AuthRepository _repository;
+  final Ref _ref;
 
   Future<void> sendOtp(String phone, String countryCode) async {
     state = state.copyWith(otpState: const ViewStateLoading());
@@ -43,6 +45,7 @@ class AuthViewModel extends StateNotifier<AuthState> {
         isRegistered: response.isRegistered,
         isVerified: response.isVerified,
       );
+      _ref.read(authSessionProvider.notifier).setAuthenticated(true);
       return response;
     } catch (e) {
       state = state.copyWith(
@@ -54,6 +57,7 @@ class AuthViewModel extends StateNotifier<AuthState> {
 
   Future<void> logout() async {
     await _repository.logout();
+    _ref.read(authSessionProvider.notifier).setAuthenticated(false);
     state = const AuthState();
   }
 }
@@ -104,5 +108,5 @@ class AuthState {
 
 final authViewModelProvider =
     StateNotifierProvider<AuthViewModel, AuthState>((ref) {
-  return AuthViewModel(ref.watch(authRepositoryProvider));
+  return AuthViewModel(ref.watch(authRepositoryProvider), ref);
 });

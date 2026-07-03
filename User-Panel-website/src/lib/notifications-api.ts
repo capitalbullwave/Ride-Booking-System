@@ -19,10 +19,10 @@ export function getUnreadNotificationCount(): Promise<{ count: number }> {
   return authFetch<{ count: number }>("/notifications/unread-count", undefined, "Unable to load notifications");
 }
 
-export function markNotificationRead(notificationId: string): Promise<{ message: string }> {
-  return authFetch<{ message: string }>(
+export function markNotificationRead(notificationId: string): Promise<{ id: string; is_read: boolean }> {
+  return authFetch<{ id: string; is_read: boolean }>(
     `/notifications/${notificationId}/read`,
-    { method: "POST" },
+    { method: "PUT" },
     "Unable to mark notification as read"
   );
 }

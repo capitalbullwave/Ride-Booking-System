@@ -4,10 +4,25 @@ import 'package:go_router/go_router.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/providers/profile_display_provider.dart';
+import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      refreshUserProfile(ref);
+    });
+  }
 
   static const _menuItems = [
     _ProfileMenuItem(
@@ -33,20 +48,43 @@ class ProfileScreen extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(userProfileProvider);
+  Widget build(BuildContext context) {
+    final labelAsync = ref.watch(resolvedProfileLabelProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Profile')),
-      body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Unable to load profile')),
-        data: (user) {
-          final name = user?.name ?? 'User';
-          final phone = user?.phone ?? '';
-          final initial = user?.initial ?? 'U';
-          final rating = user?.rating ?? 0;
+      body: RefreshIndicator(
+        onRefresh: () async => refreshUserProfile(ref),
+        child: labelAsync.when(
+          loading: () => ListView(
+            children: const [
+              SizedBox(height: 200),
+              Center(child: CircularProgressIndicator()),
+            ],
+          ),
+          error: (_, __) => ListView(
+            children: [
+              const SizedBox(height: 120),
+              const Center(child: Text('Unable to load profile')),
+              const SizedBox(height: 16),
+              Center(
+                child: TextButton(
+                  onPressed: () => refreshUserProfile(ref),
+                  child: const Text('Retry'),
+                ),
+              ),
+            ],
+          ),
+          data: (resolved) {
+          final name = resolved.name;
+          final phone = resolved.phone;
+          final initial = resolved.initial;
+          final rating = resolved.rating;
+          final totalRides = resolved.totalRides;
+          final badgeLabel = totalRides > 0
+              ? '$totalRides Trips'
+              : '${rating.toStringAsFixed(rating == rating.roundToDouble() ? 0 : 1)} Rating';
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
@@ -108,7 +146,7 @@ class ProfileScreen extends ConsumerWidget {
                                     const Icon(Icons.star, size: 14, color: AppColors.primary),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '$rating Rating',
+                                      badgeLabel,
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -169,6 +207,7 @@ class ProfileScreen extends ConsumerWidget {
             ],
           );
         },
+        ),
       ),
     );
   }

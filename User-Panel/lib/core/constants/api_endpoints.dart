@@ -8,6 +8,9 @@ class ApiEndpoints {
   static const String refreshToken = '/auth/refresh-token';
   static const String me = '/auth/me';
 
+  static const String userProfile = '/user/profile';
+  static const String userProfileAddresses = '/user/profile/addresses';
+
   // User panel (legacy /user/* prefix on backend)
   static const String dashboard = '/user/dashboard';
   static const String wallet = '/user/wallet';
@@ -24,4 +27,9 @@ class ApiEndpoints {
   static const String placesNetworkLocation = '/public/places/network-location';
 
   static const String vehicleTypes = '/common/vehicle-types';
+  static const String rentalCategories = '/common/rental-categories';
+
+  static const String createSupportTicket = '/user/support';
+  static const String supportTickets = '/user/support/tickets';
+  static const String supportFaqs = '/common/support/faqs';
 }

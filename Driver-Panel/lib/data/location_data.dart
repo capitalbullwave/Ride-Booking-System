@@ -128,7 +128,18 @@ class LocationData {
       'Karnataka': ['Bengaluru', 'Mysuru', 'Mangaluru', 'Hubballi', 'Belagavi'],
       'Kerala': ['Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur'],
       'Madhya Pradesh': ['Bhopal', 'Indore', 'Jabalpur', 'Gwalior', 'Ujjain'],
-      'Maharashtra': ['Mumbai', 'Pune', 'Nagpur', 'Nashik', 'Thane', 'Aurangabad'],
+      'Maharashtra': [
+        'Mumbai',
+        'Pune',
+        'Nagpur',
+        'Nashik',
+        'Thane',
+        'Aurangabad',
+        'Akola',
+        'Amravati',
+        'Kolhapur',
+        'Solapur',
+      ],
       'Manipur': ['Imphal', 'Thoubal', 'Bishnupur'],
       'Meghalaya': ['Shillong', 'Tura', 'Jowai'],
       'Mizoram': ['Aizawl', 'Lunglei', 'Champhai'],
@@ -213,4 +224,30 @@ class LocationData {
 
   static bool hasCityData(String? country, String? state) =>
       citiesFor(country, state).isNotEmpty;
+
+  static const String defaultServiceCity = 'Akola';
+
+  /// Flat, sorted list of Indian cities available for captain registration.
+  static List<String> get allServiceCities {
+    final cities = <String>{};
+    final india = _citiesByCountryState[defaultCountry];
+    if (india != null) {
+      for (final list in india.values) {
+        cities.addAll(list);
+      }
+    }
+    return cities.toList()..sort();
+  }
+
+  static String? stateForCity(
+    String city, {
+    String country = defaultCountry,
+  }) {
+    final states = _citiesByCountryState[country];
+    if (states == null) return null;
+    for (final entry in states.entries) {
+      if (entry.value.contains(city)) return entry.key;
+    }
+    return null;
+  }
 }

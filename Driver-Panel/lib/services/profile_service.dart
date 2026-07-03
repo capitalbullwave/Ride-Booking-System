@@ -113,6 +113,8 @@ class ProfileService extends BaseApiService {
     const aliases = <String, List<String>>{
       'bike': ['bike', 'motorcycle', 'two wheeler', 'scooter'],
       'auto': ['auto', 'rickshaw', 'three wheeler'],
+      'e-rickshaw': ['e-rickshaw', 'e rickshaw', 'erickshaw', 'electric rickshaw'],
+      'cab': ['cab', 'car', 'economy', 'mini', 'mini cab', 'hatchback', 'sedan'],
       'mini cab': ['mini', 'mini cab', 'hatchback'],
       'sedan': ['sedan', 'comfort'],
       'suv': ['suv', 'xl', 'premium'],
@@ -136,6 +138,119 @@ class ProfileService extends BaseApiService {
     }
 
     return (types.first as Map<String, dynamic>)['id']?.toString();
+  }
+
+  Future<String?> resolveVehicleTypeId(String? vehicleType) =>
+      _resolveVehicleTypeId(vehicleType);
+
+  Future<Map<String, dynamic>> getRegistrationProgress() async {
+    if (useMock) {
+      return {'kyc_status': 'PENDING', 'submitted': false, 'steps': []};
+    }
+    return get(
+      ApiEndpoints.registrationProgress,
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
+
+  Future<Map<String, dynamic>> getRegistrationData() async {
+    if (useMock) {
+      return {};
+    }
+    return get(
+      ApiEndpoints.registrationData,
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> saveLicenseUpload({
+    required String documentUrl,
+    required String side,
+  }) async {
+    if (useMock) return;
+    await post(
+      ApiEndpoints.registrationLicenseUpload,
+      data: {'document_url': documentUrl, 'side': side},
+    );
+  }
+
+  Future<void> saveLicenseNumber({required String licenseNumber}) async {
+    if (useMock) return;
+    await patch(
+      ApiEndpoints.registrationLicenseNumber,
+      data: {'license_number': licenseNumber},
+    );
+  }
+
+  Future<void> saveProfileStep({
+    required String firstName,
+    String lastName = '',
+    String? dateOfBirth,
+    String? gender,
+    String? profilePhoto,
+    String? city,
+    String? state,
+    String? country,
+  }) async {
+    if (useMock) return;
+    await patch(
+      ApiEndpoints.registrationProfile,
+      data: {
+        'first_name': firstName,
+        'last_name': lastName,
+        if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
+        if (gender != null) 'gender': gender,
+        if (profilePhoto != null) 'profile_photo': profilePhoto,
+        if (city != null) 'city': city,
+        if (state != null) 'state': state,
+        if (country != null) 'country': country,
+      },
+    );
+  }
+
+  Future<void> saveVehicleNumber({
+    required String licensePlate,
+    String? vehicleTypeId,
+    String? rcFrontUrl,
+    String? rcBackUrl,
+  }) async {
+    if (useMock) return;
+    await post(
+      ApiEndpoints.registrationVehicle,
+      data: {
+        'license_plate': licensePlate,
+        if (vehicleTypeId != null) 'vehicle_type_id': vehicleTypeId,
+        if (rcFrontUrl != null) 'rc_front_url': rcFrontUrl,
+        if (rcBackUrl != null) 'rc_back_url': rcBackUrl,
+      },
+    );
+  }
+
+  Future<void> saveKyc({
+    required String idType,
+    required String frontUrl,
+    String? backUrl,
+    required String documentNumber,
+  }) async {
+    if (useMock) return;
+    await post(
+      ApiEndpoints.registrationKyc,
+      data: {
+        'id_type': idType,
+        'front_url': frontUrl,
+        if (backUrl != null) 'back_url': backUrl,
+        'document_number': documentNumber,
+      },
+    );
+  }
+
+  Future<void> submitRegistrationProgress() async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      return;
+    }
+    await post(ApiEndpoints.registrationSubmit);
+    await _localStorage.setBool(AppConstants.driverRegisteredKey, true);
   }
 
   Future<void> setOnlineStatus(bool isOnline) async {

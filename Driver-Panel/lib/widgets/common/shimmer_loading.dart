@@ -93,3 +93,29 @@ class DashboardSkeleton extends StatelessWidget {
     );
   }
 }
+
+class ListSkeleton extends StatelessWidget {
+  const ListSkeleton({
+    super.key,
+    this.itemCount = 6,
+    this.itemHeight = 72,
+  });
+
+  final int itemCount;
+  final double itemHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      itemCount: itemCount,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (_, __) => ShimmerLoading(
+        height: itemHeight,
+        borderRadius: 16,
+      ),
+    );
+  }
+}

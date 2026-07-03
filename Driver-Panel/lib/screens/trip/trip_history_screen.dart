@@ -7,11 +7,13 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
 import 'package:wavego_driver/models/trip_model.dart';
 import 'package:wavego_driver/repositories/trip_repository.dart';
-import 'package:wavego_driver/widgets/common/state_widgets.dart';
+import 'package:wavego_driver/widgets/common/shimmer_loading.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
 
 class TripHistoryScreen extends ConsumerStatefulWidget {
-  const TripHistoryScreen({super.key});
+  const TripHistoryScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   ConsumerState<TripHistoryScreen> createState() => _TripHistoryScreenState();
@@ -87,7 +89,7 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const ListSkeleton()
                 : _error != null
                     ? ErrorStateWidget(message: _error!, onRetry: _load)
                     : _trips.isEmpty

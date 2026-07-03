@@ -69,6 +69,10 @@
 	<string>Photo library access is required to save captured images.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is not required for photo capture.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location is required to receive ride requests and navigate to passengers.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Location is required to share your position while you are online.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

@@ -12,6 +12,7 @@ class LocationCard extends StatelessWidget {
     required this.onPickupTap,
     required this.onDropoffTap,
     required this.onFindRide,
+    this.isBookingLocked = false,
   });
 
   final String pickup;
@@ -20,6 +21,7 @@ class LocationCard extends StatelessWidget {
   final VoidCallback onPickupTap;
   final VoidCallback onDropoffTap;
   final VoidCallback onFindRide;
+  final bool isBookingLocked;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +102,11 @@ class LocationCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          AppButton(label: 'Find a ride', onPressed: onFindRide),
+          AppButton(
+            label: isBookingLocked ? 'Active ride in progress' : 'Find a ride',
+            onPressed: isBookingLocked ? null : onFindRide,
+            variant: isBookingLocked ? AppButtonVariant.outline : AppButtonVariant.primary,
+          ),
         ],
       ),
     );

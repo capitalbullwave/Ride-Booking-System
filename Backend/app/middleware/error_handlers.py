@@ -39,9 +39,19 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(IntegrityError)
     async def integrity_exception_handler(request: Request, exc: IntegrityError) -> JSONResponse:
         logger.warning("integrity_error", error=str(exc.orig))
-        message = "A record with this value already exists"
-        if "license_plate" in str(exc.orig).lower() or "unique" in str(exc.orig).lower():
+        err = str(exc.orig).lower()
+        if "license_plate" in err:
             message = "This vehicle number is already registered"
+        elif "drivers" in err and "phone" in err:
+            message = "This phone number is already registered"
+        elif "drivers" in err and "email" in err:
+            message = "This email is already registered"
+        elif "users" in err and "phone" in err:
+            message = "This phone number is already registered"
+        elif "users" in err and "email" in err:
+            message = "This email is already registered"
+        else:
+            message = "A record with this value already exists"
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"success": False, "message": message, "details": {}},

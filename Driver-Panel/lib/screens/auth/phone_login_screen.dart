@@ -97,7 +97,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                 ),
                 const SizedBox(height: 32),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     InkWell(
                       onTap: () => showCountryPicker(
@@ -105,19 +105,23 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                         showPhoneCode: true,
                         onSelect: (country) => setState(() => _country = country),
                       ),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.input),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        height: 56,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
+                          color: Colors.white,
                           border: Border.all(color: AppColors.border),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadius.input),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(_country.flagEmoji, style: const TextStyle(fontSize: 24)),
-                            const SizedBox(width: 8),
+                            Text(_country.flagEmoji, style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 6),
                             Text('+${_country.phoneCode}'),
-                            const Icon(Icons.arrow_drop_down),
+                            const Icon(Icons.arrow_drop_down, size: 20),
                           ],
                         ),
                       ),

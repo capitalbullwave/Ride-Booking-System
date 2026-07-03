@@ -100,13 +100,19 @@ export interface VehicleCategory {
   id: string;
   type: VehicleType;
   name: string;
+  description?: string | null;
   baseFare: number;
   perKmFare: number;
+  includedDistanceKm: number;
+  includedHours?: number;
+  perHourRate?: number;
   waitingCharge: number;
   cancellationCharge: number;
   surgeMultiplier: number;
   isActive: boolean;
   icon: string;
+  imageUrl?: string | null;
+  serviceGroup?: "ride" | "rental" | string;
 }
 
 export interface Transaction {

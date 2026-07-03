@@ -71,6 +71,23 @@ class Driver(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
     withdrawals: Mapped[List["WithdrawalRequest"]] = relationship("WithdrawalRequest", back_populates="driver")
     notifications: Mapped[List["Notification"]] = relationship("Notification", back_populates="driver")
     support_tickets: Mapped[List["SupportTicket"]] = relationship("SupportTicket", back_populates="driver")
+    emergency_contacts: Mapped[List["DriverEmergencyContact"]] = relationship(
+        "DriverEmergencyContact", back_populates="driver", cascade="all, delete-orphan"
+    )
+
+
+class DriverEmergencyContact(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "driver_emergency_contacts"
+    __table_args__ = (Index("ix_driver_emergency_contacts_driver", "driver_id"),)
+
+    driver_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("drivers.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    relation: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    driver: Mapped["Driver"] = relationship("Driver", back_populates="emergency_contacts")
 
 
 class DriverDocument(UUIDMixin, TimestampMixin, Base):

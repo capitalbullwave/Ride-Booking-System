@@ -5,6 +5,7 @@ class UserProfile {
     required this.phone,
     this.email,
     this.rating = 0,
+    this.totalRides = 0,
     this.initial = '?',
   });
 
@@ -13,7 +14,28 @@ class UserProfile {
   final String phone;
   final String? email;
   final double rating;
+  final int totalRides;
   final String initial;
+
+  /// True when the backend only has the OTP signup placeholder name.
+  bool get isPlaceholderName {
+    final trimmed = name.trim().toLowerCase();
+    return trimmed.isEmpty || trimmed == 'user';
+  }
+
+  /// Best label for UI — prefers a real name, then phone, then fallback.
+  String get displayName {
+    if (!isPlaceholderName) return name.trim();
+    final phoneTrimmed = phone.trim();
+    if (phoneTrimmed.isNotEmpty) return phoneTrimmed;
+    return name.trim().isNotEmpty ? name.trim() : 'User';
+  }
+
+  String get displayInitial {
+    final label = displayName.trim();
+    if (label.isEmpty) return 'U';
+    return label[0].toUpperCase();
+  }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final name = json['name'] as String? ?? 'User';
@@ -23,6 +45,7 @@ class UserProfile {
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      totalRides: (json['total_rides'] as num?)?.toInt() ?? 0,
       initial: json['initial'] as String? ??
           (name.isNotEmpty ? name[0].toUpperCase() : '?'),
     );
@@ -34,6 +57,7 @@ class UserProfile {
         'phone': phone,
         'email': email,
         'rating': rating,
+        'total_rides': totalRides,
         'initial': initial,
       };
 }
@@ -112,22 +136,72 @@ class HomeBanner {
       );
 }
 
+class VehicleCategory {
+  const VehicleCategory({
+    required this.id,
+    required this.slug,
+    required this.name,
+    this.description,
+    required this.baseFare,
+    required this.perKmRate,
+    this.includedDistanceKm,
+    this.includedHours,
+    this.perHourRate,
+    this.iconUrl,
+    this.serviceGroup = 'ride',
+  });
+
+  final String id;
+  final String slug;
+  final String name;
+  final String? description;
+  final double baseFare;
+  final double perKmRate;
+  final double? includedDistanceKm;
+  final double? includedHours;
+  final double? perHourRate;
+  final String? iconUrl;
+  final String serviceGroup;
+
+  factory VehicleCategory.fromJson(Map<String, dynamic> json) => VehicleCategory(
+        id: json['id'] as String? ?? '',
+        slug: json['slug'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        description: json['description'] as String?,
+        baseFare: (json['base_fare'] as num?)?.toDouble() ?? 0,
+        perKmRate: (json['per_km_rate'] as num?)?.toDouble() ?? 0,
+        includedDistanceKm: (json['included_distance_km'] as num?)?.toDouble(),
+        includedHours: (json['included_hours'] as num?)?.toDouble(),
+        perHourRate: (json['per_hour_rate'] as num?)?.toDouble(),
+        iconUrl: json['icon_url'] as String?,
+        serviceGroup: json['service_group'] as String? ?? 'ride',
+      );
+}
+
 class HomeDashboard {
   const HomeDashboard({
     required this.greetingName,
+    this.fullName = '',
     required this.nearbyDriversCount,
     required this.banners,
+    required this.vehicleCategories,
   });
 
   final String greetingName;
+  final String fullName;
   final int nearbyDriversCount;
   final List<HomeBanner> banners;
+  final List<VehicleCategory> vehicleCategories;
 
   factory HomeDashboard.fromJson(Map<String, dynamic> json) => HomeDashboard(
         greetingName: json['greeting_name'] as String? ?? 'there',
+        fullName: json['full_name'] as String? ?? '',
         nearbyDriversCount: json['nearby_drivers_count'] as int? ?? 0,
         banners: (json['banners'] as List<dynamic>? ?? [])
             .map((e) => HomeBanner.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        vehicleCategories: (json['vehicle_categories'] as List<dynamic>? ?? [])
+            .map((e) => VehicleCategory.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }

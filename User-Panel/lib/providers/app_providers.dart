@@ -81,6 +81,14 @@ final homeDashboardProvider = FutureProvider<HomeDashboard>((ref) async {
   return ref.watch(homeRepositoryProvider).getDashboard();
 });
 
+final vehicleCategoriesProvider = FutureProvider<List<VehicleCategory>>((ref) async {
+  return ref.watch(homeRepositoryProvider).getVehicleCategories(serviceGroup: 'ride');
+});
+
+final rentalCategoriesProvider = FutureProvider<List<VehicleCategory>>((ref) async {
+  return ref.watch(homeRepositoryProvider).getRentalCategories();
+});
+
 final activeRideProvider = FutureProvider<UserActiveRide?>((ref) async {
   final data = await ref.watch(rideBookingServiceProvider).getActiveRide();
   if (data == null) return null;

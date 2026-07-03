@@ -4,8 +4,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, EmailStr
-from sqlalchemy import func, or_, select
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -14,11 +14,14 @@ from app.auth.service import AuthService
 from app.core.constants import DriverStatus, KYCStatus, RideStatus
 from app.core.exceptions import NotFoundException
 from app.database.session import get_db
-from app.models import AdminUser, Driver, DriverDocument, Ride, User, Vehicle, Wallet
+from app.models import AdminUser, Driver, DriverDocument, Ride, User, Vehicle, Wallet, WalletTransaction, Notification, SupportTicket
 from app.drivers.models import DriverBankAccount
 from app.schemas.admin import AdminLogin
 from app.schemas.user import RefreshTokenRequest
 from app.schemas.common import TokenResponse
+from app.services.driver_deletion_service import permanently_delete_driver
+from app.services.user_deletion_service import permanently_delete_user
+from app.notifications.service import NotificationService
 
 router = APIRouter(tags=["Admin"])
 
@@ -26,6 +29,7 @@ router = APIRouter(tags=["Admin"])
 class AdminLoginResponse(BaseModel):
     user: dict
     accessToken: str
+    refreshToken: str
     expiresAt: int
 
 
@@ -38,11 +42,19 @@ def _user_status(user: User) -> str:
 
 
 def _map_user(user: User, wallet_balance: float = 0.0, total_rides: int = 0) -> dict:
+    email = user.email or ""
+    # Hide auto-generated placeholder emails (phone@ridebook.app) in admin.
+    # Admin should show only user-provided details; missing values stay blank.
+    if email.endswith("@ridebook.app"):
+        local = email.split("@", 1)[0]
+        digits = "".join(ch for ch in (user.phone or "") if ch.isdigit())
+        if local and digits and local in digits:
+            email = ""
     return {
         "id": str(user.id),
         "name": f"{user.first_name} {user.last_name}".strip(),
         "mobile": user.phone,
-        "email": user.email,
+        "email": email,
         "registrationDate": user.created_at.date().isoformat(),
         "totalRides": total_rides,
         "walletBalance": wallet_balance,
@@ -185,6 +197,7 @@ async def admin_login(data: AdminLogin, db: AsyncSession = Depends(get_db)):
             "phone": "+91 00000 00000",
         },
         accessToken=tokens.access_token,
+        refreshToken=tokens.refresh_token,
         expiresAt=int(datetime.now(timezone.utc).timestamp()) + 86400,
     )
 
@@ -322,6 +335,16 @@ async def activate_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_c
     return await _set_user_active(user_id, db, active=True, verified=True)
 
 
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    await permanently_delete_user(db, user_id)
+    return {"message": "User permanently deleted", "id": str(user_id)}
+
+
 @router.post("/users/{user_id}/reset")
 async def reset_user(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
     return await get_user(user_id, admin, db)
@@ -340,17 +363,74 @@ async def user_rides(user_id: UUID, admin: Annotated[AdminUser, Depends(get_curr
 async def user_wallet(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
     wallet_result = await db.execute(select(Wallet).where(Wallet.user_id == user_id))
     wallet = wallet_result.scalar_one_or_none()
-    return {"balance": wallet.balance if wallet else 0.0, "transactions": []}
+    if not wallet:
+        return {"balance": 0.0, "transactions": []}
+
+    tx_result = await db.execute(
+        select(WalletTransaction)
+        .where(WalletTransaction.wallet_id == wallet.id)
+        .order_by(WalletTransaction.created_at.desc())
+        .limit(50)
+    )
+    transactions = []
+    for tx in tx_result.scalars().all():
+        ride_id = tx.reference_id if (tx.reference_type or "").lower() in ("ride", "rides") else None
+        transactions.append(
+            {
+                "id": str(tx.id),
+                "userId": str(user_id),
+                "description": tx.description,
+                "amount": tx.amount,
+                "status": "completed",
+                "date": tx.created_at.isoformat(),
+                "rideId": ride_id,
+            }
+        )
+    return {"balance": wallet.balance, "transactions": transactions}
 
 
 @router.get("/users/{user_id}/support-tickets")
-async def user_tickets(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)]):
-    return []
+async def user_tickets(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(SupportTicket)
+        .where(SupportTicket.user_id == user_id)
+        .order_by(SupportTicket.created_at.desc())
+        .limit(100)
+    )
+    tickets = result.scalars().all()
+    return [
+        {
+            "id": str(t.id),
+            "userId": str(user_id),
+            "subject": t.subject,
+            "description": t.description,
+            "status": t.status,
+            "priority": t.priority,
+            "createdAt": t.created_at.isoformat(),
+            "updatedAt": t.updated_at.isoformat(),
+        }
+        for t in tickets
+    ]
 
 
 @router.get("/users/{user_id}/activity-logs")
-async def user_logs(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)]):
-    return []
+async def user_logs(user_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Notification)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.created_at.desc())
+        .limit(100)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": str(n.id),
+            "userId": str(user_id),
+            "action": f"{n.title}: {n.message}" if n.message else n.title,
+            "timestamp": n.created_at.isoformat(),
+        }
+        for n in logs
+    ]
 
 
 @router.get("/drivers")
@@ -460,6 +540,17 @@ async def approve_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(ge
         raise NotFoundException("Driver not found")
     driver.kyc_status = KYCStatus.APPROVED.value
     driver.is_verified = True
+    await db.execute(
+        update(DriverDocument)
+        .where(DriverDocument.driver_id == driver.id)
+        .values(status=KYCStatus.APPROVED.value)
+    )
+    await NotificationService(db).create_in_app(
+        title="KYC Approved",
+        message="Your documents are verified. You can go online and accept rides.",
+        notification_type="SYSTEM",
+        driver_id=driver.id,
+    )
     await db.flush()
     return _map_driver(driver)
 
@@ -471,6 +562,12 @@ async def reject_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends(get
     if not driver:
         raise NotFoundException("Driver not found")
     driver.kyc_status = KYCStatus.REJECTED.value
+    await NotificationService(db).create_in_app(
+        title="Documents Rejected",
+        message="Please update your documents and resubmit for verification.",
+        notification_type="SYSTEM",
+        driver_id=driver.id,
+    )
     await db.flush()
     return _map_driver(driver)
 
@@ -495,6 +592,16 @@ async def reactivate_driver(driver_id: UUID, admin: Annotated[AdminUser, Depends
     driver.is_active = True
     await db.flush()
     return _map_driver(driver)
+
+
+@router.delete("/drivers/{driver_id}")
+async def delete_driver(
+    driver_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    await permanently_delete_driver(db, driver_id)
+    return {"message": "Driver permanently deleted", "id": str(driver_id)}
 
 
 @router.get("/drivers/{driver_id}/rides")

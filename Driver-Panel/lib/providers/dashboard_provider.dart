@@ -87,14 +87,23 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
 
   void _startLocationSync() {
     _locationSubscription?.cancel();
+    DateTime? lastPosted;
     _locationSubscription = _locationService.getPositionStream().listen(
       (position) {
-        _profileService.updateLocation(
-          lat: position.latitude,
-          lng: position.longitude,
-          heading: position.heading,
-          speed: position.speed,
-        );
+        final now = DateTime.now();
+        if (lastPosted != null &&
+            now.difference(lastPosted!) < const Duration(seconds: 5)) {
+          return;
+        }
+        lastPosted = now;
+        _profileService
+            .updateLocation(
+              lat: position.latitude,
+              lng: position.longitude,
+              heading: position.heading,
+              speed: position.speed,
+            )
+            .catchError((_) {});
       },
       onError: (_) {},
     );
@@ -153,4 +162,3 @@ final dashboardViewModelProvider =
   );
 });
 
-final themeModeProvider = StateProvider<bool>((ref) => false);

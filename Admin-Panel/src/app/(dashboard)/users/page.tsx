@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MoreHorizontal, Eye, Pencil, Ban, UserX, CheckCircle } from "lucide-react";
+import { MoreHorizontal, Eye, Pencil, Ban, UserX, CheckCircle, Trash2, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/shared/search-bar";
 import { ExportButton } from "@/components/shared/export-button";
@@ -38,12 +38,12 @@ import { formatCurrency, formatDate, formatShortId } from "@/lib/format";
 import {
   activateUser,
   blockUser,
+  deleteUser,
   fetchUsers,
   suspendUser,
   updateUser,
 } from "@/lib/users-api";
 import { toast } from "sonner";
-import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { useAuth } from "@/components/providers/auth-provider";
 
 type UserFormData = {
@@ -53,7 +53,7 @@ type UserFormData = {
   city: string;
 };
 
-type ConfirmAction = "activate" | "unblock" | "suspend" | "block";
+type ConfirmAction = "activate" | "unblock" | "suspend" | "block" | "delete";
 
 const confirmConfig: Record<
   ConfirmAction,
@@ -82,6 +82,13 @@ const confirmConfig: Record<
     description: (name) =>
       `Are you sure you want to block ${name}? This will restrict account access immediately.`,
     button: "Block User",
+    destructive: true,
+  },
+  delete: {
+    title: "Delete User",
+    description: (name) =>
+      `Permanently delete ${name}'s account? They will need to sign up again from scratch. Ride history may be kept for records.`,
+    button: "Delete User",
     destructive: true,
   },
 };
@@ -166,10 +173,6 @@ export default function UsersPage() {
     return () => clearTimeout(timer);
   }, [loadUsers, authLoading, isAuthenticated]);
 
-  useAutoRefresh(() => loadUsers({ silent: true }), {
-    enabled: isAuthenticated && !authLoading,
-  });
-
   const filteredUsers = useMemo(() => userList, [userList]);
 
   const usersExportPath = useMemo(() => {
@@ -240,6 +243,9 @@ export default function UsersPage() {
       } else if (confirmAction === "suspend") {
         await suspendUser(user.id);
         toast.success(`${user.name} has been suspended`);
+      } else if (confirmAction === "delete") {
+        await deleteUser(user.id);
+        toast.success(`${user.name} has been deleted`);
       } else {
         await blockUser(user.id);
         toast.success(`${user.name} has been blocked`);
@@ -254,6 +260,8 @@ export default function UsersPage() {
             ? "Failed to unblock user"
             : confirmAction === "suspend"
               ? "Failed to suspend user"
+              : confirmAction === "delete"
+                ? "Failed to delete user"
               : "Failed to block user";
       toast.error(error instanceof Error ? error.message : fallback);
     } finally {
@@ -280,7 +288,18 @@ export default function UsersPage() {
       key: "actions",
       header: "Actions",
       cell: (u) => (
-        <DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            disabled={actionUserId === u.id}
+            onClick={() => openConfirm(u, "delete")}
+            title="Delete user"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
@@ -323,8 +342,17 @@ export default function UsersPage() {
                 <UserX className="mr-2 h-4 w-4" /> Block User
               </DropdownMenuItem>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={actionUserId === u.id}
+              onClick={() => openConfirm(u, "delete")}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete User
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       ),
     },
   ];
@@ -332,6 +360,15 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="User Management" description="Manage and monitor all registered users">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void loadUsers()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
         <ExportButton filename="wavego-users" exportPath={usersExportPath} />
       </PageHeader>
 

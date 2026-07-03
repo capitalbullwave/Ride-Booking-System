@@ -118,3 +118,25 @@ async def update_pricing(
     from app.api.admin._extended import update_settings
 
     return await update_settings(data, admin, db)
+
+
+@router.post("/vehicle-categories")
+async def create_vehicle_category_route(
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.api.admin._extended import create_vehicle_category
+
+    return await create_vehicle_category(data, admin, db)
+
+
+@router.delete("/vehicle-categories/{category_id}")
+async def delete_vehicle_category_route(
+    category_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.api.admin._extended import delete_vehicle_category
+
+    return await delete_vehicle_category(category_id, admin, db)

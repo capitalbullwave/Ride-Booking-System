@@ -25,6 +25,12 @@ class VehicleType(UUIDMixin, TimestampMixin, Base):
     per_km_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     per_minute_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     waiting_charge_per_min: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    included_distance_km: Mapped[float] = mapped_column(Float, default=2.0, nullable=False)
+    included_hours: Mapped[float] = mapped_column(Float, default=4.0, nullable=False)
+    per_hour_rate: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    minimum_fare: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    cancellation_charge: Mapped[float] = mapped_column(Float, default=20.0, nullable=False)
+    service_group: Mapped[str] = mapped_column(String(20), default="ride", nullable=False, index=True)
     capacity: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

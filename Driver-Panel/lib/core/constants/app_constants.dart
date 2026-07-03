@@ -12,10 +12,15 @@ class AppConstants {
   static const String vehicleIdKey = 'vehicle_id';
   static const String themeModeKey = 'theme_mode';
   static const String languageKey = 'language';
+  static const String notificationsEnabledKey = 'notifications_enabled';
+  static const String autoAcceptKey = 'auto_accept_rides';
+  static const String navigationAppKey = 'navigation_app';
 
   static const List<String> vehicleTypes = [
     'Bike',
     'Auto',
+    'E-Rickshaw',
+    'Cab',
     'Mini Cab',
     'Sedan',
     'SUV',

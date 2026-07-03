@@ -5,6 +5,7 @@ class HomeServiceItem {
     required this.imageAsset,
     required this.route,
     this.isEmergency = false,
+    this.imageUrl,
   });
 
   final String name;
@@ -12,6 +13,7 @@ class HomeServiceItem {
   final String imageAsset;
   final String route;
   final bool isEmergency;
+  final String? imageUrl;
 }
 
 class AppServices {

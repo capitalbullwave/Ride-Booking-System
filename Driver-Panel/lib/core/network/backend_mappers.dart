@@ -253,6 +253,19 @@ class BackendMappers {
   static WalletInfo walletFromJson(Map<String, dynamic> json) {
     return WalletInfo(
       currentBalance: (json['balance'] as num?)?.toDouble() ?? 0,
+      bank: json['bank'] != null
+          ? bankFromJson(json['bank'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  static BankInfo bankFromJson(Map<String, dynamic> json) {
+    return BankInfo(
+      accountHolder: json['account_holder'] as String?,
+      accountNumber: json['account_number'] as String?,
+      ifsc: json['ifsc'] as String?,
+      bankName: json['bank_name'] as String?,
+      upiId: json['upi_id'] as String?,
     );
   }
 

@@ -7,6 +7,7 @@ import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
+import 'package:wavego_driver/providers/auth_session_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -42,6 +43,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final authRepo = ref.read(authRepositoryProvider);
     final onboardingDone = await authRepo.isOnboardingComplete();
     final isLoggedIn = await authRepo.isLoggedIn();
+    if (isLoggedIn) {
+      ref.read(authSessionProvider.notifier).setAuthenticated(true);
+    }
 
     if (!onboardingDone) {
       context.go(RouteNames.onboarding);
@@ -53,7 +57,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           localStorage.getBool(AppConstants.driverRegisteredKey) ?? false;
 
       context.go(
-        isRegistered ? RouteNames.dashboard : RouteNames.registration,
+        isRegistered ? RouteNames.dashboard : RouteNames.captainWelcome,
       );
     }
   }

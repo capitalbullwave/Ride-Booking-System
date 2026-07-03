@@ -3,14 +3,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
+import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/place_models.dart';
+import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/screens/booking/map_picker_screen.dart';
 import 'package:wavego_user/services/location_service.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/services/recent_places_service.dart';
+import 'package:wavego_user/services/saved_places_service.dart';
 import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
@@ -88,6 +93,9 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
             position.longitude,
           );
       if (!mounted) return;
+      await ref.read(recentPlacesServiceProvider).add(place);
+      ref.read(recentPlacesProvider.notifier).state =
+          ref.read(recentPlacesServiceProvider).getAll();
       context.pop(place);
     } on LocationServiceException catch (e) {
       if (!mounted) return;
@@ -129,6 +137,9 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       ),
     );
     if (result != null && mounted) {
+      await ref.read(recentPlacesServiceProvider).add(result);
+      ref.read(recentPlacesProvider.notifier).state =
+          ref.read(recentPlacesServiceProvider).getAll();
       context.pop(result);
     }
   }
@@ -161,18 +172,48 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     );
   }
 
+  Widget _recommendationSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: AppColors.mutedForeground,
+        ),
+      ),
+    );
+  }
+
+  Widget _recommendedTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+      onTap: onTap,
+    );
+  }
+
   void _selectPlace(PlaceSuggestion place) async {
     if (!place.hasCoordinates && place.id.isNotEmpty && place.source == 'google') {
       try {
         final resolved = await ref.read(placesServiceProvider).resolvePlaceDetails(place.id);
         if (!mounted) return;
-        context.pop(
-          SelectedPlace(
-            label: resolved.displayLabel,
-            latitude: resolved.latitude,
-            longitude: resolved.longitude,
-          ),
+        final selected = SelectedPlace(
+          label: resolved.displayLabel,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
         );
+        await ref.read(recentPlacesServiceProvider).add(selected);
+        ref.read(recentPlacesProvider.notifier).state =
+            ref.read(recentPlacesServiceProvider).getAll();
+        if (!mounted) return;
+        context.pop(selected);
         return;
       } catch (e) {
         if (mounted) {
@@ -182,13 +223,16 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       }
     }
 
-    context.pop(
-      SelectedPlace(
-        label: place.displayLabel,
-        latitude: place.latitude,
-        longitude: place.longitude,
-      ),
+    final selected = SelectedPlace(
+      label: place.displayLabel,
+      latitude: place.latitude,
+      longitude: place.longitude,
     );
+    await ref.read(recentPlacesServiceProvider).add(selected);
+    ref.read(recentPlacesProvider.notifier).state =
+        ref.read(recentPlacesServiceProvider).getAll();
+    if (!mounted) return;
+    context.pop(selected);
   }
 
   @override
@@ -248,13 +292,85 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
             ),
           Expanded(
             child: _results.isEmpty && !_isSearching
-                ? Center(
-                    child: Text(
-                      _searchController.text.length < 2
-                          ? 'Type at least 2 characters to search'
-                          : 'No places found',
-                      style: TextStyle(color: AppColors.mutedForeground),
-                    ),
+                ? Builder(
+                    builder: (context) {
+                      final q = _searchController.text.trim();
+                      if (q.length >= 2) {
+                        return Center(
+                          child: Text(
+                            'No places found',
+                            style: TextStyle(color: AppColors.mutedForeground),
+                          ),
+                        );
+                      }
+
+                      final saved = ref.watch(savedPlacesProvider);
+                      final favorites = saved.where((p) => p.isFavorite).toList();
+                      final recents = ref.watch(recentPlacesProvider);
+
+                      if (favorites.isEmpty && saved.isEmpty && recents.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'Search or pick a saved place',
+                            style: TextStyle(color: AppColors.mutedForeground),
+                          ),
+                        );
+                      }
+
+                      return ListView(
+                        children: [
+                          if (favorites.isNotEmpty) ...[
+                            _recommendationSectionTitle('Favorites'),
+                            ...favorites.take(6).map((p) => _recommendedTile(
+                                  icon: Icons.favorite,
+                                  title: p.title,
+                                  subtitle: p.address,
+                                  onTap: () async {
+                                    final selected = ref.read(savedPlacesServiceProvider).toSelectedPlace(p);
+                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    ref.read(recentPlacesProvider.notifier).state =
+                                        ref.read(recentPlacesServiceProvider).getAll();
+                                    if (context.mounted) context.pop(selected);
+                                  },
+                                )),
+                            const Divider(height: 1),
+                          ],
+                          if (saved.isNotEmpty) ...[
+                            _recommendationSectionTitle('Saved places'),
+                            ...saved.take(8).map((p) => _recommendedTile(
+                                  icon: Icons.bookmark,
+                                  title: p.title,
+                                  subtitle: p.address,
+                                  onTap: () async {
+                                    final selected = ref.read(savedPlacesServiceProvider).toSelectedPlace(p);
+                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    ref.read(recentPlacesProvider.notifier).state =
+                                        ref.read(recentPlacesServiceProvider).getAll();
+                                    if (context.mounted) context.pop(selected);
+                                  },
+                                )),
+                            const Divider(height: 1),
+                          ],
+                          if (recents.isNotEmpty) ...[
+                            _recommendationSectionTitle('Recent'),
+                            ...recents.take(10).map((p) => _recommendedTile(
+                                  icon: Icons.history,
+                                  title: p.label,
+                                  subtitle: p.latitude != null && p.longitude != null
+                                      ? 'Saved coordinates'
+                                      : 'No coordinates',
+                                  onTap: () async {
+                                    final selected = p.toSelected();
+                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    ref.read(recentPlacesProvider.notifier).state =
+                                        ref.read(recentPlacesServiceProvider).getAll();
+                                    if (context.mounted) context.pop(selected);
+                                  },
+                                )),
+                          ],
+                        ],
+                      );
+                    },
                   )
                 : ListView.separated(
                     itemCount: _results.length,
@@ -295,17 +411,40 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   bool _loadingRoute = true;
   String? _routeError;
   int? _selectedVehicleIndex;
-
-  static const _vehicles = [
-    ('Bike', '₹45', '4 min', Icons.two_wheeler),
-    ('Auto', '₹65', '5 min', Icons.electric_rickshaw),
-    ('Cab', '₹120', '6 min', Icons.directions_car),
-  ];
+  List<BookableVehicle> _vehicles = fallbackBookableVehicles();
+  bool _loadingVehicles = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadRoute());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRoute();
+      _loadVehicles();
+    });
+  }
+
+  Future<void> _loadVehicles() async {
+    try {
+      final categories = await ref.read(vehicleCategoriesProvider.future);
+      if (!mounted) return;
+      setState(() {
+        _vehicles = categories.isNotEmpty
+            ? categories
+                .asMap()
+                .entries
+                .map((entry) => bookableVehicleFromCategory(entry.value, entry.key))
+                .toList()
+            : fallbackBookableVehicles();
+        _loadingVehicles = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _vehicles = fallbackBookableVehicles();
+          _loadingVehicles = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadRoute() async {
@@ -350,6 +489,17 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   }
 
   Future<void> _confirmBooking() async {
+    final activeRide = await ref.read(activeRideProvider.future);
+    if (activeRide != null) {
+      if (mounted) {
+        context.showSnackBar(
+          'You already have an active ride. Please finish or cancel it before booking a new one.',
+          isError: true,
+        );
+      }
+      return;
+    }
+
     final trip = ref.read(tripBookingProvider);
     final pickup = trip.pickup;
     final dropoff = trip.dropoff;
@@ -373,7 +523,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       if (rideId != null && rideId.isNotEmpty) {
         ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
       }
-      if (mounted) context.push('/book/searching');
+      if (mounted) context.go(RouteNames.bookSearching);
     } catch (e) {
       if (mounted) {
         context.showSnackBar(e.toString(), isError: true);
@@ -452,84 +602,102 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                       ),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                ..._vehicles.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final v = entry.value;
-                  final isSelected = _selectedVehicleIndex == index;
-                  final fare = _route != null
-                      ? '₹${(_route!.distanceKm * 8).round()}'
-                      : v.$2;
+            child: _loadingVehicles
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      ..._vehicles.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final vehicle = entry.value;
+                        final isSelected = _selectedVehicleIndex == index;
+                        final fare = _route != null
+                            ? vehicle.fareForDistanceKm(_route!.distanceKm)
+                            : vehicle.fareForDistanceKm(5);
 
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _route == null
-                          ? null
-                          : () => setState(() => _selectedVehicleIndex = index),
-                      borderRadius: BorderRadius.circular(AppRadius.card),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.primary.withValues(alpha: 0.08)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(AppRadius.card),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.border,
-                            width: isSelected ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(v.$4, size: 32, color: AppColors.primary),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _route == null
+                                ? null
+                                : () => setState(() => _selectedVehicleIndex = index),
+                            borderRadius: BorderRadius.circular(AppRadius.card),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primary.withValues(alpha: 0.08)
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(AppRadius.card),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    v.$1,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  Text(
-                                    v.$3,
-                                    style: TextStyle(
-                                      color: AppColors.mutedForeground,
-                                      fontSize: 13,
+                                  if (vehicle.imageUrl != null)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Image.network(
+                                        vehicle.imageUrl!,
+                                        width: 48,
+                                        height: 48,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Icon(
+                                          vehicle.icon,
+                                          size: 32,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Icon(vehicle.icon, size: 32, color: AppColors.primary),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          vehicle.name,
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          vehicle.etaLabel(index),
+                                          style: TextStyle(
+                                            color: AppColors.mutedForeground,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
+                                  Text(
+                                    fare,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  if (isSelected) ...[
+                                    const SizedBox(width: 8),
+                                    const Icon(
+                                      Icons.check_circle,
+                                      color: AppColors.primary,
+                                      size: 22,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
-                            Text(
-                              fare,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            if (isSelected) ...[
-                              const SizedBox(width: 8),
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppColors.primary,
-                                size: 22,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
           ),
           Padding(
             padding: const EdgeInsets.all(16),
@@ -610,12 +778,25 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
     super.dispose();
   }
 
+  void _goHomeFromSearching() {
+    context.go(RouteNames.home);
+  }
+
   @override
   Widget build(BuildContext context) {
     final rideId = _rideId ?? ref.watch(tripBookingProvider).activeRideId ?? '';
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goHomeFromSearching();
+      },
+      child: Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _goHomeFromSearching,
+        ),
         title: const Text('Finding captain'),
         actions: [
           if (rideId.isNotEmpty)
@@ -657,6 +838,7 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -46,6 +46,7 @@ class RideBookRequest(BaseModel):
     payment_method: str = Field(default="CASH", pattern="^(CASH|WALLET|UPI|CARD)$")
     promo_code: Optional[str] = None
     scheduled_at: Optional[datetime] = None
+    rental_hours: Optional[float] = Field(default=None, ge=0)
 
 
 class RideCancelRequest(BaseModel):

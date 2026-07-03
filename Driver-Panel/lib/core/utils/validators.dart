@@ -88,6 +88,16 @@ class Validators {
     return null;
   }
 
+  static String? upiId(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'UPI ID is required';
+    }
+    if (!RegExp(r'^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$').hasMatch(value.trim())) {
+      return 'Enter a valid UPI ID';
+    }
+    return null;
+  }
+
   static String? licenseNumber(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'License number is required';

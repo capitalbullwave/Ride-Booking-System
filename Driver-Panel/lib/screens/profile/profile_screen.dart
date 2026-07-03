@@ -5,21 +5,52 @@ import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
+import 'package:wavego_driver/core/utils/account_verification_status.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/profile_completion.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
+import 'package:wavego_driver/providers/registration_provider.dart';
+import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
 import 'package:wavego_driver/widgets/common/document_status_badge.dart';
 import 'package:wavego_driver/widgets/common/online_toggle.dart';
 
-class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  AccountVerificationMap? _accountStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
+      if (!mounted) return;
+      await _loadAccountStatus();
+    });
+  }
+
+  Future<void> _loadAccountStatus() async {
+    try {
+      final progress =
+          await ref.read(profileRepositoryProvider).getRegistrationProgress();
+      if (!mounted) return;
+      setState(() => _accountStatus = AccountVerificationMap.fromProgress(progress));
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashboard = ref.watch(dashboardViewModelProvider);
     final profile = dashboard.profile;
     final stats = switch (dashboard.statsState) {
@@ -259,13 +290,62 @@ class ProfileScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   _MenuCard(
                     items: [
-                      _ProfileMenuItem(Icons.person_outline, 'Personal Information', RouteNames.editProfile),
-                      _ProfileMenuItem(Icons.directions_car_outlined, 'Vehicle Details', RouteNames.documents),
-                      _ProfileMenuItem(Icons.badge_outlined, 'Driving License', RouteNames.documents),
-                      _ProfileMenuItem(Icons.folder_outlined, 'Documents', RouteNames.documents),
-                      _ProfileMenuItem(Icons.account_balance_outlined, 'Bank Details', RouteNames.wallet),
-                      _ProfileMenuItem(Icons.contact_emergency_outlined, 'Emergency Contact', RouteNames.sos),
+                      _ProfileMenuItem(
+                        Icons.person_outline,
+                        'Personal Information',
+                        RouteNames.editProfile,
+                      ),
+                      _ProfileMenuItem(
+                        Icons.directions_car_outlined,
+                        'Vehicle Details',
+                        RouteNames.onboardingVehicleNumber,
+                        statusId: 'vehicle',
+                        fromProfile: true,
+                      ),
+                      _ProfileMenuItem(
+                        Icons.badge_outlined,
+                        'Driving License',
+                        RouteNames.onboardingLicenseUpload,
+                        statusId: 'license',
+                        fromProfile: true,
+                      ),
+                      _ProfileMenuItem(
+                        Icons.fingerprint_outlined,
+                        'Aadhaar Card',
+                        RouteNames.onboardingKyc,
+                        statusId: 'aadhaar',
+                        fromProfile: true,
+                        docType: 'aadhaar',
+                      ),
+                      _ProfileMenuItem(
+                        Icons.credit_card_outlined,
+                        'PAN Card',
+                        RouteNames.onboardingKyc,
+                        statusId: 'pan',
+                        fromProfile: true,
+                        docType: 'pan',
+                      ),
+                      _ProfileMenuItem(
+                        Icons.description_outlined,
+                        'Vehicle RC',
+                        RouteNames.onboardingVehicleNumber,
+                        statusId: 'vehicle_rc',
+                        fromProfile: true,
+                      ),
+                      _ProfileMenuItem(
+                        Icons.account_balance_outlined,
+                        'Bank Details',
+                        RouteNames.wallet,
+                        statusId: 'bank',
+                      ),
+                      _ProfileMenuItem(
+                        Icons.contact_emergency_outlined,
+                        'Emergency Contact',
+                        RouteNames.emergencyContacts,
+                      ),
                     ],
+                    accountStatus: _accountStatus,
+                    onItemTap: () => _loadAccountStatus(),
                   ),
                   const SizedBox(height: 16),
                   _SectionHeader(title: 'Performance'),
@@ -390,16 +470,69 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _ProfileMenuItem {
-  const _ProfileMenuItem(this.icon, this.label, this.route, {this.color});
+  const _ProfileMenuItem(
+    this.icon,
+    this.label,
+    this.route, {
+    this.color,
+    this.statusId,
+    this.fromProfile = false,
+    this.docType,
+  });
+
   final IconData icon;
   final String label;
   final String route;
   final Color? color;
+  final String? statusId;
+  final bool fromProfile;
+  final String? docType;
+
+  String get navigationRoute {
+    final params = <String, String>{};
+    if (fromProfile) params['from'] = 'profile';
+    if (docType != null) params['type'] = docType!;
+    if (params.isEmpty) return route;
+    return Uri(path: route, queryParameters: params).toString();
+  }
+}
+
+class _AccountStatusIndicator extends StatelessWidget {
+  const _AccountStatusIndicator({required this.verified});
+
+  final bool verified;
+
+  @override
+  Widget build(BuildContext context) {
+    if (verified) {
+      return const Icon(
+        Icons.check_circle_rounded,
+        color: AppColors.success,
+        size: 22,
+      );
+    }
+
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: const BoxDecoration(
+        color: AppColors.error,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
 }
 
 class _MenuCard extends StatelessWidget {
-  const _MenuCard({required this.items});
+  const _MenuCard({
+    required this.items,
+    this.accountStatus,
+    this.onItemTap,
+  });
+
   final List<_ProfileMenuItem> items;
+  final AccountVerificationMap? accountStatus;
+  final VoidCallback? onItemTap;
 
   @override
   Widget build(BuildContext context) {
@@ -411,8 +544,22 @@ class _MenuCard extends StatelessWidget {
             ListTile(
               leading: Icon(items[i].icon, color: items[i].color ?? AppColors.primary),
               title: Text(items[i].label),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () => context.push(items[i].route),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (items[i].statusId != null && accountStatus != null)
+                    _AccountStatusIndicator(
+                      verified: accountStatus!.isVerified(items[i].statusId!),
+                    ),
+                  if (items[i].statusId != null && accountStatus != null)
+                    const SizedBox(width: 8),
+                  const Icon(Icons.chevron_right, size: 20),
+                ],
+              ),
+              onTap: () async {
+                await context.push(items[i].navigationRoute);
+                onItemTap?.call();
+              },
             ),
             if (i < items.length - 1)
               Divider(height: 1, indent: 56, color: AppColors.border.withValues(alpha: 0.5)),

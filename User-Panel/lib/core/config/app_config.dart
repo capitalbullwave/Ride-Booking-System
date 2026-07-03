@@ -19,6 +19,18 @@ class AppConfig {
     return 'http://127.0.0.1:8000/api/v1';
   }
 
+  static String get websocketBaseUrl {
+    // Convert http(s)://host:port/api/v1 -> ws(s)://host:port
+    final rawBase = baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+    final uri = Uri.parse(rawBase);
+    final wsScheme = uri.scheme == 'https' ? 'wss' : 'ws';
+    return uri.replace(scheme: wsScheme).toString();
+  }
+
+  static String rideWebsocketUrl(String token) {
+    return '$websocketBaseUrl/ws/ride?token=$token';
+  }
+
   static const int connectTimeout = 30000;
   static const int receiveTimeout = 30000;
 

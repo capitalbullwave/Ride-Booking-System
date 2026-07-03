@@ -2,12 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_user/core/config/app_config.dart';
+import 'package:wavego_user/core/constants/support_constants.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
+import 'package:wavego_user/models/place_models.dart';
+import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/core/utils/profile_name_resolver.dart';
 import 'package:wavego_user/providers/app_providers.dart';
+import 'package:wavego_user/providers/profile_display_provider.dart';
+import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
+import 'package:wavego_user/services/saved_places_service.dart';
+import 'package:wavego_user/services/user_services.dart';
+import 'package:wavego_user/screens/profile/support_screens.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
 class ProfileSettingsScreen extends ConsumerWidget {
@@ -15,33 +24,34 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profileAsync = ref.watch(userProfileProvider);
+    final labelAsync = ref.watch(resolvedProfileLabelProvider);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Account Settings')),
-      body: profileAsync.when(
+      body: labelAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Unable to load profile')),
-        data: (user) => ListView(
+        data: (resolved) => ListView(
           children: [
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('Edit profile'),
-              subtitle: Text(user?.name ?? 'Update your name and photo'),
+              subtitle: Text(resolved.name),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(RouteNames.profileEdit),
             ),
             ListTile(
               leading: const Icon(Icons.phone_outlined),
               title: const Text('Phone number'),
-              subtitle: Text(user?.phone ?? 'Not set'),
+              subtitle: Text(resolved.phone.isNotEmpty ? resolved.phone : 'Not set'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(RouteNames.profilePhone),
             ),
             ListTile(
               leading: const Icon(Icons.email_outlined),
               title: const Text('Email'),
-              subtitle: Text(user?.email ?? 'Add your email'),
+              subtitle: Text(profile?.email ?? 'Add your email'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(RouteNames.profileEmail),
             ),
@@ -69,6 +79,16 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  bool _saving = false;
+  String? _appliedProfileKey;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      refreshUserProfile(ref);
+    });
+  }
 
   @override
   void dispose() {
@@ -77,20 +97,62 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
+  void _applyProfileFields(UserProfile? user) {
+    if (user == null) return;
+
+    final dashboard = ref.read(homeDashboardProvider).valueOrNull;
+    final resolvedName = ProfileNameResolver.fromProfileAndDashboard(
+      profile: user,
+      dashboard: dashboard,
+    );
+
+    final key = '${user.id}|$resolvedName|${user.email ?? ''}';
+    if (_appliedProfileKey == key) return;
+    _appliedProfileKey = key;
+
+    _nameController.text = resolvedName;
+    _emailController.text = user.email ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
+    final dashboardAsync = ref.watch(homeDashboardProvider);
+
+    ref.listen<AsyncValue<UserProfile?>>(userProfileProvider, (_, next) {
+      next.whenData(_applyProfileFields);
+    });
+    ref.listen<AsyncValue<HomeDashboard>>(homeDashboardProvider, (_, next) {
+      final user = ref.read(userProfileProvider).valueOrNull;
+      if (user != null) _applyProfileFields(user);
+    });
+
+    profileAsync.whenData(_applyProfileFields);
+    dashboardAsync.whenData((_) {
+      final user = profileAsync.valueOrNull;
+      if (user != null) _applyProfileFields(user);
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Unable to load profile')),
+        error: (_, __) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Unable to load profile'),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => refreshUserProfile(ref),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
         data: (user) {
-          if (_nameController.text.isEmpty && user != null) {
-            _nameController.text = user.name;
-            _emailController.text = user.email ?? '';
-          }
+          final resolved = ref.watch(resolvedProfileLabelProvider).valueOrNull;
+          final initial = resolved?.initial ?? user?.displayInitial ?? 'U';
 
           return Padding(
             padding: const EdgeInsets.all(16),
@@ -100,8 +162,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   radius: 44,
                   backgroundColor: AppColors.primary,
                   child: Text(
-                    user?.initial ?? 'U',
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                    initial,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -112,7 +178,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Full name'),
+                  decoration: const InputDecoration(
+                    labelText: 'Full name',
+                    hintText: 'Enter your full name',
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -123,10 +192,33 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 const Spacer(),
                 AppButton(
                   label: 'Save changes',
-                  onPressed: () {
-                    Navigator.pop(context);
-                    context.showSnackBar('Profile updated successfully');
-                  },
+                  isLoading: _saving,
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          final name = _nameController.text.trim();
+                          if (name.length < 2) {
+                            context.showSnackBar('Enter your full name');
+                            return;
+                          }
+                          setState(() => _saving = true);
+                          try {
+                            await ref.read(authRepositoryProvider).updateProfile(
+                                  fullName: name,
+                                  email: _emailController.text.trim(),
+                                );
+                            refreshUserProfile(ref);
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            context.showSnackBar('Profile updated successfully');
+                          } catch (_) {
+                            if (context.mounted) {
+                              context.showSnackBar('Could not update profile');
+                            }
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
                 ),
               ],
             ),
@@ -201,6 +293,8 @@ class EmailSettingsScreen extends ConsumerStatefulWidget {
 
 class _EmailSettingsScreenState extends ConsumerState<EmailSettingsScreen> {
   final _emailController = TextEditingController();
+  bool _saving = false;
+  bool _hydrated = false;
 
   @override
   void dispose() {
@@ -218,8 +312,9 @@ class _EmailSettingsScreenState extends ConsumerState<EmailSettingsScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => const Center(child: Text('Unable to load')),
         data: (user) {
-          if (_emailController.text.isEmpty) {
+          if (!_hydrated) {
             _emailController.text = user?.email ?? '';
+            _hydrated = true;
           }
           return Padding(
             padding: const EdgeInsets.all(16),
@@ -237,10 +332,27 @@ class _EmailSettingsScreenState extends ConsumerState<EmailSettingsScreen> {
                 const SizedBox(height: 24),
                 AppButton(
                   label: 'Save email',
-                  onPressed: () {
-                    Navigator.pop(context);
-                    context.showSnackBar('Verification email sent');
-                  },
+                  isLoading: _saving,
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          setState(() => _saving = true);
+                          try {
+                            await ref.read(authRepositoryProvider).updateProfile(
+                                  email: _emailController.text.trim(),
+                                );
+                            refreshUserProfile(ref);
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            context.showSnackBar('Email saved');
+                          } catch (_) {
+                            if (context.mounted) {
+                              context.showSnackBar('Could not save email');
+                            }
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
                 ),
               ],
             ),
@@ -300,59 +412,101 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   }
 }
 
-class SavedPlacesScreen extends StatelessWidget {
+class SavedPlacesScreen extends ConsumerStatefulWidget {
   const SavedPlacesScreen({super.key});
 
-  static const _places = [
-    ('Home', 'Apt 4B, Sunset Boulevard'),
-    ('Work', 'Tech Park, Building 3'),
-    ('Gym', 'Fitness First, Sector 29'),
-  ];
+  @override
+  ConsumerState<SavedPlacesScreen> createState() => _SavedPlacesScreenState();
+}
+
+class _SavedPlacesScreenState extends ConsumerState<SavedPlacesScreen> {
+  bool _showFavoritesOnly = false;
 
   @override
   Widget build(BuildContext context) {
+    final placesAsync = ref.watch(savedAddressesProvider);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Saved Places')),
+      appBar: AppBar(
+        title: Text(_showFavoritesOnly ? 'Favourite Places' : 'Saved Places'),
+        actions: [
+          IconButton(
+            tooltip: _showFavoritesOnly ? 'Show saved places' : 'Show fav places',
+            onPressed: () => setState(() => _showFavoritesOnly = !_showFavoritesOnly),
+            icon: Icon(_showFavoritesOnly ? Icons.favorite : Icons.favorite_border),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddPlaceSheet(context),
         child: const Icon(Icons.add),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _places.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) {
-          final place = _places[i];
-          return Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              onTap: () => _showPlaceDetail(context, place.$1, place.$2),
-              borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
+      body: placesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Unable to load saved places')),
+        data: (places) {
+          final visible =
+              _showFavoritesOnly ? places.where((p) => p.isFavorite).toList() : places;
+          if (visible.isEmpty) {
+            return const Center(child: Text('No saved places yet'));
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: visible.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (_, i) {
+              final place = visible[i];
+              return Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: () => _showPlaceDetail(context, place.title, place.address),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.place, color: AppColors.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(place.$1, style: const TextStyle(fontWeight: FontWeight.w600)),
-                          Text(place.$2, style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13)),
-                        ],
-                      ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
-                  ],
+                    child: Row(
+                      children: [
+                        const Icon(Icons.place, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(place.title,
+                                  style: const TextStyle(fontWeight: FontWeight.w600)),
+                              Text(
+                                place.address,
+                                style: const TextStyle(
+                                    color: AppColors.mutedForeground, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: place.isFavorite
+                              ? 'Remove from favorites'
+                              : 'Add to favorites',
+                          onPressed: () async {
+                            await ref.read(savedPlacesServiceProvider).toggleFavorite(place.id);
+                            refreshSavedAddresses(ref);
+                          },
+                          icon: Icon(
+                            place.isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: place.isFavorite
+                                ? AppColors.error
+                                : AppColors.mutedForeground,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           );
         },
       ),
@@ -398,65 +552,81 @@ class SavedPlacesScreen extends StatelessWidget {
   void _showAddPlaceSheet(BuildContext context) {
     final labelController = TextEditingController();
     final addressController = TextEditingController();
+    SelectedPlace? selected;
 
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('Add saved place', style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(controller: labelController, decoration: const InputDecoration(labelText: 'Label (e.g. Home)')),
-            const SizedBox(height: 12),
-            TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
-            const SizedBox(height: 20),
-            AppButton(
-              label: 'Save place',
-              onPressed: () {
-                Navigator.pop(ctx);
-                context.showSnackBar('Place saved');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class HelpSupportScreen extends StatelessWidget {
-  const HelpSupportScreen({super.key});
-
-  static const _topics = [
-    ('Trip issues', Icons.directions_car, 'Get help with rides, cancellations, and driver concerns.'),
-    ('Payments & refunds', Icons.payment, 'Wallet charges, refunds, and payment method help.'),
-    ('Account & safety', Icons.shield_outlined, 'Profile, verification, and safety features.'),
-    ('Contact support', Icons.chat_outlined, 'Chat with our support team 24/7.'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Help & Support')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: _topics
-            .map(
-              (topic) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _HelpTile(
-                  title: topic.$1,
-                  icon: topic.$2,
-                  onTap: () => context.push(RouteNames.profileHelpTopic, extra: topic),
-                ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Add saved place',
+                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
-            )
-            .toList(),
+              const SizedBox(height: 16),
+              TextField(
+                controller: labelController,
+                decoration: const InputDecoration(labelText: 'Label (e.g. Home)'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: addressController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  hintText: 'Tap to choose from map/search',
+                  suffixIcon: Icon(Icons.map_outlined),
+                ),
+                onTap: () async {
+                  final result = await context.push<SelectedPlace>(
+                    RouteNames.location,
+                    extra: 'dropoff',
+                  );
+                  if (result == null) return;
+                  selected = result;
+                  addressController.text = result.label;
+                  setSheetState(() {});
+                },
+              ),
+              const SizedBox(height: 20),
+              AppButton(
+                label: 'Save place',
+                onPressed: () async {
+                  final title = labelController.text.trim();
+                  final addr = addressController.text.trim();
+                  if (title.isEmpty || addr.isEmpty) {
+                    context.showSnackBar('Enter label and address', isError: true);
+                    return;
+                  }
+                  if (AppConfig.enableMockApi) {
+                    await ref.read(savedPlacesServiceProvider).add(
+                          title: title,
+                          address: addr,
+                          latitude: selected?.latitude,
+                          longitude: selected?.longitude,
+                        );
+                  } else {
+                    await ref.read(profileServiceProvider).addAddress(
+                          label: title,
+                          addressLine: addr,
+                          latitude: selected?.latitude,
+                          longitude: selected?.longitude,
+                        );
+                  }
+                  refreshSavedAddresses(ref);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) context.showSnackBar('Place saved');
+                },
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -483,45 +653,11 @@ class HelpTopicScreen extends StatelessWidget {
             Text(body, style: const TextStyle(height: 1.5, color: AppColors.foreground)),
             const SizedBox(height: 24),
             AppButton(
-              label: 'Contact support',
-              onPressed: () => context.showSnackBar('Support chat opened'),
+              label: 'Call $kSupportPhoneNumber',
+              icon: Icons.phone,
+              onPressed: () => launchSupportCall(context),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HelpTile extends StatelessWidget {
-  const _HelpTile({required this.title, required this.icon, required this.onTap});
-
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.primary),
-              const SizedBox(width: 12),
-              Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
-              const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
-            ],
-          ),
         ),
       ),
     );

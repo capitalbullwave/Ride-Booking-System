@@ -12,8 +12,10 @@ import 'package:wavego_user/screens/home/home_screen.dart';
 import 'package:wavego_user/screens/notifications/notification_detail_screen.dart';
 import 'package:wavego_user/screens/notifications/notifications_screen.dart';
 import 'package:wavego_user/screens/onboarding/onboarding_screen.dart';
+import 'package:wavego_user/screens/rental/rental_flow_screens.dart';
 import 'package:wavego_user/screens/profile/profile_screen.dart';
 import 'package:wavego_user/screens/profile/profile_sub_screens.dart';
+import 'package:wavego_user/screens/profile/support_screens.dart';
 import 'package:wavego_user/screens/shell/main_shell.dart';
 import 'package:wavego_user/screens/splash/splash_screen.dart';
 import 'package:wavego_user/models/user_models.dart';
@@ -124,6 +126,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.rental,
+        builder: (_, __) => const RentalHoursScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
+            path: 'vehicles',
+            builder: (_, __) => const RentalVehiclesScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
+            path: 'pickup',
+            builder: (_, __) => const RentalPickupScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
+            path: 'dropoff',
+            builder: (_, __) => const RentalDropoffScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: _rootNavigatorKey,
+            path: 'confirm',
+            builder: (_, __) => const RentalConfirmScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '/ambulance/tracking',
         builder: (_, __) => const AmbulanceTrackingScreen(),
       ),
@@ -140,7 +169,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: RouteNames.profileHelp,
-        builder: (_, __) => const HelpSupportScreen(),
+        builder: (_, __) => const UserSupportScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -210,6 +239,29 @@ final routerProvider = Provider<GoRouter>((ref) {
           final topic = state.extra! as (String, IconData, String);
           return HelpTopicScreen(title: topic.$1, icon: topic.$2, body: topic.$3);
         },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.supportTickets,
+        builder: (_, __) => const SupportTicketsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.supportCreateTicket,
+        builder: (_, state) {
+          final extra = state.extra! as (String, IconData);
+          return CreateSupportTicketScreen(
+            category: extra.$1,
+            icon: extra.$2,
+          );
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.supportTicketDetail,
+        builder: (_, state) => SupportTicketDetailScreen(
+          ticketId: state.extra! as String,
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

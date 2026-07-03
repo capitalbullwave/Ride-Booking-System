@@ -69,14 +69,25 @@ class FareEngine:
         promo_discount: float = 0.0,
         surge_multiplier: float = 1.0,
         pricing_rule: Optional[PricingRule] = None,
+        rental_hours: Optional[float] = None,
     ) -> dict:
         base_fare = pricing_rule.base_fare if pricing_rule else vehicle_type.base_fare
-        per_km = pricing_rule.per_km_rate if pricing_rule else vehicle_type.per_km_rate
-        per_min = pricing_rule.per_minute_rate if pricing_rule else vehicle_type.per_minute_rate
 
-        distance_fare = distance_km * per_km
-        time_fare = duration_min * per_min
-        subtotal = base_fare + distance_fare + time_fare
+        if (vehicle_type.service_group or "ride") == "rental":
+            included = float(getattr(vehicle_type, "included_hours", 4.0) or 4.0)
+            per_hour = float(getattr(vehicle_type, "per_hour_rate", 0.0) or 0.0)
+            hours = float(rental_hours if rental_hours is not None else included)
+            extra_hours = max(0.0, hours - included)
+            distance_fare = 0.0
+            time_fare = extra_hours * per_hour
+            subtotal = base_fare + time_fare
+        else:
+            per_km = pricing_rule.per_km_rate if pricing_rule else vehicle_type.per_km_rate
+            per_min = pricing_rule.per_minute_rate if pricing_rule else vehicle_type.per_minute_rate
+
+            distance_fare = distance_km * per_km
+            time_fare = duration_min * per_min
+            subtotal = base_fare + distance_fare + time_fare
 
         night_charges = 0.0
         if self.is_night_time():
@@ -84,8 +95,14 @@ class FareEngine:
             night_charges = subtotal * (multiplier - 1)
 
         peak_charges = subtotal * (surge_multiplier - 1) if surge_multiplier > 1 else 0.0
-        platform_fee = subtotal * (settings.platform_fee_percent / 100)
-        tax_amount = (subtotal + platform_fee) * (settings.tax_percent / 100)
+        # Rentals are hour-based packages; keep the displayed estimate aligned to the configured package rate.
+        # (Ride flow can still apply fees/taxes if needed in the payment layer.)
+        if (vehicle_type.service_group or "ride") == "rental":
+            platform_fee = 0.0
+            tax_amount = 0.0
+        else:
+            platform_fee = subtotal * (settings.platform_fee_percent / 100)
+            tax_amount = (subtotal + platform_fee) * (settings.tax_percent / 100)
         total = subtotal + night_charges + peak_charges + platform_fee + tax_amount - promo_discount
 
         return {
@@ -143,6 +160,25 @@ class RideService:
         self.fare = FareEngine(db)
         self.maps = MapsService()
 
+    async def _broadcast_realtime_update(self, ride: Ride, event: str = "ride_updated") -> None:
+        # Local import to keep core ride logic decoupled from the API layer.
+        from app.api.websocket.manager import manager
+
+        payload = {
+            "event": event,
+            "ride_id": str(ride.id),
+            "status": ride.status,
+            "ride": RideService.to_response(ride).model_dump(),
+        }
+
+        # Subscribers who explicitly subscribed to this ride_id.
+        await manager.broadcast_ride(str(ride.id), payload)
+
+        # Also notify the participants directly, so the app can get updates without subscribing.
+        await manager.send_personal(str(ride.user_id), payload)
+        if ride.driver_id:
+            await manager.send_personal(str(ride.driver_id), payload)
+
     async def _transition(
         self,
         ride: Ride,
@@ -160,7 +196,13 @@ class RideService:
             actor_id=actor_id,
             metadata=metadata,
         )
-        return await self.crud.update(ride)
+        updated = await self.crud.update(ride)
+        try:
+            await self._broadcast_realtime_update(updated)
+        except Exception:
+            # Realtime is best-effort; don't block ride lifecycle on websocket.
+            pass
+        return updated
 
     async def book(self, user_id: UUID, data: RideBookRequest) -> Ride:
         if await self.crud.get_active_for_user(user_id):
@@ -176,14 +218,27 @@ class RideService:
         if not vehicle_type:
             raise NotFoundException("Vehicle type not found")
 
-        distance_km = self.fare.calculate_distance_km(
-            data.pickup_lat, data.pickup_lng, data.dropoff_lat, data.dropoff_lng
-        )
-        duration_min = self.fare.estimate_duration_min(distance_km)
+        if (vehicle_type.service_group or "ride") == "rental":
+            distance_km = 0.0
+            hours = float(data.rental_hours) if data.rental_hours is not None else float(vehicle_type.included_hours)
+            duration_min = hours * 60.0
+        else:
+            distance_km = self.fare.calculate_distance_km(
+                data.pickup_lat, data.pickup_lng, data.dropoff_lat, data.dropoff_lng
+            )
+            duration_min = self.fare.estimate_duration_min(distance_km)
         rule = await self.fare.get_pricing_rule(data.vehicle_type_id)
-        fare = await self.fare.calculate_fare(vehicle_type, distance_km, duration_min, pricing_rule=rule)
+        fare = await self.fare.calculate_fare(
+            vehicle_type,
+            distance_km,
+            duration_min,
+            pricing_rule=rule,
+            rental_hours=data.rental_hours,
+        )
 
-        await self.maps.get_route_between(data.pickup_address, data.dropoff_address)
+        # Rental bookings are hour-based; don't block on external routing.
+        if (vehicle_type.service_group or "ride") != "rental":
+            await self.maps.get_route_between(data.pickup_address, data.dropoff_address)
 
         ride = Ride(
             user_id=user_id,

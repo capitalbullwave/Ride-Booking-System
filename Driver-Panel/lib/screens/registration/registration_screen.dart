@@ -82,21 +82,34 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final step = ref.watch(registrationStepProvider);
+    final hubMode = ref.watch(registrationHubModeProvider);
     final registration = ref.watch(registrationViewModelProvider);
     final vm = ref.read(registrationViewModelProvider.notifier);
     final padding = Responsive.pagePadding(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Step ${step + 2}/10 · ${_stepTitles[step]}'),
-        leading: step > 0
+        title: Text(
+          hubMode ? _stepTitles[step] : 'Step ${step + 2}/10 · ${_stepTitles[step]}',
+        ),
+        leading: hubMode
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () {
-                  ref.read(registrationStepProvider.notifier).state = step - 1;
+                  ref.read(registrationHubModeProvider.notifier).state = false;
+                  ref.read(registrationHubPhotoNameFlowProvider.notifier).state =
+                      false;
+                  context.pop();
                 },
               )
-            : null,
+            : step > 0
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      ref.read(registrationStepProvider.notifier).state = step - 1;
+                    },
+                  )
+                : null,
       ),
       body: Column(
         children: [
@@ -133,7 +146,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
             padding: padding,
             child: Row(
               children: [
-                if (step > 0)
+                if (!hubMode && step > 0)
                   Expanded(
                     child: AppButton(
                       label: 'Back',
@@ -144,13 +157,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                       },
                     ),
                   ),
-                if (step > 0) const SizedBox(width: 12),
+                if (!hubMode && step > 0) const SizedBox(width: 12),
                 Expanded(
-                  flex: 2,
+                  flex: hubMode ? 1 : 2,
                   child: AppButton(
-                    label: step == _stepTitles.length - 1 ? 'Submit' : 'Next',
+                    label: _nextButtonLabel(step, hubMode),
                     isLoading: vm.isSubmitting,
-                    onPressed: () => _handleNext(step, vm),
+                    onPressed: () => _handleNext(step, vm, hubMode),
                   ),
                 ),
               ],
@@ -162,8 +175,31 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     );
   }
 
-  Future<void> _handleNext(int step, RegistrationViewModel vm) async {
+  String _nextButtonLabel(int step, bool hubMode) {
+    if (hubMode) {
+      final photoFlow = ref.read(registrationHubPhotoNameFlowProvider);
+      if (photoFlow && step == 0) return 'Continue';
+      return 'Save';
+    }
+    return step == _stepTitles.length - 1 ? 'Submit' : 'Next';
+  }
+
+  Future<void> _handleNext(int step, RegistrationViewModel vm, bool hubMode) async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (hubMode) {
+      final photoFlow = ref.read(registrationHubPhotoNameFlowProvider);
+      if (photoFlow && step == 0) {
+        ref.read(registrationStepProvider.notifier).state = 1;
+        ref.read(registrationHubPhotoNameFlowProvider.notifier).state = false;
+        return;
+      }
+
+      ref.read(registrationHubModeProvider.notifier).state = false;
+      ref.read(registrationHubPhotoNameFlowProvider.notifier).state = false;
+      if (mounted) context.pop();
+      return;
+    }
 
     if (step < _stepTitles.length - 1) {
       ref.read(registrationStepProvider.notifier).state = step + 1;

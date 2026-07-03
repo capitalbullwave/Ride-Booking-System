@@ -8,6 +8,8 @@ import 'package:wavego_user/core/utils/phone_utils.dart';
 import 'package:wavego_user/models/otp_send_result.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/services/base_api_service.dart';
+import 'package:wavego_user/services/profile_service.dart';
+import 'package:wavego_user/services/support_service.dart';
 
 class AuthService extends BaseApiService {
   AuthService(super.dio);
@@ -74,15 +76,7 @@ class AuthService extends BaseApiService {
       parser: (data) => data as Map<String, dynamic>,
     );
 
-    try {
-      final profile = await get<Map<String, dynamic>>(
-        ApiEndpoints.me,
-        parser: (data) => data as Map<String, dynamic>,
-      );
-      return BackendMappers.loginWithProfile(tokens, profile);
-    } catch (_) {
-      return BackendMappers.loginFromToken(tokens);
-    }
+    return BackendMappers.loginFromToken(tokens);
   }
 
   Future<void> logout() async {
@@ -117,10 +111,10 @@ class AuthService extends BaseApiService {
     }
 
     final data = await get<Map<String, dynamic>>(
-      ApiEndpoints.me,
+      ApiEndpoints.userProfile,
       parser: (raw) => raw as Map<String, dynamic>,
     );
-    return BackendMappers.userProfile(data);
+    return BackendMappers.profileFromApi(data);
   }
 }
 
@@ -135,6 +129,37 @@ class HomeService extends BaseApiService {
     return get(
       ApiEndpoints.dashboard,
       parser: (data) => HomeDashboard.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  Future<List<VehicleCategory>> getVehicleCategories({String? serviceGroup}) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      final dashboard = await getDashboard();
+      final all = dashboard.vehicleCategories;
+      if (serviceGroup == null) return all.where((c) => c.serviceGroup == 'ride').toList();
+      return all.where((c) => c.serviceGroup == serviceGroup).toList();
+    }
+    final path = serviceGroup == null
+        ? ApiEndpoints.vehicleTypes
+        : '${ApiEndpoints.vehicleTypes}?service_group=$serviceGroup';
+    return get(
+      path,
+      parser: (data) => (data as List<dynamic>)
+          .map((e) => VehicleCategory.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  Future<List<VehicleCategory>> getRentalCategories() async {
+    if (useMock) {
+      return getVehicleCategories(serviceGroup: 'rental');
+    }
+    return get(
+      ApiEndpoints.rentalCategories,
+      parser: (data) => (data as List<dynamic>)
+          .map((e) => VehicleCategory.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }
@@ -231,4 +256,12 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 
 final activityServiceProvider = Provider<ActivityService>((ref) {
   return ActivityService(ref.watch(dioClientProvider).dio);
+});
+
+final supportServiceProvider = Provider<SupportService>((ref) {
+  return SupportService(ref.watch(dioClientProvider).dio);
+});
+
+final profileServiceProvider = Provider<ProfileService>((ref) {
+  return ProfileService(ref.watch(dioClientProvider).dio);
 });

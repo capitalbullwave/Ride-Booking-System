@@ -40,6 +40,8 @@ from app.schemas.user import (
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.services.payment_service import WalletService
+from app.services.driver_deletion_service import purge_soft_deleted_driver_signup_conflicts
+from app.services.user_deletion_service import purge_soft_deleted_user_signup_conflicts
 from app.services.twilio_otp_service import get_twilio_otp_service
 
 logger = get_logger(__name__)
@@ -64,6 +66,20 @@ class AuthService:
         if settings.is_development and otp and not get_twilio_otp_service().is_configured:
             response["otp"] = otp
         return response
+
+    def _driver_otp_email(self, phone: str) -> str:
+        return f"{normalize_phone(phone).replace('+', '')}@driver.ridebook.app"
+
+    def _user_otp_email(self, phone: str) -> str:
+        return f"{normalize_phone(phone).replace('+', '')}@ridebook.app"
+
+    async def _get_driver_for_phone_otp(self, phone: str) -> Driver | None:
+        normalized = normalize_phone(phone)
+        return await self.driver_repo.find_for_otp(normalized, self._driver_otp_email(normalized))
+
+    async def _get_user_for_phone_otp(self, phone: str) -> User | None:
+        normalized = normalize_phone(phone)
+        return await self.user_repo.find_for_otp(normalized, self._user_otp_email(normalized))
 
     def _twilio_otp(self):
         return get_twilio_otp_service()
@@ -124,13 +140,9 @@ class AuthService:
         phone = normalize_phone(data.phone)
         email = data.email or f"{phone.replace('+', '')}@ridebook.app"
 
-        existing = await self.user_repo.get_by_phone(phone)
+        existing = await self.user_repo.find_for_otp(phone, email)
         if existing and existing.is_verified:
             raise ConflictException("Phone already registered")
-        if await self.user_repo.get_by_email(email):
-            other = await self.user_repo.get_by_email(email)
-            if not other or other.phone != phone:
-                raise ConflictException("Email already registered")
 
         otp = await self._issue_phone_otp(phone)
         expires = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -140,11 +152,13 @@ class AuthService:
             existing.first_name = data.first_name
             existing.last_name = data.last_name or ""
             existing.email = email
+            existing.phone = phone
             existing.otp = otp
             existing.otp_expires_at = expires if otp else None
             existing.is_verified = False
             await self.user_repo.update(existing)
         else:
+            await purge_soft_deleted_user_signup_conflicts(self.db, phone, email)
             user = User(
                 email=email,
                 phone=phone,
@@ -293,13 +307,9 @@ class AuthService:
         phone = normalize_phone(data.phone)
         email = data.email or f"{phone.replace('+', '')}@driver.ridebook.app"
 
-        existing = await self.driver_repo.get_by_phone(phone)
+        existing = await self.driver_repo.find_for_otp(phone, email)
         if existing and existing.is_verified:
             raise ConflictException("Phone already registered")
-        if await self.driver_repo.get_by_email(email):
-            other = await self.driver_repo.get_by_email(email)
-            if not other or other.phone != phone:
-                raise ConflictException("Email already registered")
 
         otp = await self._issue_phone_otp(phone)
         expires = datetime.now(timezone.utc) + timedelta(minutes=10)
@@ -309,12 +319,14 @@ class AuthService:
             existing.first_name = data.first_name
             existing.last_name = data.last_name or ""
             existing.email = email
+            existing.phone = phone
             existing.license_number = data.license_number
             existing.otp = otp
             existing.otp_expires_at = expires if otp else None
             existing.is_verified = False
             await self.driver_repo.update(existing)
         else:
+            await purge_soft_deleted_driver_signup_conflicts(self.db, phone, email)
             driver = Driver(
                 email=email,
                 phone=phone,
@@ -332,7 +344,7 @@ class AuthService:
 
     async def verify_driver_register_otp(self, data: DriverRegisterOTPVerify) -> TokenResponse:
         phone = normalize_phone(data.phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        driver = await self._get_driver_for_phone_otp(phone)
         if not driver:
             raise UnauthorizedException("No signup found for this mobile number")
         if driver.is_verified:
@@ -349,7 +361,7 @@ class AuthService:
 
     async def resend_driver_register_otp(self, data: DriverPhoneOTPRequest) -> dict:
         phone = normalize_phone(data.phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        driver = await self._get_driver_for_phone_otp(phone)
         if not driver:
             raise UnauthorizedException("No signup found for this mobile number")
         if driver.is_verified:
@@ -358,6 +370,7 @@ class AuthService:
         otp = await self._issue_phone_otp(phone)
         driver.otp = otp
         driver.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10) if otp else None
+        driver.phone = phone
         await self.driver_repo.update(driver)
         return self._otp_response("OTP resent to your mobile number", otp)
 
@@ -381,7 +394,7 @@ class AuthService:
 
     async def send_driver_login_otp(self, data: DriverPhoneOTPRequest) -> dict:
         phone = normalize_phone(data.phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        driver = await self._get_driver_for_phone_otp(phone)
         if not driver:
             raise UnauthorizedException("No driver account found with this mobile number")
         if not driver.is_active:
@@ -392,6 +405,7 @@ class AuthService:
         otp = await self._issue_phone_otp(phone)
         driver.otp = otp
         driver.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10) if otp else None
+        driver.phone = phone
         await self.driver_repo.update(driver)
 
         return self._otp_response("OTP sent to your mobile number", otp)
@@ -399,7 +413,8 @@ class AuthService:
     async def send_driver_phone_otp(self, phone: str) -> dict:
         """Send OTP for phone login — auto-selects login vs signup flow."""
         phone = normalize_phone(phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        email = f"{phone.replace('+', '')}@driver.ridebook.app"
+        driver = await self.driver_repo.find_for_otp(phone, email)
         if driver and driver.is_verified:
             return await self.send_driver_login_otp(DriverPhoneOTPRequest(phone=phone))
         return await self.send_driver_register_otp(
@@ -414,7 +429,7 @@ class AuthService:
     async def verify_driver_phone_otp(self, phone: str, otp: str) -> TokenResponse:
         """Verify phone OTP — auto-selects login vs signup flow."""
         phone = normalize_phone(phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        driver = await self._get_driver_for_phone_otp(phone)
         if driver and driver.is_verified:
             return await self.verify_driver_login_otp(
                 DriverPhoneOTPVerify(phone=phone, otp=otp)
@@ -425,7 +440,7 @@ class AuthService:
 
     async def verify_driver_login_otp(self, data: DriverPhoneOTPVerify) -> TokenResponse:
         phone = normalize_phone(data.phone)
-        driver = await self.driver_repo.get_by_phone(phone)
+        driver = await self._get_driver_for_phone_otp(phone)
         if not driver:
             raise UnauthorizedException("No driver account found with this mobile number")
         self._validate_phone_otp(phone, data.otp, driver.otp, driver.otp_expires_at)

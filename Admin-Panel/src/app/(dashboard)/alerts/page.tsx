@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -19,10 +19,11 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { adminAlerts as initialAlerts } from "@/data/mock-data";
+import { adminAlerts as fallbackAlerts } from "@/data/mock-data";
 import { AdminAlert, AdminAlertType } from "@/types";
 import { ROUTES } from "@/constants/routes";
 import { formatDateTime } from "@/lib/format";
+import { fetchAdminAlerts } from "@/lib/alerts-api";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -45,8 +46,26 @@ const alertColors: Record<AdminAlertType, string> = {
 };
 
 export default function AlertsInboxPage() {
-  const [alerts, setAlerts] = useState<AdminAlert[]>(initialAlerts);
+  const [alerts, setAlerts] = useState<AdminAlert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchAdminAlerts();
+        if (!cancelled) setAlerts(data.length > 0 ? data : fallbackAlerts);
+      } catch {
+        if (!cancelled) setAlerts(fallbackAlerts);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const unreadCount = alerts.filter((a) => a.unread).length;
 
@@ -113,7 +132,13 @@ export default function AlertsInboxPage() {
           <TabsTrigger value="read">Read</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-6 space-y-3">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                <p className="text-sm text-muted-foreground">Loading alerts…</p>
+              </CardContent>
+            </Card>
+          ) : filtered.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                 <Bell className="mb-4 h-10 w-10 text-muted-foreground/50" />

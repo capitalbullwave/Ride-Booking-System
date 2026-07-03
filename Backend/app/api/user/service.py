@@ -18,17 +18,37 @@ class UserApiService:
         active = await self.ride_repo.get_active_ride_for_user(user.id)
         return {
             "greeting_name": user.first_name,
+            "full_name": f"{user.first_name} {user.last_name}".strip(),
             "vehicle_categories": [
                 {
                     "id": str(vt.id),
-                    "slug": vt.name.lower().replace(" ", "-"),
+                    "slug": vt.slug or vt.name.lower().replace(" ", "-"),
                     "name": vt.name,
                     "description": vt.description,
                     "base_fare": vt.base_fare,
                     "per_km_rate": vt.per_km_rate,
+                    "included_distance_km": vt.included_distance_km,
                     "icon_url": vt.icon,
+                    "service_group": vt.service_group or "ride",
                 }
                 for vt in vehicle_types
+            ],
+            "rental_categories": [
+                {
+                    "id": str(vt.id),
+                    "slug": vt.slug or vt.name.lower().replace(" ", "-"),
+                    "name": vt.name,
+                    "description": vt.description,
+                    "base_fare": vt.base_fare,
+                    "per_km_rate": vt.per_km_rate,
+                    "included_distance_km": vt.included_distance_km,
+                    "included_hours": vt.included_hours,
+                    "per_hour_rate": vt.per_hour_rate,
+                    "icon_url": vt.icon,
+                    "service_group": "rental",
+                }
+                for vt in vehicle_types
+                if (vt.service_group or "ride") == "rental"
             ],
             "offers": [],
             "banners": [],

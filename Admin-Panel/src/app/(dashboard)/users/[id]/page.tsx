@@ -341,7 +341,9 @@ export default function UserDetailPage({
             <h2 className="text-xl font-semibold">{user.name}</h2>
             <StatusBadge status={user.status} />
           </div>
-          <p className="text-sm text-muted-foreground">{user.email} · {user.mobile}</p>
+          <p className="text-sm text-muted-foreground">
+            {user.email || "—"} · {user.mobile || "—"}
+          </p>
         </div>
         <div className="grid grid-cols-3 gap-6 text-center">
           <div>
@@ -353,7 +355,7 @@ export default function UserDetailPage({
             <p className="text-xs text-muted-foreground">Wallet Balance</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">{user.city}</p>
+            <p className="text-2xl font-bold">{user.city || "—"}</p>
             <p className="text-xs text-muted-foreground">City</p>
           </div>
         </div>
@@ -401,6 +403,7 @@ export default function UserDetailPage({
               {userRides.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No rides found for this user.</p>
               ) : (
+                <div className="w-full overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -414,19 +417,24 @@ export default function UserDetailPage({
                   <TableBody>
                     {userRides.map((ride) => (
                       <TableRow key={ride.id}>
-                        <TableCell className="font-mono text-xs">{ride.id}</TableCell>
+                        <TableCell className="font-mono text-xs whitespace-nowrap">{ride.id}</TableCell>
                         <TableCell>
-                          <span className="text-sm">{ride.pickupLocation}</span>
+                          <span className="text-sm block max-w-[520px] truncate" title={ride.pickupLocation}>
+                            {ride.pickupLocation}
+                          </span>
                           <span className="mx-1 text-muted-foreground">→</span>
-                          <span className="text-sm">{ride.dropLocation}</span>
+                          <span className="text-sm block max-w-[520px] truncate" title={ride.dropLocation}>
+                            {ride.dropLocation}
+                          </span>
                         </TableCell>
-                        <TableCell>{formatCurrency(ride.fare)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatCurrency(ride.fare)}</TableCell>
                         <TableCell><StatusBadge status={ride.status} /></TableCell>
-                        <TableCell>{formatDateTime(ride.date)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDateTime(ride.date)}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -9,14 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.user.dependencies import get_current_user
 from app.api.user.service import UserApiService
-from app.core.constants import SupportTicketPriority, SupportTicketStatus
-from app.core.exceptions import ForbiddenException, NotFoundException
+from app.core.constants import RideStatus, SupportTicketPriority, SupportTicketStatus
+from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.database.session import get_db
-from app.models import Notification, Ride, SavedAddress, SupportTicket, User, VehicleType
+from app.models import Notification, Rating, Ride, SavedAddress, SupportTicket, SupportTicketReply, User, VehicleType
 from app.repositories.ride_repository import RideRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import WalletTopUp, WalletTransactionResponse
-from app.schemas.ride import RideCancel, RideCreate, RideDetailResponse, RideResponse
+from app.rides.schemas import RideBookRequest
+from app.schemas.ride import RideDetailResponse, RideResponse
 from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import WalletService
 from app.services.ride_service import RideService
@@ -50,11 +51,54 @@ class BookRideRequest(BaseModel):
     dropoff_lng: float = 77.0266
     vehicle_category_id: str | None = None
     payment_method: str = "CASH"
+    rental_hours: float | None = Field(default=None, ge=0)
 
 
 class SupportRequest(BaseModel):
-    subject: str
-    message: str
+    subject: str = Field(..., min_length=3, max_length=200)
+    message: str = Field(..., min_length=5)
+    category: str | None = None
+
+
+def _ticket_status_key(status: str) -> str:
+    return {
+        SupportTicketStatus.OPEN.value: "open",
+        SupportTicketStatus.IN_PROGRESS.value: "in_progress",
+        SupportTicketStatus.RESOLVED.value: "resolved",
+        SupportTicketStatus.CLOSED.value: "closed",
+    }.get(status, status.lower())
+
+
+async def _load_ticket_replies(db: AsyncSession, ticket_id: UUID) -> list[SupportTicketReply]:
+    result = await db.execute(
+        select(SupportTicketReply)
+        .where(SupportTicketReply.ticket_id == ticket_id)
+        .order_by(SupportTicketReply.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+def _ticket_messages(ticket: SupportTicket, replies: list[SupportTicketReply], user_name: str) -> list[dict]:
+    messages = [
+        {
+            "id": f"{ticket.id}-initial",
+            "sender": user_name,
+            "sender_type": "user",
+            "message": ticket.description,
+            "created_at": ticket.created_at.isoformat(),
+        }
+    ]
+    for reply in replies:
+        messages.append(
+            {
+                "id": str(reply.id),
+                "sender": "WaveGo Support" if reply.sender_type == "ADMIN" else user_name,
+                "sender_type": reply.sender_type.lower(),
+                "message": reply.message,
+                "created_at": reply.created_at.isoformat(),
+            }
+        )
+    return messages
 
 
 class CancelRideRequest(BaseModel):
@@ -78,7 +122,7 @@ def _address_response(address: SavedAddress) -> dict:
     }
 
 
-def _user_to_profile(user: User, addresses: list[SavedAddress]) -> dict:
+def _user_to_profile(user: User, addresses: list[SavedAddress], total_rides: int = 0) -> dict:
     return {
         "id": str(user.id),
         "phone": format_phone_display(user.phone),
@@ -87,6 +131,7 @@ def _user_to_profile(user: User, addresses: list[SavedAddress]) -> dict:
         "profile_image_url": user.profile_photo,
         "emergency_contact_name": user.emergency_contact_name,
         "emergency_contact_phone": user.emergency_contact_phone,
+        "total_rides": total_rides,
         "addresses": [_address_response(a) for a in addresses],
     }
 
@@ -108,7 +153,15 @@ async def get_profile(user: Annotated[User, Depends(get_current_user)], db: Asyn
     result = await db.execute(
         select(SavedAddress).where(SavedAddress.user_id == user.id, SavedAddress.is_deleted == False)
     )
-    return _user_to_profile(user, list(result.scalars().all()))
+    ride_count = (
+        await db.execute(
+            select(func.count()).select_from(Ride).where(
+                Ride.user_id == user.id,
+                Ride.status == RideStatus.COMPLETED.value,
+            )
+        )
+    ).scalar_one()
+    return _user_to_profile(user, list(result.scalars().all()), int(ride_count or 0))
 
 
 @router.put("/profile")
@@ -130,7 +183,15 @@ async def update_profile(
         user.emergency_contact_phone = data.emergency_contact_phone
     await UserRepository(db).update(user)
     result = await db.execute(select(SavedAddress).where(SavedAddress.user_id == user.id))
-    return _user_to_profile(user, list(result.scalars().all()))
+    ride_count = (
+        await db.execute(
+            select(func.count()).select_from(Ride).where(
+                Ride.user_id == user.id,
+                Ride.status == RideStatus.COMPLETED.value,
+            )
+        )
+    ).scalar_one()
+    return _user_to_profile(user, list(result.scalars().all()), int(ride_count or 0))
 
 
 async def _list_user_addresses(user: User, db: AsyncSession) -> list[dict]:
@@ -220,7 +281,7 @@ async def book_ride(
     else:
         vehicle_type_id = UUID(data.vehicle_category_id)
 
-    ride_data = RideCreate(
+    ride_data = RideBookRequest(
         pickup_address=data.pickup_address,
         pickup_lat=data.pickup_lat,
         pickup_lng=data.pickup_lng,
@@ -229,6 +290,7 @@ async def book_ride(
         dropoff_lng=data.dropoff_lng,
         vehicle_type_id=vehicle_type_id,
         payment_method=data.payment_method,
+        rental_hours=data.rental_hours,
     )
     ride = await RideService(db).create_ride(user.id, ride_data)
     notified = await DriverMatchingService(db).dispatch_ride_to_online_drivers(ride, manager)
@@ -358,22 +420,159 @@ async def notifications(
     return [{"id": str(n.id), "title": n.title, "body": n.message, "is_read": n.is_read} for n in result.scalars().all()]
 
 
+@router.put("/notifications/read-all")
+async def mark_all_user_notifications_read(
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import update
+
+    result = await db.execute(
+        update(Notification)
+        .where(Notification.user_id == user.id, Notification.is_read.is_(False))
+        .values(is_read=True)
+    )
+    await db.flush()
+    return {"updated": int(result.rowcount or 0)}
+
+
+@router.put("/notifications/{notification_id}/read")
+async def mark_user_notification_read(
+    notification_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Notification).where(Notification.id == notification_id, Notification.user_id == user.id)
+    )
+    notification = result.scalar_one_or_none()
+    if not notification:
+        raise NotFoundException("Notification not found")
+    notification.is_read = True
+    await db.flush()
+    return {"id": str(notification.id), "is_read": True}
+
+
+class RateRideRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: str | None = None
+
+
+@router.post("/ride/{ride_id}/rate")
+async def rate_ride(
+    ride_id: UUID,
+    data: RateRideRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    ride = await RideService(db).get_ride(ride_id)
+    if ride.user_id != user.id:
+        raise ForbiddenException("Access denied")
+    if ride.status != RideStatus.COMPLETED.value:
+        raise ValidationException("Ride must be completed before rating")
+    if not ride.driver_id:
+        raise ValidationException("No driver assigned to this ride")
+
+    existing = await db.execute(select(Rating).where(Rating.ride_id == ride.id))
+    if existing.scalar_one_or_none():
+        raise ValidationException("Ride already rated")
+
+    rating = Rating(
+        ride_id=ride.id,
+        user_id=user.id,
+        driver_id=ride.driver_id,
+        rater_type="USER",
+        rating=data.rating,
+        comment=data.comment,
+    )
+    db.add(rating)
+
+    from app.models import Driver
+
+    driver = await db.get(Driver, ride.driver_id)
+    if driver:
+        avg_result = await db.execute(
+            select(func.avg(Rating.rating)).where(Rating.driver_id == ride.driver_id)
+        )
+        avg = avg_result.scalar_one()
+        driver.rating_avg = float(avg) if avg is not None else float(data.rating)
+
+    await db.flush()
+    return {"ride_id": str(ride.id), "rating": data.rating}
+
+
 @router.post("/support")
 async def create_support(
     data: SupportRequest,
     user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
+    subject = data.subject.strip()
+    if data.category and not subject.startswith("["):
+        subject = f"[{data.category}] {subject}"
+
     ticket = SupportTicket(
         user_id=user.id,
-        subject=data.subject,
-        description=data.message,
+        subject=subject,
+        description=data.message.strip(),
         status=SupportTicketStatus.OPEN.value,
         priority=SupportTicketPriority.MEDIUM.value,
     )
     db.add(ticket)
     await db.flush()
-    return {"id": str(ticket.id), "subject": ticket.subject, "status": "open"}
+    return {
+        "id": str(ticket.id),
+        "subject": ticket.subject,
+        "status": _ticket_status_key(ticket.status),
+        "created_at": ticket.created_at.isoformat(),
+    }
+
+
+@router.get("/support/tickets")
+async def list_user_support_tickets(
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SupportTicket)
+        .where(SupportTicket.user_id == user.id)
+        .order_by(SupportTicket.created_at.desc())
+        .limit(50)
+    )
+    return {
+        "data": [
+            {
+                "id": str(t.id),
+                "subject": t.subject,
+                "status": _ticket_status_key(t.status),
+                "created_at": t.created_at.isoformat(),
+                "updated_at": t.updated_at.isoformat(),
+            }
+            for t in result.scalars().all()
+        ]
+    }
+
+
+@router.get("/support/tickets/{ticket_id}")
+async def get_user_support_ticket(
+    ticket_id: UUID,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await db.get(SupportTicket, ticket_id)
+    if not ticket or ticket.user_id != user.id:
+        raise NotFoundException("Ticket not found")
+
+    replies = await _load_ticket_replies(db, ticket.id)
+    user_name = f"{user.first_name} {user.last_name}".strip() or "You"
+    return {
+        "id": str(ticket.id),
+        "subject": ticket.subject,
+        "status": _ticket_status_key(ticket.status),
+        "created_at": ticket.created_at.isoformat(),
+        "updated_at": ticket.updated_at.isoformat(),
+        "messages": _ticket_messages(ticket, replies, user_name),
+    }
 
 
 @router.get("/dashboard")

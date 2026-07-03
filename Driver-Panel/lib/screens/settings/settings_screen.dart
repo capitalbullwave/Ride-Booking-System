@@ -4,15 +4,9 @@ import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/providers/app_providers.dart';
-import 'package:wavego_driver/providers/dashboard_provider.dart';
-import 'package:wavego_driver/services/permission_service.dart';
+import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
-
-final languageProvider = StateProvider<String>((ref) => 'English');
-final notificationsEnabledProvider = StateProvider<bool>((ref) => true);
-final autoAcceptProvider = StateProvider<bool>((ref) => false);
-final navigationAppProvider = StateProvider<String>((ref) => 'Google Maps');
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -53,13 +47,23 @@ class SettingsScreen extends ConsumerWidget {
             title: const Text('Push Notifications'),
             subtitle: const Text('Ride requests and updates'),
             value: notifications,
-            onChanged: (v) => ref.read(notificationsEnabledProvider.notifier).state = v,
+            onChanged: (v) async {
+              ref.read(notificationsEnabledProvider.notifier).state = v;
+              await ref
+                  .read(sharedPreferencesProvider)
+                  .setBool(AppConstants.notificationsEnabledKey, v);
+            },
           ),
           SwitchListTile(
             title: const Text('Auto Accept Rides'),
             subtitle: const Text('Automatically accept nearby requests'),
             value: autoAccept,
-            onChanged: (v) => ref.read(autoAcceptProvider.notifier).state = v,
+            onChanged: (v) async {
+              ref.read(autoAcceptProvider.notifier).state = v;
+              await ref
+                  .read(sharedPreferencesProvider)
+                  .setBool(AppConstants.autoAcceptKey, v);
+            },
           ),
           ListTile(
             leading: const Icon(Icons.navigation_outlined),
@@ -171,6 +175,9 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (selected != null) {
       ref.read(navigationAppProvider.notifier).state = selected;
+      await ref
+          .read(sharedPreferencesProvider)
+          .setString(AppConstants.navigationAppKey, selected);
     }
   }
 }

@@ -245,6 +245,8 @@ class RideBookingService extends BaseApiService {
     required double dropoffLat,
     required double dropoffLng,
     String paymentMethod = 'CASH',
+    String? vehicleCategoryId,
+    double? rentalHours,
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -267,6 +269,8 @@ class RideBookingService extends BaseApiService {
         'dropoff_lat': dropoffLat,
         'dropoff_lng': dropoffLng,
         'payment_method': paymentMethod,
+        if (vehicleCategoryId != null) 'vehicle_category_id': vehicleCategoryId,
+        if (rentalHours != null) 'rental_hours': rentalHours,
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );

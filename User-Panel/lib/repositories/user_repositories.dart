@@ -4,19 +4,24 @@ import 'package:wavego_user/core/network/api_exception.dart';
 import 'package:wavego_user/core/storage/local_storage_service.dart';
 import 'package:wavego_user/core/storage/secure_storage_service.dart';
 import 'package:wavego_user/models/otp_send_result.dart';
+import 'package:wavego_user/core/utils/profile_name_resolver.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/services/profile_service.dart';
 import 'package:wavego_user/services/user_services.dart';
 
 class AuthRepository {
   AuthRepository({
     required AuthService authService,
+    required ProfileService profileService,
     required SecureStorageService secureStorage,
     required LocalStorageService localStorage,
   })  : _authService = authService,
+        _profileService = profileService,
         _secureStorage = secureStorage,
         _localStorage = localStorage;
 
   final AuthService _authService;
+  final ProfileService _profileService;
   final SecureStorageService _secureStorage;
   final LocalStorageService _localStorage;
 
@@ -61,14 +66,48 @@ class AuthRepository {
       response.tokens.refreshToken,
     );
 
-    if (response.user != null) {
-      await _localStorage.setJson(
-        AppConstants.userProfileKey,
-        response.user!.toJson(),
+    try {
+      final profile = await syncProfileFromApi();
+      return LoginResponse(
+        success: response.success,
+        isRegistered: response.isRegistered,
+        isVerified: response.isVerified,
+        tokens: response.tokens,
+        user: profile,
       );
+    } catch (_) {
+      if (response.user != null) {
+        await _cacheProfile(response.user!);
+      }
+      return response;
     }
+  }
 
-    return response;
+  Future<void> _cacheProfile(UserProfile profile) async {
+    await _localStorage.setJson(
+      AppConstants.userProfileKey,
+      profile.toJson(),
+    );
+  }
+
+  Future<void> cacheProfilePublic(UserProfile profile) => _cacheProfile(profile);
+
+  Future<UserProfile> syncProfileFromApi() async {
+    final profile = await _profileService.getProfile();
+    await _cacheProfile(profile);
+    return profile;
+  }
+
+  Future<UserProfile> updateProfile({
+    String? fullName,
+    String? email,
+  }) async {
+    final profile = await _profileService.updateProfile(
+      fullName: fullName,
+      email: email,
+    );
+    await _cacheProfile(profile);
+    return profile;
   }
 
   Future<UserProfile?> getProfile() async {
@@ -88,7 +127,7 @@ class AuthRepository {
     if (access == null || access.isEmpty) return false;
 
     try {
-      await _authService.getMe();
+      await syncProfileFromApi();
       return true;
     } on UnauthorizedException {
       return refreshSession();
@@ -128,6 +167,9 @@ class HomeRepository {
   HomeRepository(this._service);
   final HomeService _service;
   Future<HomeDashboard> getDashboard() => _service.getDashboard();
+  Future<List<VehicleCategory>> getVehicleCategories({String? serviceGroup}) =>
+      _service.getVehicleCategories(serviceGroup: serviceGroup);
+  Future<List<VehicleCategory>> getRentalCategories() => _service.getRentalCategories();
 }
 
 class WalletRepository {
@@ -151,6 +193,7 @@ class ActivityRepository {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(
     authService: ref.watch(authServiceProvider),
+    profileService: ref.watch(profileServiceProvider),
     secureStorage: ref.watch(secureStorageProvider),
     localStorage: ref.watch(localStorageProvider),
   );
@@ -173,5 +216,26 @@ final activityRepositoryProvider = Provider<ActivityRepository>((ref) {
 });
 
 final userProfileProvider = FutureProvider<UserProfile?>((ref) async {
-  return ref.watch(authRepositoryProvider).getProfile();
+  final auth = ref.watch(authRepositoryProvider);
+  if (!await auth.isLoggedIn()) return null;
+
+  UserProfile? profile;
+  try {
+    profile = await auth.syncProfileFromApi();
+  } catch (_) {
+    profile = await auth.getProfile();
+  }
+
+  HomeDashboard? dashboard;
+  try {
+    dashboard = await ref.read(homeRepositoryProvider).getDashboard();
+  } catch (_) {}
+
+  final merged = ProfileNameResolver.merge(
+    profile: profile,
+    dashboard: dashboard,
+  );
+
+  await auth.cacheProfilePublic(merged);
+  return merged;
 });

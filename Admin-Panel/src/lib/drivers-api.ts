@@ -160,6 +160,10 @@ export async function reactivateDriver(driverId: string): Promise<Driver> {
   return normalizeDriver(driver);
 }
 
+export async function deleteDriver(driverId: string): Promise<void> {
+  await apiFetch(`/api/v1/admin/drivers/${driverId}`, { method: "DELETE" });
+}
+
 export async function setDriverStatus(
   driverId: string,
   status: DriverStatus,

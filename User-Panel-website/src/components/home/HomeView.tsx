@@ -12,6 +12,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { homeServices } from "@/constants/services";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useHomeDashboard } from "@/hooks/useHomeDashboard";
+import { homeRouteForCategory, vehicleImageForCategory } from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
 
 export function HomeView() {
@@ -23,6 +24,53 @@ export function HomeView() {
   const user = useAuthUser();
   const { data: dashboard, unreadCount } = useHomeDashboard();
   const displayName = dashboard?.greeting_name || user.name;
+
+  const rideCategories =
+    dashboard?.vehicle_categories?.filter(
+      (category) => (category.service_group ?? "ride") !== "rental"
+    ) ?? [];
+
+  const services =
+    rideCategories.length > 0
+      ? rideCategories.map((category) => ({
+          key: category.id,
+          name: category.name,
+          description: category.description ?? `Book ${category.name} instantly`,
+          image: vehicleImageForCategory(category),
+          route: homeRouteForCategory(category),
+          isAmbulance: category.slug.toLowerCase().includes("ambulance"),
+        }))
+      : homeServices.map((service) => ({
+          key: service.name,
+          name: service.name,
+          description: service.description,
+          image: service.image,
+          route: service.route,
+          isAmbulance: service.name === "Ambulance",
+        }));
+
+  const rentalServices =
+    dashboard?.rental_categories && dashboard.rental_categories.length > 0
+      ? dashboard.rental_categories.map((category) => ({
+          key: category.id,
+          name: category.name,
+          description: category.description ?? "Daily rental package",
+          image: vehicleImageForCategory(category),
+        }))
+      : [
+          {
+            key: "rental-bike",
+            name: "Rental Bike",
+            description: "Rent a bike by the day",
+            image: "/images/services/bike.png",
+          },
+          {
+            key: "rental-car",
+            name: "Rental Car",
+            description: "Flexible car rental packages",
+            image: "/images/services/car.png",
+          },
+        ];
 
   useEffect(() => {
     const urlPickup = searchParams.get("pickup");
@@ -121,11 +169,11 @@ export function HomeView() {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {homeServices.map((service) => {
-              const isAmbulance = service.name === "Ambulance";
+            {services.map((service) => {
+              const isAmbulance = service.isAmbulance;
               return (
                 <button
-                  key={service.name}
+                  key={service.key}
                   type="button"
                   onClick={() => router.push(service.route)}
                   className={cn(
@@ -169,6 +217,42 @@ export function HomeView() {
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        <div className="mb-10">
+          <div className="mb-4">
+            <h2 className="font-heading text-xl font-bold text-foreground">Vehicle Rental</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Rent bikes and cars by the day
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {rentalServices.map((service) => (
+              <button
+                key={service.key}
+                type="button"
+                onClick={() => {
+                  const pickupParam = pickup ? `?pickup=${encodeURIComponent(pickup)}` : "";
+                  router.push(`${ROUTES.rental}${pickupParam}`);
+                }}
+                className="group flex w-full items-center gap-4 rounded-[20px] border border-border bg-card p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.99] sm:p-5"
+              >
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-secondary/30 transition-colors group-hover:bg-primary/10 sm:h-24 sm:w-24">
+                  <ServiceImage src={service.image} alt={service.name} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-heading text-base font-bold text-foreground transition-colors group-hover:text-primary sm:text-lg">
+                    {service.name}
+                  </h3>
+                  <p className="mt-1 text-sm leading-snug text-muted-foreground">
+                    {service.description}
+                  </p>
+                </div>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+              </button>
+            ))}
           </div>
         </div>
       </div>

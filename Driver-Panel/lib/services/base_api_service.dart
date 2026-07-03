@@ -49,6 +49,17 @@ class BaseApiService {
     );
   }
 
+  Future<T> patch<T>(
+    String path, {
+    dynamic data,
+    T Function(dynamic data)? parser,
+  }) async {
+    return _request(
+      (options) => _dio.patch(path, data: data, options: options),
+      parser,
+    );
+  }
+
   Future<T> delete<T>(
     String path, {
     T Function(dynamic data)? parser,

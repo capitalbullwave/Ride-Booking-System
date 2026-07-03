@@ -143,6 +143,21 @@ export function getRideTracking(rideId: string): Promise<Record<string, unknown>
   return authFetch<Record<string, unknown>>(`/ride/${rideId}`, undefined, "Unable to load tracking");
 }
 
+export function rateRide(
+  rideId: string,
+  rating: number,
+  comment?: string
+): Promise<{ ride_id: string; rating: number }> {
+  return authFetch<{ ride_id: string; rating: number }>(
+    `/ride/${rideId}/rate`,
+    {
+      method: "POST",
+      body: JSON.stringify({ rating, comment: comment ?? null }),
+    },
+    "Unable to submit rating"
+  );
+}
+
 export function getNearbyDrivers(): Promise<{ count: number; eta_minutes: number }> {
   return Promise.resolve({ count: 3, eta_minutes: 5 });
 }

@@ -7,15 +7,17 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.admin._core import _map_driver, _map_ride
 from app.auth.dependencies import get_current_admin
-from app.core.constants import DriverStatus, RideStatus, SupportTicketStatus
-from app.core.exceptions import NotFoundException
+from app.core.constants import DriverStatus, RideStatus, SupportTicketPriority, SupportTicketStatus
+from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.database.session import get_db
+from app.services.image_storage import persist_vehicle_type_image
 from app.models import (
     AdminUser,
     AppSetting,
@@ -24,6 +26,7 @@ from app.models import (
     PromoCode,
     Ride,
     SupportTicket,
+    SupportTicketReply,
     User,
     Vehicle,
     VehicleType,
@@ -95,19 +98,46 @@ def _relative_time(dt: datetime) -> str:
     return f"{hours // 24} days ago"
 
 
+def _vehicle_slug(name: str) -> str:
+    return name.lower().strip().replace(" ", "-")
+
+
+def _vehicle_image_url(icon: str | None) -> str | None:
+    if not icon:
+        return None
+    if icon.startswith(("/", "http://", "https://")):
+        return icon
+    return None
+
+
+def _vehicle_icon_type(icon: str | None) -> str:
+    if not icon or icon.startswith(("/", "http://", "https://")):
+        return "car"
+    return icon
+
+
 def _map_vehicle_type(vt: VehicleType) -> dict:
-    slug = vt.name.lower().replace(" ", "_")
+    slug = vt.slug or _vehicle_slug(vt.name)
+    image_url = _vehicle_image_url(vt.icon)
     return {
         "id": str(vt.id),
-        "type": slug,
+        "type": slug.replace("-", "_"),
+        "slug": slug,
         "name": vt.name,
+        "description": vt.description,
         "baseFare": vt.base_fare,
         "perKmFare": vt.per_km_rate,
+        "includedDistanceKm": vt.included_distance_km,
+        "includedHours": vt.included_hours,
+        "perHourRate": vt.per_hour_rate,
         "waitingCharge": vt.waiting_charge_per_min,
-        "cancellationCharge": max(vt.base_fare, 20.0),
+        "cancellationCharge": vt.cancellation_charge,
         "surgeMultiplier": 1.5,
         "isActive": vt.is_active,
-        "icon": vt.icon or "car",
+        "icon": _vehicle_icon_type(vt.icon),
+        "imageUrl": image_url,
+        "capacity": vt.capacity,
+        "serviceGroup": vt.service_group or "ride",
     }
 
 
@@ -133,7 +163,12 @@ def _map_coupon(p: PromoCode) -> dict:
     }
 
 
-def _map_support_ticket(ticket: SupportTicket, user: User | None = None, driver: Driver | None = None) -> dict:
+def _map_support_ticket(
+    ticket: SupportTicket,
+    user: User | None = None,
+    driver: Driver | None = None,
+    replies: list[SupportTicketReply] | None = None,
+) -> dict:
     if user:
         user_type = "user"
         user_id = str(user.id)
@@ -153,6 +188,26 @@ def _map_support_ticket(ticket: SupportTicket, user: User | None = None, driver:
         SupportTicketStatus.RESOLVED.value: "resolved",
         SupportTicketStatus.CLOSED.value: "closed",
     }
+    messages = [
+        {
+            "id": f"{ticket.id}-initial",
+            "sender": user_name,
+            "senderType": user_type,
+            "message": ticket.description,
+            "timestamp": ticket.created_at.isoformat(),
+        }
+    ]
+    for reply in replies or []:
+        messages.append(
+            {
+                "id": str(reply.id),
+                "sender": "WaveGo Support" if reply.sender_type == "ADMIN" else user_name,
+                "senderType": reply.sender_type.lower(),
+                "message": reply.message,
+                "timestamp": reply.created_at.isoformat(),
+            }
+        )
+
     return {
         "id": str(ticket.id),
         "subject": ticket.subject,
@@ -164,16 +219,17 @@ def _map_support_ticket(ticket: SupportTicket, user: User | None = None, driver:
         "priority": ticket.priority.lower(),
         "createdAt": ticket.created_at.isoformat(),
         "updatedAt": ticket.updated_at.isoformat(),
-        "messages": [
-            {
-                "id": str(ticket.id),
-                "sender": user_name,
-                "senderType": user_type,
-                "message": ticket.description,
-                "timestamp": ticket.created_at.isoformat(),
-            }
-        ],
+        "messages": messages,
     }
+
+
+async def _ticket_replies(db: AsyncSession, ticket_id: UUID) -> list[SupportTicketReply]:
+    result = await db.execute(
+        select(SupportTicketReply)
+        .where(SupportTicketReply.ticket_id == ticket_id)
+        .order_by(SupportTicketReply.created_at.asc())
+    )
+    return list(result.scalars().all())
 
 
 def _map_wallet_transaction(tx: WalletTransaction, wallet: Wallet) -> dict:
@@ -582,6 +638,59 @@ async def list_vehicle_categories(
     return [_map_vehicle_type(vt) for vt in result.scalars().all()]
 
 
+async def create_vehicle_category(
+    data: dict,
+    admin: AdminUser,
+    db: AsyncSession,
+):
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise ValidationException("Vehicle name is required")
+
+    slug = (data.get("slug") or _vehicle_slug(name)).strip().lower().replace(" ", "-")
+    existing = await db.execute(
+        select(VehicleType).where(or_(VehicleType.name == name, VehicleType.slug == slug))
+    )
+    if existing.scalar_one_or_none():
+        raise ConflictException("A vehicle category with this name already exists")
+
+    base_fare = float(data.get("baseFare", 25))
+    per_km_rate = float(data.get("perKmFare", 10))
+    service_group = (data.get("serviceGroup") or "ride").strip().lower()
+
+    vt = VehicleType(
+        name=name,
+        slug=slug,
+        description=data.get("description"),
+        icon=data.get("icon", "car"),
+        base_fare=base_fare,
+        per_km_rate=per_km_rate,
+        per_minute_rate=float(data.get("perMinuteRate", 2)),
+        waiting_charge_per_min=float(data.get("waitingCharge", 2)),
+        included_distance_km=float(data.get("includedDistanceKm", 2)),
+        included_hours=float(data.get("includedHours", 4 if service_group == "rental" else 0)),
+        per_hour_rate=float(data.get("perHourRate", 50 if service_group == "rental" else 0)),
+        minimum_fare=float(data.get("minimumFare", base_fare)),
+        cancellation_charge=float(
+            data.get("cancellationCharge", max(base_fare, 20.0))
+        ),
+        service_group=service_group,
+        capacity=int(data.get("capacity", 4)),
+        is_active=data.get("isActive", True),
+    )
+    db.add(vt)
+    await db.flush()
+
+    image_payload = data.get("image") or data.get("imageUrl")
+    if image_payload:
+        stored = persist_vehicle_type_image(image_payload, str(vt.id))
+        if stored:
+            vt.icon = stored
+
+    await db.flush()
+    return _map_vehicle_type(vt)
+
+
 @router.patch("/vehicle-categories/{category_id}")
 async def update_vehicle_category(
     category_id: UUID,
@@ -596,14 +705,61 @@ async def update_vehicle_category(
         "baseFare": "base_fare",
         "perKmFare": "per_km_rate",
         "waitingCharge": "waiting_charge_per_min",
+        "cancellationCharge": "cancellation_charge",
+        "minimumFare": "minimum_fare",
+        "includedDistanceKm": "included_distance_km",
+        "includedHours": "included_hours",
+        "perHourRate": "per_hour_rate",
+        "serviceGroup": "service_group",
         "isActive": "is_active",
         "name": "name",
+        "description": "description",
+        "icon": "icon",
+        "capacity": "capacity",
     }
+    image_payload = data.get("image") or data.get("imageUrl")
     for front_key, db_key in field_map.items():
         if front_key in data:
+            if (
+                front_key == "icon"
+                and _vehicle_image_url(vt.icon)
+                and not image_payload
+            ):
+                continue
             setattr(vt, db_key, data[front_key])
+    if "name" in data:
+        vt.slug = _vehicle_slug(vt.name)
+    if image_payload:
+        stored = persist_vehicle_type_image(image_payload, str(vt.id))
+        if stored:
+            vt.icon = stored
     await db.flush()
     return _map_vehicle_type(vt)
+
+
+async def delete_vehicle_category(
+    category_id: UUID,
+    admin: AdminUser,
+    db: AsyncSession,
+):
+    vt = await db.get(VehicleType, category_id)
+    if not vt:
+        raise NotFoundException("Vehicle category not found")
+
+    ride_count = await db.scalar(
+        select(func.count()).select_from(Ride).where(Ride.vehicle_type_id == category_id)
+    )
+    vehicle_count = await db.scalar(
+        select(func.count()).select_from(Vehicle).where(Vehicle.vehicle_type_id == category_id)
+    )
+    if ride_count or vehicle_count:
+        vt.is_active = False
+        await db.flush()
+        return {"success": True, "deactivated": True}
+
+    await db.delete(vt)
+    await db.flush()
+    return {"success": True, "deactivated": False}
 
 
 @router.get("/coupons")
@@ -665,7 +821,8 @@ async def list_support_tickets(
     for t in tickets:
         user = await db.get(User, t.user_id) if t.user_id else None
         driver = await db.get(Driver, t.driver_id) if t.driver_id else None
-        items.append(_map_support_ticket(t, user, driver))
+        replies = await _ticket_replies(db, t.id)
+        items.append(_map_support_ticket(t, user, driver, replies))
     return items
 
 
@@ -680,7 +837,61 @@ async def get_support_ticket(
         raise NotFoundException("Ticket not found")
     user = await db.get(User, ticket.user_id) if ticket.user_id else None
     driver = await db.get(Driver, ticket.driver_id) if ticket.driver_id else None
-    return _map_support_ticket(ticket, user, driver)
+    replies = await _ticket_replies(db, ticket.id)
+    return _map_support_ticket(ticket, user, driver, replies)
+
+
+class AdminTicketReplyRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+
+
+@router.post("/support/tickets/{ticket_id}/reply")
+async def reply_support_ticket(
+    ticket_id: UUID,
+    data: AdminTicketReplyRequest,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.notifications.service import NotificationService
+
+    ticket = await db.get(SupportTicket, ticket_id)
+    if not ticket:
+        raise NotFoundException("Ticket not found")
+
+    reply = SupportTicketReply(
+        ticket_id=ticket.id,
+        sender_id=admin.id,
+        sender_type="ADMIN",
+        message=data.message.strip(),
+    )
+    db.add(reply)
+    if ticket.status == SupportTicketStatus.OPEN.value:
+        ticket.status = SupportTicketStatus.IN_PROGRESS.value
+
+    notif = NotificationService(db)
+    if ticket.user_id:
+        await notif.create_in_app(
+            title="Support team replied",
+            message=f"New reply on: {ticket.subject}",
+            notification_type="SYSTEM",
+            user_id=ticket.user_id,
+            data={"ticket_id": str(ticket.id), "event": "support_reply"},
+        )
+    elif ticket.driver_id:
+        await notif.create_in_app(
+            title="Support team replied",
+            message=f"New reply on: {ticket.subject}",
+            notification_type="SYSTEM",
+            driver_id=ticket.driver_id,
+            data={"ticket_id": str(ticket.id), "event": "support_reply"},
+        )
+
+    await db.flush()
+    await db.refresh(ticket)
+    user = await db.get(User, ticket.user_id) if ticket.user_id else None
+    driver = await db.get(Driver, ticket.driver_id) if ticket.driver_id else None
+    replies = await _ticket_replies(db, ticket.id)
+    return _map_support_ticket(ticket, user, driver, replies)
 
 
 @router.patch("/support/tickets/{ticket_id}")
@@ -704,9 +915,11 @@ async def update_support_ticket(
     if "priority" in data:
         ticket.priority = data["priority"].upper()
     await db.flush()
+    await db.refresh(ticket)
     user = await db.get(User, ticket.user_id) if ticket.user_id else None
     driver = await db.get(Driver, ticket.driver_id) if ticket.driver_id else None
-    return _map_support_ticket(ticket, user, driver)
+    replies = await _ticket_replies(db, ticket.id)
+    return _map_support_ticket(ticket, user, driver, replies)
 
 
 @router.get("/notifications")

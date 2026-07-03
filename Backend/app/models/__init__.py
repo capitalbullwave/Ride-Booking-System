@@ -14,7 +14,7 @@ from app.admin.models import (
 from app.auth.models import AuthDevice, OtpLog, UserSession
 from app.common.models import AuditLog
 from app.coupons.models import PromoCode, ReferralCode
-from app.drivers.models import Driver, DriverBankAccount, DriverDocument, DriverLocation
+from app.drivers.models import Driver, DriverBankAccount, DriverDocument, DriverEmergencyContact, DriverLocation
 from app.notifications.models import Notification
 from app.payments.models import Payment
 from app.platform_settings.models import AppSetting, City, PricingRule, SystemConfig
@@ -39,6 +39,7 @@ __all__ = [
     "Driver",
     "DriverBankAccount",
     "DriverDocument",
+    "DriverEmergencyContact",
     "DriverLocation",
     "Faq",
     "Notification",

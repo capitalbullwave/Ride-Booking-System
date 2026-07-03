@@ -56,6 +56,25 @@ export function getApiBaseUrl(): string {
 
 }
 
+export function resolveMediaUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:")
+  ) {
+    return trimmed;
+  }
+
+  const base = getApiBaseUrl().replace(/\/$/, "");
+  const path = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return `${base}${path}`;
+}
+
 
 
 export function getErrorMessage(payload: unknown, fallback: string): string {

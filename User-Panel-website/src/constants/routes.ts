@@ -29,6 +29,7 @@ export const ROUTES = {
   bookSearching: "/book/searching",
   bookTracking: "/book/tracking",
   ambulance: "/ambulance",
+  rental: "/rental",
   ambulanceHistory: "/ambulance/history",
   terms: "/legal/terms",
   privacy: "/legal/privacy",

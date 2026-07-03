@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/routes/app_router.dart';
+import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/storage/auth_token_store.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/storage/secure_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_theme.dart';
-import 'package:wavego_driver/providers/dashboard_provider.dart';
+import 'package:wavego_driver/providers/auth_session_provider.dart';
+import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/connectivity_banner.dart';
 import 'package:wavego_driver/widgets/common/phone_mode_shell.dart';
 
@@ -44,13 +46,33 @@ Future<void> main() async {
   );
 }
 
-class WaveGoDriverApp extends ConsumerWidget {
+class WaveGoDriverApp extends ConsumerStatefulWidget {
   const WaveGoDriverApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WaveGoDriverApp> createState() => _WaveGoDriverAppState();
+}
+
+class _WaveGoDriverAppState extends ConsumerState<WaveGoDriverApp> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      hydrateAppPreferences(ref);
+      ref.read(authSessionProvider.notifier).refresh();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final isDark = ref.watch(themeModeProvider);
+
+    ref.listen<bool>(authSessionProvider, (previous, next) {
+      if (previous == true && next == false) {
+        router.go(RouteNames.phoneLogin);
+      }
+    });
 
     return MaterialApp.router(
       title: 'WaveGo Captain',

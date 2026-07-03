@@ -26,7 +26,7 @@ export function buildBookUrl(
 export function buildSearchingUrl(
   pickup: string,
   dropoff: string,
-  vehicle: RideVehicleId,
+  vehicle: string,
   tab = "rides",
   categoryId?: string
 ) {

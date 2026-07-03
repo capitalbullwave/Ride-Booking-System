@@ -5,6 +5,7 @@ import 'package:wavego_user/core/config/app_config.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -59,6 +60,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       context.go(RouteNames.phoneLogin);
       return;
     }
+
+    refreshUserProfile(ref);
+    if (!mounted) return;
 
     context.go(RouteNames.home);
   }

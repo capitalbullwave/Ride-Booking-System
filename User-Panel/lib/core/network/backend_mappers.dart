@@ -1,5 +1,6 @@
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/core/utils/date_formatter.dart';
+import 'package:wavego_user/models/saved_place.dart';
 
 class BackendMappers {
   BackendMappers._();
@@ -25,15 +26,44 @@ class BackendMappers {
   }
 
   static UserProfile userProfile(Map<String, dynamic> json) {
+    return profileFromApi(json);
+  }
+
+  static UserProfile profileFromApi(Map<String, dynamic> json) {
+    final fullName = json['full_name'] as String?;
     final firstName = json['first_name'] as String? ?? '';
     final lastName = json['last_name'] as String? ?? '';
-    final name = '$firstName $lastName'.trim();
+    final explicitName = json['name'] as String?;
+    final combined = fullName?.trim().isNotEmpty == true
+        ? fullName!.trim()
+        : explicitName?.trim().isNotEmpty == true
+            ? explicitName!.trim()
+            : '$firstName $lastName'.trim();
+    final name = combined.isEmpty ? 'User' : combined;
+    final rating = (json['rating_avg'] as num?)?.toDouble() ??
+        (json['rating'] as num?)?.toDouble() ??
+        0;
+
     return UserProfile(
       id: json['id']?.toString() ?? '',
-      name: name.isEmpty ? 'User' : name,
+      name: name,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
-      rating: (json['rating_avg'] as num?)?.toDouble() ?? 0,
+      rating: rating,
+      totalRides: (json['total_rides'] as num?)?.toInt() ?? 0,
+      initial: name.isNotEmpty ? name[0].toUpperCase() : 'U',
+    );
+  }
+
+  static SavedPlace savedPlaceFromApi(Map<String, dynamic> json) {
+    return SavedPlace(
+      id: json['id']?.toString() ?? '',
+      title: json['label'] as String? ?? 'Saved place',
+      address: json['address_line'] as String? ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      isFavorite: json['is_default'] as bool? ?? false,
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch,
     );
   }
 

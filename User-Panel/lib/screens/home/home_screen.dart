@@ -3,16 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:wavego_user/core/constants/services.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/providers/profile_display_provider.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/services/ride_realtime_service.dart';
 import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
 import 'package:wavego_user/widgets/home/active_ride_card.dart';
 import 'package:wavego_user/widgets/home/location_card.dart';
@@ -29,6 +31,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _resolvingPickup = false;
   bool _cancellingRide = false;
   Timer? _activeRidePollTimer;
+  StreamSubscription? _rideRealtimeSub;
+  String? _subscribedRideId;
 
   @override
   void initState() {
@@ -37,13 +41,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _prefillPickupIfNeeded();
       ref.invalidate(activeRideProvider);
       _startActiveRidePolling();
+      _startRideRealtime();
     });
   }
 
   @override
   void dispose() {
     _activeRidePollTimer?.cancel();
+    _rideRealtimeSub?.cancel();
     super.dispose();
+  }
+
+  void _startRideRealtime() {
+    final realtime = ref.read(rideRealtimeProvider);
+    realtime.connect();
+
+    _rideRealtimeSub?.cancel();
+    _rideRealtimeSub = realtime.messages.listen((msg) {
+      final event = msg['event']?.toString() ?? '';
+      if (event.isEmpty) return;
+      // Any ride update should refresh active ride snapshot.
+      if (mounted) ref.invalidate(activeRideProvider);
+    });
   }
 
   void _startActiveRidePolling() {
@@ -105,17 +124,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : (trip.pickup?.label ?? '');
     final dropoff = trip.dropoff?.label ?? '';
     final dashboardAsync = ref.watch(homeDashboardProvider);
+    final vehicleCategoriesAsync = ref.watch(vehicleCategoriesProvider);
     final profileAsync = ref.watch(userProfileProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
     final activeRideAsync = ref.watch(activeRideProvider);
 
-    final displayName = dashboardAsync.maybeWhen(
-      data: (d) => d.greetingName,
-      orElse: () => profileAsync.maybeWhen(
-        data: (p) => p?.name.split(' ').first ?? 'there',
-        orElse: () => 'there',
-      ),
-    );
+    // Subscribe to the currently active ride_id for ride-specific events.
+    activeRideAsync.whenData((ride) {
+      final rideId = ride?.id;
+      if (rideId == null || rideId.isEmpty) return;
+      if (_subscribedRideId == rideId) return;
+      _subscribedRideId = rideId;
+      ref.read(rideRealtimeProvider).subscribeRide(rideId);
+    });
+
+    final displayName = ref.watch(homeGreetingNameProvider);
 
     final unreadCount = notificationsAsync.maybeWhen(
       data: (list) => list.where((n) => !n.read).length,
@@ -154,6 +177,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           onPickupTap: () => _openLocation(context, isPickup: true),
                           onDropoffTap: () => _openLocation(context, isPickup: false),
                           onFindRide: () => _findRide(trip),
+                          isBookingLocked: false,
                         ),
                         data: (activeRide) {
                           if (activeRide != null) {
@@ -172,6 +196,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               },
                             );
                           }
+                          final isLocked = activeRideAsync.maybeWhen(
+                            data: (ride) => ride != null,
+                            orElse: () => false,
+                          );
                           return LocationCard(
                             pickup: pickup,
                             dropoff: dropoff,
@@ -179,6 +207,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             onPickupTap: () => _openLocation(context, isPickup: true),
                             onDropoffTap: () => _openLocation(context, isPickup: false),
                             onFindRide: () => _findRide(trip),
+                            isBookingLocked: isLocked,
                           );
                         },
                       ),
@@ -246,15 +275,118 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  ...AppServices.homeServices.map(
-                    (service) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: ServiceTile(
-                        service: service,
-                        onTap: () => context.push(service.route),
+                  vehicleCategoriesAsync.when(
+                    loading: () => Column(
+                      children: fallbackHomeServices()
+                          .map(
+                            (service) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: ServiceTile(
+                                service: service,
+                                onTap: () => context.push(service.route),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    error: (e, st) => Column(
+                      children: fallbackHomeServices()
+                          .map(
+                            (service) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: ServiceTile(
+                                service: service,
+                                onTap: () => context.push(service.route),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                    data: (categories) {
+                      final services = categories.isNotEmpty
+                          ? categories.map(homeServiceFromCategory).toList()
+                          : fallbackHomeServices();
+
+                      return Column(
+                        children: services
+                            .map(
+                              (service) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ServiceTile(
+                                  service: service,
+                                  onTap: () => context.push(service.route),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Vehicle Rental',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Rent bikes and cars by the hour',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.mutedForeground,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => context.push(RouteNames.rental),
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.schedule, color: AppColors.primary),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Start Vehicle Rental',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Set hours, choose vehicle, pick locations',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: AppColors.mutedForeground,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
                 ]),
               ),
             ),

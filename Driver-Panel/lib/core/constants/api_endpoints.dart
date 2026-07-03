@@ -16,6 +16,14 @@ class ApiEndpoints {
   static const String uploadLicense = '/driver/upload-license';
   static const String uploadVehicle = '/driver/upload-vehicle';
   static const String completeRegistration = '/drivers/complete-registration';
+  static const String registrationProgress = '/driver/registration-progress';
+  static const String registrationData = '/driver/registration-data';
+  static const String registrationLicenseUpload = '/driver/registration/license-upload';
+  static const String registrationLicenseNumber = '/driver/registration/license-number';
+  static const String registrationProfile = '/driver/registration/profile';
+  static const String registrationVehicle = '/driver/registration/vehicle';
+  static const String registrationKyc = '/driver/registration/kyc';
+  static const String registrationSubmit = '/driver/registration/submit';
   static const String goOnline = '/driver/go-online';
   static const String goOffline = '/driver/go-offline';
   static const String driverLocation = '/driver/location';
@@ -38,21 +46,20 @@ class ApiEndpoints {
   static const String wallet = '/driver/wallet';
   static const String earnings = '/driver/earnings';
 
-  // Notifications (mock fallback — no backend route yet)
-  static const String notifications = '/notifications';
-  static const String markNotificationRead = '/notifications/read';
+  // Notifications
+  static const String driverNotifications = '/driver/notifications';
 
-  // Support (mock fallback)
-  static const String faq = '/support/faq';
-  static const String tickets = '/support/tickets';
-  static const String createTicket = '/support/tickets';
+  // Support
+  static const String faq = '/common/support/faqs';
+  static const String tickets = '/driver/support/tickets';
+  static const String createTicket = '/driver/support';
 
-  // SOS (mock fallback)
-  static const String sos = '/sos/trigger';
-  static const String emergencyContacts = '/sos/contacts';
+  // SOS
+  static const String sos = '/driver/sos';
+  static const String driverEmergencyContacts = '/driver/emergency-contacts';
 
-  // Bank (mock fallback)
+  // Bank
   static const String bankDetails = '/driver/bank';
   static const String withdraw = '/wallet/withdraw';
-  static const String walletTransactions = '/wallet/transactions';
+  static const String walletTransactions = '/driver/wallet/transactions';
 }

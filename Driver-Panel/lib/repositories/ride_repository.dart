@@ -13,7 +13,8 @@ class RideRepository {
   Future<ActiveRide> acceptRide(String rideId) =>
       _service.acceptRide(rideId);
 
-  Future<void> declineRide(String rideId) => _service.declineRide(rideId);
+  Future<void> declineRide(String rideId, {String? reason}) =>
+      _service.declineRide(rideId, reason: reason);
 
   Future<ActiveRide?> getActiveRide() => _service.getActiveRide();
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { ArrowLeft, Send, Paperclip } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -17,8 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { getTicketById } from "@/data/mock-data";
+import { SupportTicket, TicketStatus } from "@/types";
 import { formatDateTime, capitalize } from "@/lib/format";
+import {
+  fetchSupportTicket,
+  replySupportTicket,
+  updateSupportTicketStatus,
+} from "@/lib/support-api";
 import { toast } from "sonner";
 
 export default function TicketDetailPage({
@@ -27,15 +32,67 @@ export default function TicketDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const ticket = getTicketById(id);
+  const [ticket, setTicket] = useState<SupportTicket | null>(null);
+  const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<TicketStatus>("open");
   const [internalNote, setInternalNote] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchSupportTicket(id);
+        if (!cancelled) {
+          setTicket(data);
+          setStatus(data.status);
+        }
+      } catch {
+        if (!cancelled) setTicket(null);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
+        Loading ticket…
+      </div>
+    );
+  }
 
   if (!ticket) notFound();
 
-  const handleReply = () => {
-    toast.success("Reply sent successfully");
-    setReply("");
+  const handleReply = async () => {
+    const text = reply.trim();
+    if (!text) return;
+    setSending(true);
+    try {
+      const updated = await replySupportTicket(id, text);
+      setTicket(updated);
+      setReply("");
+      toast.success("Reply sent to user");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send reply");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleStatusUpdate = async () => {
+    try {
+      const updated = await updateSupportTicketStatus(id, status);
+      setTicket(updated);
+      toast.success("Status updated");
+    } catch {
+      toast.error("Failed to update status");
+    }
   };
 
   return (
@@ -84,10 +141,10 @@ export default function TicketDetailPage({
                   rows={3}
                 />
                 <div className="flex items-center justify-between">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled>
                     <Paperclip className="mr-2 h-4 w-4" /> Attach
                   </Button>
-                  <Button onClick={handleReply} disabled={!reply.trim()}>
+                  <Button onClick={handleReply} disabled={!reply.trim() || sending}>
                     <Send className="mr-2 h-4 w-4" /> Send Reply
                   </Button>
                 </div>
@@ -108,9 +165,9 @@ export default function TicketDetailPage({
                 ["Created", formatDateTime(ticket.createdAt)],
                 ["Updated", formatDateTime(ticket.updatedAt)],
               ].map(([label, value]) => (
-                <div key={label} className="flex justify-between">
+                <div key={label} className="flex justify-between gap-4">
                   <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-medium">{value}</span>
+                  <span className="text-sm font-medium text-right break-all">{value}</span>
                 </div>
               ))}
             </CardContent>
@@ -119,7 +176,7 @@ export default function TicketDetailPage({
           <Card>
             <CardHeader><CardTitle>Status Update</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Select defaultValue={ticket.status}>
+              <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="open">Open</SelectItem>
@@ -128,7 +185,9 @@ export default function TicketDetailPage({
                   <SelectItem value="closed">Closed</SelectItem>
                 </SelectContent>
               </Select>
-              <Button className="w-full">Update Status</Button>
+              <Button className="w-full" onClick={handleStatusUpdate}>
+                Update Status
+              </Button>
             </CardContent>
           </Card>
 
@@ -141,7 +200,9 @@ export default function TicketDetailPage({
                 onChange={(e) => setInternalNote(e.target.value)}
                 rows={3}
               />
-              <Button variant="outline" className="w-full">Save Note</Button>
+              <Button variant="outline" className="w-full" disabled>
+                Save Note
+              </Button>
             </CardContent>
           </Card>
         </div>

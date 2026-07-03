@@ -7,7 +7,11 @@ export interface VehicleCategory {
   description: string | null;
   base_fare: number;
   per_km_rate: number;
+  included_distance_km?: number;
+  included_hours?: number;
+  per_hour_rate?: number;
   icon_url: string | null;
+  service_group?: string;
 }
 
 export interface HomeBanner {
@@ -39,6 +43,7 @@ export interface RideSummary {
 export interface HomeDashboard {
   greeting_name: string;
   vehicle_categories: VehicleCategory[];
+  rental_categories?: VehicleCategory[];
   offers: HomeOffer[];
   banners: HomeBanner[];
   nearby_drivers_count: number;
@@ -50,8 +55,21 @@ export function getHomeDashboard(): Promise<HomeDashboard> {
   return authFetch<HomeDashboard>("/dashboard", undefined, "Unable to load home data");
 }
 
-export function getVehicleCategories(): Promise<VehicleCategory[]> {
-  return apiFetch<VehicleCategory[]>("/api/v1/common/vehicle-types", undefined, "Unable to load vehicles");
+export function getVehicleCategories(serviceGroup?: "ride" | "rental"): Promise<VehicleCategory[]> {
+  const query = serviceGroup ? `?service_group=${serviceGroup}` : "";
+  return apiFetch<VehicleCategory[]>(
+    `/api/v1/common/vehicle-types${query}`,
+    undefined,
+    "Unable to load vehicles"
+  );
+}
+
+export function getRentalCategories(): Promise<VehicleCategory[]> {
+  return apiFetch<VehicleCategory[]>(
+    "/api/v1/common/rental-categories",
+    undefined,
+    "Unable to load rental vehicles"
+  );
 }
 
 export function getBanners(): Promise<HomeBanner[]> {

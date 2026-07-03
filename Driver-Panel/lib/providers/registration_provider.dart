@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
+import 'package:wavego_driver/core/utils/registration_hydration.dart';
 import 'package:wavego_driver/models/registration_model.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/providers/app_providers.dart';
@@ -36,6 +37,36 @@ class RegistrationViewModel extends StateNotifier<DriverRegistration> {
 
   void goToStep(int step) {
     if (step >= 0 && step < totalSteps) currentStep = step;
+  }
+
+  Future<void> hydrateFromServer() async {
+    try {
+      final data = await _profileRepository.getRegistrationData();
+      if (data.isEmpty) return;
+      final hydrated = RegistrationHydration.fromSavedData(data);
+      state = state.copyWith(
+        fullName: hydrated.fullName.isNotEmpty ? hydrated.fullName : state.fullName,
+        phone: hydrated.phone.isNotEmpty ? hydrated.phone : state.phone,
+        email: hydrated.email.isNotEmpty ? hydrated.email : state.email,
+        dateOfBirth: hydrated.dateOfBirth ?? state.dateOfBirth,
+        gender: hydrated.gender ?? state.gender,
+        city: hydrated.city ?? state.city,
+        state: hydrated.state ?? state.state,
+        country: hydrated.country ?? state.country,
+        profilePhotoUrl: hydrated.profilePhotoUrl ?? state.profilePhotoUrl,
+        licenseNumber: hydrated.licenseNumber ?? state.licenseNumber,
+        licenseFrontUrl: hydrated.licenseFrontUrl ?? state.licenseFrontUrl,
+        licenseBackUrl: hydrated.licenseBackUrl ?? state.licenseBackUrl,
+        vehicleNumber: hydrated.vehicleNumber ?? state.vehicleNumber,
+        vehicleType: hydrated.vehicleType ?? state.vehicleType,
+        rcUrl: hydrated.rcUrl ?? state.rcUrl,
+        aadhaarNumber: hydrated.aadhaarNumber ?? state.aadhaarNumber,
+        aadhaarFrontUrl: hydrated.aadhaarFrontUrl ?? state.aadhaarFrontUrl,
+        aadhaarBackUrl: hydrated.aadhaarBackUrl ?? state.aadhaarBackUrl,
+        panNumber: hydrated.panNumber ?? state.panNumber,
+        panUrl: hydrated.panUrl ?? state.panUrl,
+      );
+    } catch (_) {}
   }
 
   Future<void> hydrateVerifiedPhone({
@@ -96,3 +127,7 @@ final registrationViewModelProvider =
 });
 
 final registrationStepProvider = StateProvider<int>((ref) => 0);
+
+final registrationHubModeProvider = StateProvider<bool>((ref) => false);
+
+final registrationHubPhotoNameFlowProvider = StateProvider<bool>((ref) => false);

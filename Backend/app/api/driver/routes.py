@@ -3,28 +3,48 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
-from sqlalchemy import select
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.driver.dependencies import get_current_driver
-from app.core.constants import DriverStatus, KYCStatus, RideStatus
+from app.core.constants import DriverStatus, KYCStatus, RideStatus, SupportTicketPriority, SupportTicketStatus
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.database.session import get_db
-from app.models import Driver, DriverDocument, Ride, Vehicle
+from app.models import Driver, DriverDocument, Notification, Ride, SupportTicket, Vehicle, WalletTransaction
 from app.repositories.driver_repository import DriverRepository
 from app.repositories.ride_repository import RideRepository
 from app.schemas.driver import (
+    DriverBankResponse,
+    DriverBankUpsert,
     DriverDocumentCreate,
     DriverEarningsResponse,
     DriverLocationUpdate,
     DriverRegistrationComplete,
+    DriverRegistrationProgressResponse,
     DriverResponse,
+    DriverSavedRegistrationData,
     DriverUpdate,
     DriverVehicleCreate,
+    EmergencyContactCreate,
+    EmergencyContactResponse,
+    EmergencyContactUpdate,
+    SaveKycStep,
+    SaveLicenseNumber,
+    SaveLicenseUpload,
+    SaveProfileStep,
+    SaveVehicleNumberStep,
 )
 from app.services.driver_registration_service import DriverRegistrationService
+from app.services.driver_registration_progress_service import (
+    DriverRegistrationProgressService,
+)
 from app.schemas.ride import RideOTPVerify, RideResponse
+from app.notifications.service import NotificationService, serialize_driver_notification
+from app.services.driver_emergency_contact_service import (
+    DriverEmergencyContactService,
+    contact_to_response,
+)
 from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import PaymentService
 from app.services.ride_service import RideService
@@ -76,16 +96,81 @@ async def upload_license(
     driver: Annotated[Driver, Depends(get_current_driver)],
     db: AsyncSession = Depends(get_db),
 ):
-    doc = DriverDocument(
-        driver_id=driver.id,
-        document_type="DRIVING_LICENSE",
-        document_url=data.document_url,
-        document_number=data.document_number,
-        status="PENDING",
+    service = DriverRegistrationProgressService(db)
+    side = "back" if data.document_type.upper().endswith("BACK") else "front"
+    return await service.save_license_upload(
+        driver,
+        SaveLicenseUpload(document_url=data.document_url, side=side),
     )
-    db.add(doc)
-    await db.flush()
-    return {"id": str(doc.id), "status": doc.status}
+
+
+@router.get("/registration-progress", response_model=DriverRegistrationProgressResponse)
+async def get_registration_progress(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).get_progress(driver)
+
+
+@router.get("/registration-data", response_model=DriverSavedRegistrationData)
+async def get_registration_data(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).get_saved_data(driver)
+
+
+@router.post("/registration/license-upload")
+async def registration_license_upload(
+    data: SaveLicenseUpload,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).save_license_upload(driver, data)
+
+
+@router.patch("/registration/license-number")
+async def registration_license_number(
+    data: SaveLicenseNumber,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).save_license_number(driver, data)
+
+
+@router.patch("/registration/profile")
+async def registration_profile(
+    data: SaveProfileStep,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).save_profile(driver, data)
+
+
+@router.post("/registration/vehicle")
+async def registration_vehicle(
+    data: SaveVehicleNumberStep,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).save_vehicle_number(driver, data)
+
+
+@router.post("/registration/kyc")
+async def registration_kyc(
+    data: SaveKycStep,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).save_kyc(driver, data)
+
+
+@router.post("/registration/submit")
+async def registration_submit(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    return await DriverRegistrationProgressService(db).submit(driver)
 
 
 @router.post("/upload-vehicle")
@@ -252,26 +337,302 @@ async def end_ride(
     ride = await RideService(db).complete_ride(data.ride_id)
     if ride.final_fare:
         await PaymentService(db).process_payment(ride.id, ride.user_id, ride.final_fare, ride.payment_method)
+        from app.services.payment_service import WalletService
+        from app.notifications.service import NotificationService
+
+        driver_share = round(float(ride.final_fare) * 0.85, 2)
+        wallet = await WalletService(db).get_or_create_wallet(driver_id=driver.id)
+        await WalletService(db).credit(
+            wallet.id,
+            driver_share,
+            f"Earnings for ride {str(ride.id)[:8]}",
+            str(ride.id),
+        )
+        notif = NotificationService(db)
+        await notif.create_in_app(
+            title="Ride earnings credited",
+            message=f"₹{driver_share:.2f} added to your wallet.",
+            notification_type="PAYMENT",
+            driver_id=driver.id,
+            data={"ride_id": str(ride.id), "amount": driver_share},
+        )
+        await notif.create_in_app(
+            title="Rate your driver",
+            message="How was your trip? Tap to rate your captain.",
+            notification_type="RIDE",
+            user_id=ride.user_id,
+            data={"ride_id": str(ride.id), "event": "rate_driver"},
+        )
     await manager.broadcast_ride(str(data.ride_id), {"event": "ride_completed", "ride_id": str(data.ride_id)})
     return RideResponse.model_validate(ride)
 
 
 @router.get("/wallet")
 async def driver_wallet(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
+    from app.services.driver_bank_service import DriverBankService, bank_to_response
     from app.services.payment_service import WalletService
 
     wallet = await WalletService(db).get_or_create_wallet(driver_id=driver.id)
-    return {"balance": wallet.balance}
+    bank = await DriverBankService(db).get_primary(driver.id)
+    payload: dict = {"balance": wallet.balance}
+    if bank:
+        payload["bank"] = bank_to_response(bank).model_dump()
+    return payload
+
+
+@router.get("/bank", response_model=DriverBankResponse)
+async def get_bank(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.driver_bank_service import DriverBankService, bank_to_response
+
+    bank = await DriverBankService(db).get_primary(driver.id)
+    if not bank:
+        raise NotFoundException("No bank account linked")
+    return bank_to_response(bank)
+
+
+@router.post("/bank", response_model=DriverBankResponse)
+async def save_bank(
+    data: DriverBankUpsert,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.driver_bank_service import DriverBankService
+
+    bank = await DriverBankService(db).upsert(driver.id, data)
+    return bank
 
 
 @router.get("/earnings", response_model=DriverEarningsResponse)
-async def earnings(driver: Annotated[Driver, Depends(get_current_driver)], period: str = Query("daily")):
+async def earnings(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+    period: str = Query("daily"),
+):
+    from app.services.payment_service import WalletService
+
+    wallet = await WalletService(db).get_or_create_wallet(driver_id=driver.id)
+    credit_sum = await db.execute(
+        select(func.coalesce(func.sum(WalletTransaction.amount), 0)).where(
+            WalletTransaction.wallet_id == wallet.id,
+            WalletTransaction.transaction_type == "CREDIT",
+        )
+    )
+    total_earnings = float(credit_sum.scalar_one() or 0)
     return DriverEarningsResponse(
         period=period,
         total_rides=driver.total_rides,
-        total_earnings=0.0,
-        net_earnings=0.0,
+        total_earnings=total_earnings,
+        net_earnings=total_earnings,
     )
+
+
+@router.get("/wallet/transactions")
+async def driver_wallet_transactions(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    from app.services.payment_service import WalletService
+
+    wallet = await WalletService(db).get_or_create_wallet(driver_id=driver.id)
+    result = await db.execute(
+        select(WalletTransaction)
+        .where(WalletTransaction.wallet_id == wallet.id)
+        .order_by(WalletTransaction.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    txns = result.scalars().all()
+    return {
+        "data": [
+            {
+                "id": str(t.id),
+                "type": t.transaction_type.lower(),
+                "amount": t.amount,
+                "description": t.description,
+                "reference_id": t.reference_id,
+                "created_at": t.created_at.isoformat(),
+            }
+            for t in txns
+        ],
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+_DOC_LABELS = {
+    "DRIVING_LICENSE": "Driving License",
+    "DRIVING_LICENSE_BACK": "Driving License (Back)",
+    "AADHAAR": "Aadhaar Card",
+    "AADHAAR_BACK": "Aadhaar Card (Back)",
+    "PAN": "PAN Card",
+    "VEHICLE_RC": "Vehicle RC",
+    "VEHICLE_RC_BACK": "Vehicle RC (Back)",
+    "INSURANCE": "Insurance",
+}
+
+
+@router.get("/documents")
+async def driver_documents(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverDocument).where(DriverDocument.driver_id == driver.id).order_by(DriverDocument.created_at.desc())
+    )
+    return {
+        "data": [
+            {
+                "id": str(doc.id),
+                "type": _DOC_LABELS.get(doc.document_type, doc.document_type.replace("_", " ").title()),
+                "status": doc.status.lower(),
+                "document_url": doc.document_url,
+                "expiry_date": doc.expiry_date.isoformat() if doc.expiry_date else None,
+                "is_expiring_soon": False,
+            }
+            for doc in result.scalars().all()
+        ]
+    }
+
+
+class DriverSupportRequest(BaseModel):
+    subject: str = Field(..., min_length=3, max_length=200)
+    message: str = Field(..., min_length=5)
+
+
+class DriverSosRequest(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    message: str | None = None
+
+
+@router.post("/support")
+async def driver_create_support(
+    data: DriverSupportRequest,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = SupportTicket(
+        driver_id=driver.id,
+        subject=data.subject.strip(),
+        description=data.message.strip(),
+        status=SupportTicketStatus.OPEN.value,
+        priority=SupportTicketPriority.MEDIUM.value,
+    )
+    db.add(ticket)
+    await db.flush()
+    return {"id": str(ticket.id), "subject": ticket.subject, "status": "open"}
+
+
+@router.get("/support/tickets")
+async def driver_support_tickets(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(SupportTicket)
+        .where(SupportTicket.driver_id == driver.id)
+        .order_by(SupportTicket.created_at.desc())
+        .limit(50)
+    )
+    return {
+        "data": [
+            {
+                "id": str(t.id),
+                "subject": t.subject,
+                "status": t.status.lower(),
+                "priority": t.priority.lower(),
+                "created_at": t.created_at.isoformat(),
+                "updated_at": t.updated_at.isoformat(),
+            }
+            for t in result.scalars().all()
+        ]
+    }
+
+
+@router.get("/support/tickets/{ticket_id}")
+async def driver_support_ticket_detail(
+    ticket_id: UUID,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    from app.models import SupportTicketReply
+
+    ticket = await db.get(SupportTicket, ticket_id)
+    if not ticket or ticket.driver_id != driver.id:
+        raise NotFoundException("Ticket not found")
+
+    replies_result = await db.execute(
+        select(SupportTicketReply)
+        .where(SupportTicketReply.ticket_id == ticket.id)
+        .order_by(SupportTicketReply.created_at.asc())
+    )
+    replies = list(replies_result.scalars().all())
+    driver_name = f"{driver.first_name} {driver.last_name}".strip() or "You"
+    status_key = ticket.status.lower()
+    messages = [
+        {
+            "id": f"{ticket.id}-initial",
+            "sender": driver_name,
+            "sender_type": "driver",
+            "message": ticket.description,
+            "created_at": ticket.created_at.isoformat(),
+        }
+    ]
+    for reply in replies:
+        messages.append(
+            {
+                "id": str(reply.id),
+                "sender": "WaveGo Support" if reply.sender_type == "ADMIN" else driver_name,
+                "sender_type": reply.sender_type.lower(),
+                "message": reply.message,
+                "created_at": reply.created_at.isoformat(),
+            }
+        )
+    return {
+        "id": str(ticket.id),
+        "subject": ticket.subject,
+        "status": status_key,
+        "created_at": ticket.created_at.isoformat(),
+        "updated_at": ticket.updated_at.isoformat(),
+        "messages": messages,
+    }
+
+
+@router.post("/sos")
+async def driver_trigger_sos(
+    data: DriverSosRequest,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    message = (data.message or "").strip() or "Driver triggered emergency SOS"
+    ticket = SupportTicket(
+        driver_id=driver.id,
+        subject="SOS Emergency Alert",
+        description=f"{message}\nLocation: {data.lat}, {data.lng}",
+        status=SupportTicketStatus.OPEN.value,
+        priority=SupportTicketPriority.URGENT.value,
+    )
+    db.add(ticket)
+    await NotificationService(db).create_in_app(
+        title="SOS Alert Sent",
+        message="Emergency services and support have been notified with your location.",
+        notification_type="SYSTEM",
+        driver_id=driver.id,
+        data={"lat": data.lat, "lng": data.lng, "ticket_id": str(ticket.id)},
+    )
+    admin_alert = Notification(
+        title="Driver SOS Alert",
+        message=f"{driver.first_name} {driver.last_name} triggered SOS at {data.lat}, {data.lng}",
+        notification_type="ADMIN",
+    )
+    db.add(admin_alert)
+    await db.flush()
+    return {"success": True, "ticket_id": str(ticket.id)}
 
 
 @router.get("/active-ride")
@@ -315,3 +676,80 @@ async def arrived_ride(
     ride = await RideService(db).driver_arrived(data.ride_id)
     await manager.broadcast_ride(str(data.ride_id), {"event": "driver_arrived", "ride_id": str(data.ride_id)})
     return RideResponse.model_validate(ride)
+
+
+@router.get("/notifications")
+async def driver_notifications(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+):
+    service = NotificationService(db)
+    items, total, unread_count = await service.list_for_driver(driver.id, page, page_size)
+    return {
+        "data": [serialize_driver_notification(n) for n in items],
+        "total": total,
+        "unread_count": unread_count,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@router.put("/notifications/read-all")
+async def mark_all_driver_notifications_read(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    updated = await NotificationService(db).mark_all_driver_notifications_read(driver.id)
+    return {"updated": updated}
+
+
+@router.put("/notifications/{notification_id}/read")
+async def mark_driver_notification_read(
+    notification_id: UUID,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    notification = await NotificationService(db).mark_driver_notification_read(notification_id, driver.id)
+    return serialize_driver_notification(notification)
+
+
+@router.get("/emergency-contacts")
+async def list_emergency_contacts(
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    contacts = await DriverEmergencyContactService(db).list_for_driver(driver.id)
+    return {"data": [contact_to_response(c).model_dump() for c in contacts]}
+
+
+@router.post("/emergency-contacts", response_model=EmergencyContactResponse)
+async def create_emergency_contact(
+    data: EmergencyContactCreate,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    contact = await DriverEmergencyContactService(db).create(driver.id, data)
+    return contact_to_response(contact)
+
+
+@router.put("/emergency-contacts/{contact_id}", response_model=EmergencyContactResponse)
+async def update_emergency_contact(
+    contact_id: UUID,
+    data: EmergencyContactUpdate,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    contact = await DriverEmergencyContactService(db).update(driver.id, contact_id, data)
+    return contact_to_response(contact)
+
+
+@router.delete("/emergency-contacts/{contact_id}")
+async def delete_emergency_contact(
+    contact_id: UUID,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    await DriverEmergencyContactService(db).delete(driver.id, contact_id)
+    return {"success": True}

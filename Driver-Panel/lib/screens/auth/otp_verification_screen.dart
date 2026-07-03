@@ -101,7 +101,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     setState(() => _isLoading = false);
 
     if (!response.isRegistered) {
-      context.go(RouteNames.registration);
+      context.go(RouteNames.captainWelcome);
     } else if (!response.isVerified) {
       context.go(RouteNames.verificationPending);
     } else {

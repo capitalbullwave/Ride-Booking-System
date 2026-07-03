@@ -88,6 +88,10 @@ export async function activateUser(userId: string): Promise<User> {
   return normalizeUser(user);
 }
 
+export async function deleteUser(userId: string): Promise<void> {
+  await apiFetch(`/api/v1/admin/users/${userId}`, { method: "DELETE" });
+}
+
 export async function fetchUser(userId: string): Promise<User> {
   const user = await apiFetch<User & { walletBalance?: number | string }>(
     `/api/v1/admin/users/${userId}`,

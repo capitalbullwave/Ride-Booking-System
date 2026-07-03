@@ -9,6 +9,8 @@ import {
   CheckCircle,
   XCircle,
   RotateCcw,
+  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchBar } from "@/components/shared/search-bar";
@@ -47,6 +49,7 @@ import { Driver, DriverStatus } from "@/types";
 import { formatCurrency, capitalize } from "@/lib/format";
 import {
   approveDriver,
+  deleteDriver,
   fetchDrivers,
   reactivateDriver,
   rejectDriver,
@@ -55,7 +58,6 @@ import {
   updateDriver,
 } from "@/lib/drivers-api";
 import { toast } from "sonner";
-import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import { useAuth } from "@/components/providers/auth-provider";
 
 type DriverFormData = {
@@ -74,7 +76,8 @@ type ConfirmAction =
   | "setOffline"
   | "setBusy"
   | "setRejected"
-  | "setSuspended";
+  | "setSuspended"
+  | "delete";
 
 const statusActions: {
   action: ConfirmAction;
@@ -143,6 +146,13 @@ const confirmConfig: Record<
     title: "Set Suspended",
     description: (name) => `Set ${name}'s status to suspended?`,
     button: "Set Suspended",
+    destructive: true,
+  },
+  delete: {
+    title: "Delete Driver",
+    description: (name) =>
+      `Permanently delete ${name}'s account? This removes the driver, vehicles, documents, and wallet data. This cannot be undone.`,
+    button: "Delete Driver",
     destructive: true,
   },
 };
@@ -226,11 +236,6 @@ export default function DriversPage() {
     return () => clearTimeout(timer);
   }, [loadDrivers, authLoading, isAuthenticated]);
 
-  useAutoRefresh(() => {
-    if (!isAuthenticated) return;
-    void loadDrivers({ silent: true });
-  });
-
   const filteredDrivers = useMemo(() => driverList, [driverList]);
 
   const driversExportPath = useMemo(() => {
@@ -303,6 +308,9 @@ export default function DriversPage() {
       } else if (confirmAction === "reactivate") {
         await reactivateDriver(driver.id);
         toast.success(`${driver.name} has been reactivated`);
+      } else if (confirmAction === "delete") {
+        await deleteDriver(driver.id);
+        toast.success(`${driver.name} has been deleted`);
       } else {
         const statusMap: Partial<Record<ConfirmAction, DriverStatus>> = {
           setOnline: "online",
@@ -329,6 +337,8 @@ export default function DriversPage() {
               ? "Failed to suspend driver"
               : confirmAction === "reactivate"
                 ? "Failed to reactivate driver"
+                : confirmAction === "delete"
+                  ? "Failed to delete driver"
                 : "Failed to update driver status";
       toast.error(error instanceof Error ? error.message : fallback);
     } finally {
@@ -360,7 +370,18 @@ export default function DriversPage() {
       key: "actions",
       header: "Actions",
       cell: (d) => (
-        <DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            disabled={actionDriverId === d.id}
+            onClick={() => openConfirm(d, "delete")}
+            title="Delete driver"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
             <MoreHorizontal className="h-4 w-4" />
           </DropdownMenuTrigger>
@@ -413,8 +434,17 @@ export default function DriversPage() {
                 </DropdownMenuItem>
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={actionDriverId === d.id}
+              onClick={() => openConfirm(d, "delete")}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> Delete Driver
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       ),
     },
   ];
@@ -422,6 +452,15 @@ export default function DriversPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Driver Management" description="Manage drivers, documents, and verifications">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void loadDrivers()}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
         <ButtonLink href="/vehicles/approval">Vehicle Approval</ButtonLink>
         <ExportButton filename="wavego-drivers" exportPath={driversExportPath} />
       </PageHeader>

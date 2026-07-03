@@ -23,10 +23,15 @@ class AuthInterceptor extends Interceptor {
 
 /// Retries failed requests once after refreshing the access token on 401.
 class TokenRefreshInterceptor extends Interceptor {
-  TokenRefreshInterceptor(this._tokenStore, this._dio);
+  TokenRefreshInterceptor(
+    this._tokenStore,
+    this._dio, {
+    this.onSessionExpired,
+  });
 
   final AuthTokenStore _tokenStore;
   final Dio _dio;
+  final void Function()? onSessionExpired;
 
   @override
   Future<void> onError(
@@ -46,6 +51,7 @@ class TokenRefreshInterceptor extends Interceptor {
     try {
       final refreshToken = await _tokenStore.readRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
+        onSessionExpired?.call();
         return handler.next(err);
       }
 
@@ -60,6 +66,7 @@ class TokenRefreshInterceptor extends Interceptor {
       final refresh = data?['refresh_token'] as String? ?? data?['data']?['refresh_token'] as String? ?? refreshToken;
 
       if (access == null || access.isEmpty) {
+        onSessionExpired?.call();
         return handler.next(err);
       }
 
@@ -70,6 +77,7 @@ class TokenRefreshInterceptor extends Interceptor {
       final retryResponse = await _dio.fetch<dynamic>(retryOptions);
       return handler.resolve(retryResponse);
     } catch (_) {
+      onSessionExpired?.call();
       return handler.next(err);
     }
   }

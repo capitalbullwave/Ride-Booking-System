@@ -51,8 +51,38 @@ class _RideRequestScreenState extends ConsumerState<RideRequestScreen> {
 
   Future<void> _decline() async {
     if (_request == null) return;
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Reason for declining',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+            ),
+            ...['Too far', 'Low fare', 'Traffic / road issue', 'Personal reason']
+                .map(
+              (r) => ListTile(
+                title: Text(r),
+                onTap: () => Navigator.pop(ctx, r),
+              ),
+            ),
+            ListTile(
+              title: const Text('Decline without reason'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
     _timer?.cancel();
-    await ref.read(rideViewModelProvider.notifier).declineRide(_request!.id);
+    await ref
+        .read(rideViewModelProvider.notifier)
+        .declineRide(_request!.id, reason: reason);
     if (mounted) context.pop();
   }
 

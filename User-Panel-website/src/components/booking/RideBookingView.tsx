@@ -10,35 +10,25 @@ import { ROUTES } from "@/constants/routes";
 import {
   PAYMENT_METHODS,
   RIDE_VEHICLE_OPTIONS,
-  type RideVehicleId,
 } from "@/data/ride-options";
 import { getVehicleCategories } from "@/lib/home-api";
 import { estimateFare } from "@/lib/ride-api";
 import { buildLocationSearchUrl } from "@/lib/location-search";
 import { buildBookUrl, buildSearchingUrl, formatFare } from "@/lib/ride-booking";
 import {
-  CATEGORY_SLUG_TO_VEHICLE,
+  categoryVehicleId,
   estimateDistanceKm,
   estimateDurationMin,
-  vehicleImageForSlug,
+  vehicleImageForCategory,
 } from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
 
 const MAP_EMBED_URL =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14008.114827184203!2d77.216721!3d28.6328!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390cfd37b741d057%3A0xc46ce4427b231eb5!2sConnaught%20Place%2C%20New%20Delhi%2C%20Delhi%20110001!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
 
-const BOOK_LABELS: Record<RideVehicleId, string> = {
-  bike: "Bike",
-  auto: "Auto",
-  cab: "Cab",
-  parcel: "Parcel",
-  travel: "Travel and Stay",
-  ambulance: "Ambulance",
-};
-
 interface BookableOption {
-  id: RideVehicleId;
-  categoryId?: string;
+  id: string;
+  categoryId: string;
   name: string;
   eta: string;
   price: number;
@@ -52,16 +42,12 @@ export function RideBookingView() {
   const pickup = searchParams.get("pickup") || "";
   const dropoff = searchParams.get("dropoff") || "";
   const tab = searchParams.get("tab") || "rides";
-  const vehicleParam = searchParams.get("vehicle") as RideVehicleId | null;
+  const vehicleParam = searchParams.get("vehicle");
+  const categoryParam = searchParams.get("category");
 
   const [options, setOptions] = useState<BookableOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedVehicle, setSelectedVehicle] = useState<RideVehicleId>(() => {
-    if (vehicleParam && RIDE_VEHICLE_OPTIONS.some((v) => v.id === vehicleParam)) {
-      return vehicleParam;
-    }
-    return RIDE_VEHICLE_OPTIONS[0].id;
-  });
+  const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [payment] = useState(PAYMENT_METHODS[0]);
 
   useEffect(() => {
@@ -73,13 +59,10 @@ export function RideBookingView() {
   useEffect(() => {
     async function load() {
       try {
-        const categories = await getVehicleCategories();
+        const categories = await getVehicleCategories("ride");
         const apiOptions: BookableOption[] = [];
 
-        for (const category of categories) {
-          const vehicleId = CATEGORY_SLUG_TO_VEHICLE[category.slug];
-          if (!vehicleId) continue;
-
+        for (const [index, category] of categories.entries()) {
           let price = category.base_fare + category.per_km_rate * estimateDistanceKm();
           try {
             const estimate = await estimateFare({
@@ -92,38 +75,38 @@ export function RideBookingView() {
             // Use fallback price from category rates
           }
 
-          const staticMeta = RIDE_VEHICLE_OPTIONS.find((v) => v.id === vehicleId);
+          const mappedId = categoryVehicleId(category);
+          const staticMeta = RIDE_VEHICLE_OPTIONS.find((v) => v.id === mappedId);
           apiOptions.push({
-            id: vehicleId,
+            id: String(mappedId),
             categoryId: category.id,
             name: category.name,
-            eta: staticMeta?.eta ?? "8 mins",
+            eta: staticMeta?.eta ?? `${4 + index} mins`,
             price,
-            image: vehicleImageForSlug(category.slug),
+            image: vehicleImageForCategory(category),
           });
         }
 
-        const staticExtras = RIDE_VEHICLE_OPTIONS.filter(
-          (v) => !apiOptions.some((o) => o.id === v.id)
-        ).map((v) => ({
-          id: v.id,
-          name: v.name,
-          eta: v.eta,
-          price: v.price,
-          image: v.image,
-        }));
-
-        setOptions([...apiOptions, ...staticExtras]);
+        setOptions(apiOptions);
+        if (apiOptions.length > 0) {
+          const preferred =
+            (categoryParam && apiOptions.find((o) => o.categoryId === categoryParam)?.id) ||
+            (vehicleParam && apiOptions.find((o) => o.id === vehicleParam)?.id) ||
+            apiOptions[0].id;
+          setSelectedVehicle(preferred);
+        }
       } catch {
         setOptions(
           RIDE_VEHICLE_OPTIONS.map((v) => ({
             id: v.id,
+            categoryId: v.id,
             name: v.name,
             eta: v.eta,
             price: v.price,
             image: v.image,
           }))
         );
+        setSelectedVehicle(vehicleParam ?? RIDE_VEHICLE_OPTIONS[0].id);
       } finally {
         setIsLoading(false);
       }
@@ -138,6 +121,7 @@ export function RideBookingView() {
         ? options
         : RIDE_VEHICLE_OPTIONS.map((v) => ({
             id: v.id,
+            categoryId: v.id,
             name: v.name,
             eta: v.eta,
             price: v.price,
@@ -299,7 +283,7 @@ export function RideBookingView() {
           disabled={isLoading}
           className="h-14 w-full rounded-[16px] bg-primary text-base font-bold text-primary-foreground shadow-md hover:bg-primary/90"
         >
-          Book {BOOK_LABELS[selectedOption.id]}
+          Book {selectedOption.name}
         </Button>
       </div>
     </motion.div>

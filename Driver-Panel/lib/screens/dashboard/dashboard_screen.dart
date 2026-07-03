@@ -12,6 +12,12 @@ import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
+import 'package:wavego_driver/providers/settings_provider.dart';
+import 'package:wavego_driver/repositories/notification_repository.dart';
+import 'package:wavego_driver/screens/notifications/notifications_screen.dart';
+import 'package:wavego_driver/screens/profile/profile_screen.dart';
+import 'package:wavego_driver/screens/trip/trip_history_screen.dart';
+import 'package:wavego_driver/screens/wallet/wallet_screen.dart';
 import 'package:wavego_driver/widgets/common/online_toggle.dart';
 import 'package:wavego_driver/widgets/common/shimmer_loading.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
@@ -34,6 +40,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     Future.microtask(() async {
       await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
       if (!mounted) return;
+
+      final activeRide =
+          await ref.read(rideViewModelProvider.notifier).restoreActiveRide();
+      if (activeRide != null && mounted) {
+        context.go(RouteNames.activeTrip);
+        return;
+      }
+
+      await _loadNotificationBadge();
+      if (!mounted) return;
+
       if (ref.read(dashboardViewModelProvider).isOnline) {
         _pollForRides();
         _startRidePolling();
@@ -47,9 +64,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.dispose();
   }
 
+  Future<void> _loadNotificationBadge() async {
+    try {
+      final items =
+          await ref.read(notificationRepositoryProvider).getNotifications();
+      final unread = items.where((n) => !n.read).length;
+      ref.read(notificationUnreadCountProvider.notifier).state = unread;
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(dashboardViewModelProvider);
+    final unreadCount = ref.watch(notificationUnreadCountProvider);
 
     ref.listen(dashboardStateProvider(dashboardState.isOnline), (prev, next) {
       if (next && mounted) {
@@ -65,44 +92,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         index: _navIndex,
         children: [
           _HomeTab(state: dashboardState),
-          const _TripsTabPlaceholder(),
-          const _WalletTabPlaceholder(),
-          const _NotificationsTabPlaceholder(),
-          const _ProfileTabPlaceholder(),
+          const TripHistoryScreen(embedded: true),
+          const WalletScreen(embedded: true),
+          const NotificationsScreen(embedded: true),
+          const ProfileScreen(embedded: true),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
-        onDestinationSelected: (index) {
-          if (index == 1) {
-            context.push(RouteNames.trips);
-          } else if (index == 2) {
-            context.push(RouteNames.wallet);
-          } else if (index == 3) {
-            context.push(RouteNames.notifications);
-          } else if (index == 4) {
-            context.push(RouteNames.profile);
-          } else {
-            setState(() => _navIndex = index);
-          }
-        },
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: 'Trips'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-          NavigationDestination(icon: Icon(Icons.notifications_outlined), selectedIcon: Icon(Icons.notifications), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
+        onDestinationSelected: (index) => setState(() => _navIndex = index),
+        destinations: [
+          const NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.route_outlined),
+            selectedIcon: Icon(Icons.route),
+            label: 'Trips',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet),
+            label: 'Wallet',
+          ),
+          NavigationDestination(
+            icon: unreadCount > 0
+                ? Badge(
+                    label: Text('$unreadCount'),
+                    child: const Icon(Icons.notifications_outlined),
+                  )
+                : const Icon(Icons.notifications_outlined),
+            selectedIcon: unreadCount > 0
+                ? Badge(
+                    label: Text('$unreadCount'),
+                    child: const Icon(Icons.notifications),
+                  )
+                : const Icon(Icons.notifications),
+            label: 'Alerts',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
-      floatingActionButton: dashboardState.isOnline
-          ? null
-          : null,
     );
   }
 
   void _startRidePolling() {
     _ridePollTimer?.cancel();
-    _ridePollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _pollForRides());
+    _ridePollTimer =
+        Timer.periodic(const Duration(seconds: 5), (_) => _pollForRides());
   }
 
   void _stopRidePolling() {
@@ -110,16 +153,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _ridePollTimer = null;
   }
 
-  void _pollForRides() async {
+  Future<void> _pollForRides() async {
     if (!ref.read(dashboardViewModelProvider).isOnline) return;
+    if (ref.read(rideViewModelProvider).activeRide != null) return;
 
     final hadRequest = ref.read(rideViewModelProvider).incomingRequest != null;
     await ref.read(rideViewModelProvider.notifier).pollForRideRequest();
     final rideState = ref.read(rideViewModelProvider);
-    if (rideState.incomingRequest != null && mounted && !hadRequest) {
-      context.showSnackBar('New ride request nearby!');
-      context.push(RouteNames.rideRequest);
+    final request = rideState.incomingRequest;
+    if (request == null || !mounted || hadRequest) return;
+
+    if (ref.read(autoAcceptProvider)) {
+      final ride = await ref
+          .read(rideViewModelProvider.notifier)
+          .acceptRide(request.id);
+      if (ride != null && mounted) {
+        context.showSnackBar('Ride auto-accepted');
+        context.go(RouteNames.activeTrip);
+      }
+      return;
     }
+
+    context.showSnackBar('New ride request nearby!');
+    context.push(RouteNames.rideRequest);
   }
 }
 
@@ -151,7 +207,10 @@ class _HomeTab extends ConsumerWidget {
                           backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                           child: Text(
                             (state.profile?.name ?? 'D')[0].toUpperCase(),
-                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -159,13 +218,24 @@ class _HomeTab extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Hello, ${state.profile?.name.split(' ').first ?? 'Captain'}! 👋',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                              Text(
+                                'Hello, ${state.profile?.name.split(' ').first ?? 'Captain'}! 👋',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
                               Text(
                                 state.statsState is ViewStateSuccess
-                                    ? (state.statsState as ViewStateSuccess).data.currentLocation ?? 'Fetching location...'
+                                    ? (state.statsState as ViewStateSuccess)
+                                            .data
+                                            .currentLocation ??
+                                        'Fetching location...'
                                     : 'Fetching location...',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
                               ),
                             ],
                           ),
@@ -205,7 +275,10 @@ class _HomeTab extends ConsumerWidget {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.verified_user_outlined, color: AppColors.warning),
+                            const Icon(
+                              Icons.verified_user_outlined,
+                              color: AppColors.warning,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
@@ -231,7 +304,9 @@ class _HomeTab extends ConsumerWidget {
                 ViewStateLoading() => const DashboardSkeleton(),
                 ViewStateError(:final message) => ErrorStateWidget(
                     message: message,
-                    onRetry: () => ref.read(dashboardViewModelProvider.notifier).loadDashboard(),
+                    onRetry: () => ref
+                        .read(dashboardViewModelProvider.notifier)
+                        .loadDashboard(),
                   ),
                 ViewStateSuccess(:final data) => Padding(
                     padding: padding,
@@ -293,7 +368,8 @@ class _HomeTab extends ConsumerWidget {
                             Expanded(
                               child: StatCard(
                                 title: 'Performance',
-                                value: '${data.acceptanceRate.toStringAsFixed(0)}%',
+                                value:
+                                    '${data.acceptanceRate.toStringAsFixed(0)}%',
                                 subtitle: 'Acceptance rate',
                                 icon: Icons.trending_up,
                                 onTap: () => context.push(RouteNames.earnings),
@@ -326,7 +402,10 @@ class _SearchingAnimationState extends State<_SearchingAnimation>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
   }
 
   @override
@@ -354,8 +433,19 @@ class _SearchingAnimationState extends State<_SearchingAnimation>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Searching for rides...', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
-                Text('Stay in high-demand areas', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                Text(
+                  'Searching for rides...',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                Text(
+                  'Stay in high-demand areas',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
               ],
             ),
           ),
@@ -363,28 +453,4 @@ class _SearchingAnimationState extends State<_SearchingAnimation>
       ),
     );
   }
-}
-
-class _TripsTabPlaceholder extends StatelessWidget {
-  const _TripsTabPlaceholder();
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-class _WalletTabPlaceholder extends StatelessWidget {
-  const _WalletTabPlaceholder();
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-class _NotificationsTabPlaceholder extends StatelessWidget {
-  const _NotificationsTabPlaceholder();
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
-}
-
-class _ProfileTabPlaceholder extends StatelessWidget {
-  const _ProfileTabPlaceholder();
-  @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
 }

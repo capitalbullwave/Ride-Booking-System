@@ -81,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await apiFetch<{
         user: AuthUser;
         accessToken: string;
+        refreshToken: string;
         expiresAt: number;
       }>("/api/v1/admin/login", {
         method: "POST",
@@ -90,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const session: AuthSession = {
         user: data.user,
         token: data.accessToken,
+        refreshToken: data.refreshToken,
         expiresAt:
           data.expiresAt > 1_000_000_000_000
             ? data.expiresAt
