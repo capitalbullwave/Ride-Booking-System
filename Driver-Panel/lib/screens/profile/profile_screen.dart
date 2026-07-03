@@ -7,7 +7,6 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/account_verification_status.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
-import 'package:wavego_driver/core/utils/profile_completion.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
@@ -15,7 +14,6 @@ import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
-import 'package:wavego_driver/widgets/common/document_status_badge.dart';
 import 'package:wavego_driver/widgets/common/online_toggle.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -58,10 +56,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       _ => null,
     };
     final isOnline = dashboard.isOnline;
-    final completion = calculateProfileCompletion(
-      isVerified: profile?.verificationStatus == 'verified',
-      hasAvatar: profile?.avatar != null,
-    );
     final isVerified = profile?.verificationStatus == 'verified';
 
     return Scaffold(
@@ -249,37 +243,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 },
                               ),
                             ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _SectionHeader(title: 'Profile Completion'),
-                  const SizedBox(height: 8),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('$completion% complete'),
-                              if (!isVerified)
-                                const DocumentStatusBadge(status: DocumentStatus.pending, compact: true),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                            child: LinearProgressIndicator(
-                              value: completion / 100,
-                              minHeight: 8,
-                              backgroundColor: AppColors.muted,
-                              color: AppColors.primary,
-                            ),
                           ),
                         ],
                       ),
