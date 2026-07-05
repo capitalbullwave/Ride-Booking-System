@@ -1,4 +1,4 @@
-# Add hero, service, feature, and captain images here.
+# - /images/fast-bull-logo.png (transparent Fast Bull logo)
 # Referenced paths:
 # - /images/hero_vehicles.png
 # - /images/services/bike.png, auto.png, car.png, parcel.png, travel.png, ambulance.png

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 
-/// WaveGo typography — Satoshi headings, Inter body.
+/// Fast Bull typography — Satoshi headings, Inter body.
 class AppTypography {
   AppTypography._();
 

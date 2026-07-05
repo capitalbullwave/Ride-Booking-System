@@ -100,3 +100,39 @@ def persist_vehicle_type_image(value: str | None, vehicle_type_id: str, prefix: 
     file_path.write_bytes(raw)
 
     return f"/uploads/vehicles/{vehicle_type_id}/{filename}"
+
+
+def persist_user_image(value: str | None, user_id: str, prefix: str) -> str | None:
+    """Accept http(s) URL or data:image/...;base64,... and return stored path."""
+    if not value or not value.strip():
+        return None
+
+    text = value.strip()
+    if text.startswith("http://") or text.startswith("https://"):
+        return text
+
+    if text.startswith("/uploads/"):
+        return text
+
+    match = _DATA_URL_RE.match(text)
+    if not match:
+        return text
+
+    fmt = match.group("fmt").lower()
+    ext = _EXT_BY_FMT.get(fmt, "jpg")
+    try:
+        raw = base64.b64decode(match.group("data"), validate=True)
+    except (binascii.Error, ValueError):
+        return text
+
+    if not raw:
+        return None
+
+    folder = _upload_root() / "users" / str(user_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    filename = f"{prefix}_{uuid.uuid4().hex[:12]}.{ext}"
+    file_path = folder / filename
+    file_path.write_bytes(raw)
+
+    return f"/uploads/users/{user_id}/{filename}"
+

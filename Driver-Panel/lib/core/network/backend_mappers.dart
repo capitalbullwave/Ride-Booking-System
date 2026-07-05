@@ -168,16 +168,26 @@ class BackendMappers {
   }
 
   static PaymentBreakdown paymentFromRide(Map<String, dynamic> json) {
-    final fare = (json['final_fare'] as num?)?.toDouble() ??
+    final fare = (json['trip_fare'] as num?)?.toDouble() ??
+        (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final commission = fare * 0.2;
+    final commission = (json['commission'] as num?)?.toDouble() ?? fare * 0.2;
+    final totalEarnings =
+        (json['total_earnings'] as num?)?.toDouble() ?? (fare - commission);
     return PaymentBreakdown(
       tripFare: fare,
       commission: commission,
-      totalEarnings: fare - commission,
-      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      bonus: (json['bonus'] as num?)?.toDouble() ?? 0,
+      totalEarnings: totalEarnings,
+      paymentMode: json['payment_mode'] as String? ??
+          json['payment_method'] as String? ??
+          'CASH',
     );
+  }
+
+  static Map<String, dynamic> collectPaymentFromJson(Map<String, dynamic> json) {
+    return json;
   }
 
   static RideSummary rideSummaryFromJson(Map<String, dynamic> json) {

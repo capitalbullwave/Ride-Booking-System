@@ -121,13 +121,13 @@ function LinkRow({
 
 export function AboutView() {
   return (
-    <InfoPageLayout title="About WaveGo">
+    <InfoPageLayout title="About Fast Bull">
       <div className="max-w-3xl space-y-8">
         {/* Brand intro */}
         <div className="rounded-[24px] border border-border bg-gradient-to-br from-primary/5 via-card to-secondary/10 p-6 shadow-sm">
           <WaveGoLogo size="md" />
           <p className="mt-5 text-sm leading-relaxed text-muted-foreground">
-            WaveGo is a premium mobility platform built for seamless travel across your city.
+            Fast Bull is a premium mobility platform built for seamless travel across your city.
             From quick bike rides and cab bookings to parcel deliveries and emergency ambulance
             support — every way you move, in one beautiful app.
           </p>
@@ -155,7 +155,7 @@ export function AboutView() {
             </div>
             <p className="font-heading font-bold text-foreground">Our mission</p>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Move smarter. Travel better. WaveGo connects riders and captains with safe,
+              Move smarter. Travel better. Fast Bull connects riders and captains with safe,
               reliable, and affordable transportation — whenever and wherever you need it.
             </p>
           </div>
@@ -173,7 +173,7 @@ export function AboutView() {
 
         {/* Values */}
         <section>
-          <h2 className="mb-3 font-heading text-lg font-bold text-foreground">Why WaveGo</h2>
+          <h2 className="mb-3 font-heading text-lg font-bold text-foreground">Why Fast Bull</h2>
           <div className="space-y-3">
             {values.map((value) => (
               <ValueRow key={value.title} {...value} />
@@ -207,7 +207,7 @@ export function AboutView() {
               <p className="text-sm font-semibold text-foreground">App version</p>
               <p className="text-xs text-muted-foreground">0.1.0 · UI Preview</p>
             </div>
-            <p className="text-xs text-muted-foreground">© 2026 WaveGo Technologies</p>
+            <p className="text-xs text-muted-foreground">© 2026 Fast Bull Technologies</p>
           </div>
         </div>
       </div>

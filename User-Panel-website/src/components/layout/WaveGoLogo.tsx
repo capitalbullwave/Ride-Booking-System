@@ -1,48 +1,37 @@
-import { playwriteEnglandJoined } from "@/lib/fonts";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type WaveGoLogoSize = "sm" | "md" | "lg";
-type WaveGoLogoVariant = "default" | "light";
 
-const sizeStyles: Record<WaveGoLogoSize, string> = {
-  sm: "h-9 min-w-[5.5rem] rounded-lg px-2.5 text-[1.2rem]",
-  md: "h-11 min-w-[6.75rem] rounded-xl px-3 text-[1.45rem]",
-  lg: "h-14 min-w-[8.5rem] rounded-2xl px-4 text-[1.85rem]",
-};
-
-const variantStyles: Record<WaveGoLogoVariant, string> = {
-  default: "bg-primary text-white shadow-md shadow-primary/20",
-  light: "bg-white text-primary shadow-lg shadow-black/10",
+const sizeStyles: Record<WaveGoLogoSize, { width: number; height: number; className: string }> = {
+  sm: { width: 296, height: 118, className: "h-24 w-auto min-w-[12rem]" },
+  md: { width: 352, height: 140, className: "h-28 w-auto min-w-[14rem]" },
+  lg: { width: 448, height: 176, className: "h-36 w-auto min-w-[17rem]" },
 };
 
 interface WaveGoLogoProps {
   size?: WaveGoLogoSize;
-  variant?: WaveGoLogoVariant;
+  /** Kept for compatibility — logo image has no background box. */
+  variant?: "default" | "light";
   className?: string;
+  priority?: boolean;
 }
 
 export function WaveGoLogo({
   size = "md",
-  variant = "default",
   className,
+  priority = false,
 }: WaveGoLogoProps) {
+  const { width, height, className: sizeClassName } = sizeStyles[size];
+
   return (
-    <div
-      className={cn(
-        "inline-flex items-center justify-center",
-        sizeStyles[size],
-        variantStyles[variant],
-        className
-      )}
-    >
-      <span
-        className={cn(
-          playwriteEnglandJoined.className,
-          "leading-none [font-feature-settings:'calt'_1,'liga'_1,'kern'_1]"
-        )}
-      >
-        WaveGo
-      </span>
-    </div>
+    <Image
+      src="/images/fast-bull-logo.png"
+      alt="Fast Bull"
+      width={width}
+      height={height}
+      priority={priority}
+      className={cn("object-contain", sizeClassName, className)}
+    />
   );
 }

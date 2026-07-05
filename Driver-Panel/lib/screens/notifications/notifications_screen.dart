@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
+import 'package:wavego_driver/core/utils/ride_notification_utils.dart';
 import 'package:wavego_driver/models/notification_model.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/repositories/notification_repository.dart';
 import 'package:wavego_driver/widgets/common/shimmer_loading.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
+import 'package:wavego_driver/widgets/notifications/ride_request_notification_card.dart';
 
 enum _NotifFilter { all, rides, offers, system }
 
@@ -227,10 +229,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               ),
             )
           else
-            ...items.map((n) => _NotificationCard(
+            ...items.map((n) {
+              if (isActionableRideRequestNotification(n)) {
+                return RideRequestNotificationCard(
                   notification: n,
-                  onTap: () => _markRead(n),
-                )),
+                  onHandled: () async {
+                    await _markRead(n);
+                  },
+                );
+              }
+              if (isRideRequestNotification(n)) {
+                return const SizedBox.shrink();
+              }
+              return _NotificationCard(
+                notification: n,
+                onTap: () => _markRead(n),
+              );
+            }),
         ],
       ),
     );

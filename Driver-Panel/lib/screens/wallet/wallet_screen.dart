@@ -906,7 +906,7 @@ class _WalletBalanceCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: AppButton(
-                        label: bank != null ? 'View Account' : 'Add Account',
+                        label: bank != null ? 'Account' : 'Add Bank',
                         icon: Icons.account_balance_outlined,
                         variant: AppButtonVariant.secondary,
                         height: 46,
@@ -914,7 +914,7 @@ class _WalletBalanceCard extends StatelessWidget {
                       ),
                     ),
                     if (onWithdraw != null && wallet.currentBalance > 0) ...[
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: AppButton(
                           label: 'Withdraw',

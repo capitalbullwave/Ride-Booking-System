@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'WaveGo Captain';
+  static const String appName = 'Fast Bull Captain';
   static const String appVersion = '1.0.0';
 
   static String get baseUrl {

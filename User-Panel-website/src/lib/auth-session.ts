@@ -4,6 +4,7 @@ import {
   DEV_OTP_HINT_KEY,
   POST_LOGIN_REDIRECT_KEY,
   PENDING_OTP_PHONE_KEY,
+  PROFILE_COMPLETE_COOKIE,
 } from "@/constants/auth";
 import { ROUTES } from "@/constants/routes";
 
@@ -14,6 +15,22 @@ export interface AuthSession {
   email?: string;
   accessToken?: string;
   refreshToken?: string;
+  profileComplete?: boolean;
+}
+
+export function needsProfileSetup(name?: string | null): boolean {
+  const trimmed = name?.trim();
+  if (!trimmed) return true;
+  return trimmed.toLowerCase() === "user";
+}
+
+function syncProfileCompleteCookie(profileComplete: boolean) {
+  if (typeof document === "undefined") return;
+  if (profileComplete) {
+    document.cookie = `${PROFILE_COMPLETE_COOKIE}=1; path=/; max-age=86400; SameSite=Lax`;
+  } else {
+    document.cookie = `${PROFILE_COMPLETE_COOKIE}=; path=/; max-age=0`;
+  }
 }
 
 export function setPendingOtpPhone(phone: string) {
@@ -60,9 +77,30 @@ export function getDevOtpHint(): string | null {
 
 export function setAuthSession(session: AuthSession) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
+  const profileComplete =
+    session.profileComplete ?? !needsProfileSetup(session.name);
+  const normalized: AuthSession = { ...session, profileComplete };
+  sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(normalized));
   document.cookie = `${AUTH_COOKIE_NAME}=1; path=/; max-age=86400; SameSite=Lax`;
+  syncProfileCompleteCookie(profileComplete);
   window.dispatchEvent(new Event("wavego-auth-update"));
+}
+
+export function markProfileComplete(updates?: { name?: string; email?: string }) {
+  const session = getAuthSession();
+  if (!session) return;
+  setAuthSession({
+    ...session,
+    ...(updates?.name?.trim() ? { name: updates.name.trim() } : {}),
+    ...(updates?.email?.trim() ? { email: updates.email.trim() } : {}),
+    profileComplete: true,
+  });
+}
+
+export function isProfileComplete(): boolean {
+  const session = getAuthSession();
+  if (!session) return false;
+  return session.profileComplete ?? !needsProfileSetup(session.name);
 }
 
 export function getAuthSession(): AuthSession | null {
@@ -93,6 +131,16 @@ export function clearAuthSession() {
   clearPendingOtpPhone();
   clearPostLoginRedirect();
   document.cookie = `${AUTH_COOKIE_NAME}=; path=/; max-age=0`;
+  syncProfileCompleteCookie(false);
+}
+
+export function resolvePostAuthDestination(): string {
+  const redirectTo = getPostLoginRedirect();
+  if (redirectTo) {
+    clearPostLoginRedirect();
+    return redirectTo;
+  }
+  return ROUTES.home;
 }
 
 export function hasAuthCookie(): boolean {

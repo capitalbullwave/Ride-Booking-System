@@ -85,7 +85,7 @@ class Ride(UUIDMixin, TimestampMixin, Base):
     tracking: Mapped[List["RideTracking"]] = relationship("RideTracking", back_populates="ride")
     events: Mapped[List["RideEvent"]] = relationship("RideEvent", back_populates="ride", order_by="RideEvent.created_at")
     payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="ride", uselist=False)
-    rating: Mapped[Optional["Rating"]] = relationship("Rating", back_populates="ride", uselist=False)
+    ratings: Mapped[List["Rating"]] = relationship("Rating", back_populates="ride")
     chat_messages: Mapped[List["ChatMessage"]] = relationship("ChatMessage", back_populates="ride")
 
 

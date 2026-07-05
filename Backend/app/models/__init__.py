@@ -21,9 +21,10 @@ from app.platform_settings.models import AppSetting, City, PricingRule, SystemCo
 from app.ratings.models import Rating
 from app.rides.models import ChatMessage, Ride, RideEvent, RideTracking
 from app.support.models import Faq, SupportTicket, SupportTicketReply
+from app.subscriptions.models import StudentPass, SubscriptionPayment, SubscriptionPlan, UserSubscription
 from app.users.models import SavedAddress, User
 from app.vehicles.models import Vehicle, VehicleType
-from app.wallet.models import Wallet, WalletTransaction, WithdrawalRequest
+from app.wallet.models import Wallet, WalletTopUpPayment, WalletTransaction, WithdrawalRequest
 
 __all__ = [
     "AdminLog",
@@ -53,14 +54,19 @@ __all__ = [
     "RideEvent",
     "RideTracking",
     "SavedAddress",
+    "StudentPass",
+    "SubscriptionPayment",
+    "SubscriptionPlan",
     "SupportTicket",
     "SupportTicketReply",
     "SystemConfig",
     "User",
+    "UserSubscription",
     "UserSession",
     "Vehicle",
     "VehicleType",
     "Wallet",
+    "WalletTopUpPayment",
     "WalletTransaction",
     "WithdrawalRequest",
 ]

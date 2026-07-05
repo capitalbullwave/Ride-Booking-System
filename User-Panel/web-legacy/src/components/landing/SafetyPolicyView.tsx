@@ -144,7 +144,7 @@ export function SafetyPolicyView() {
           </div>
 
           <p className="mt-12 border-t border-white/10 pt-8 text-center text-sm text-white/50">
-            © 2026 WaveGo Technologies. All rights reserved.
+            © 2026 Fast Bull Technologies. All rights reserved.
           </p>
         </div>
       </footer>

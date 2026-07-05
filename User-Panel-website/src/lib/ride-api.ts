@@ -1,4 +1,4 @@
-import { authFetch } from "@/lib/api";
+import { apiFetch, authFetch } from "@/lib/api";
 
 export interface Ride {
   id: string;
@@ -57,33 +57,107 @@ export interface RideHistoryResponse {
 export interface FareEstimate {
   category_id: string;
   estimated_fare: number;
+  original_fare?: number | null;
+  member_discount?: number;
+  discount_percent?: number;
   currency: string;
+}
+
+export interface RideDirections {
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  distance_km: number;
+  duration_min: number;
+}
+
+export async function getRideDirections(
+  pickup: string,
+  dropoff: string
+): Promise<RideDirections> {
+  const params = new URLSearchParams({ pickup, dropoff });
+  const data = await apiFetch<{
+    pickup: { lat: number; lng: number };
+    dropoff: { lat: number; lng: number };
+    distance_km: number;
+    duration_min: number;
+  }>(`/public/places/directions?${params.toString()}`, undefined, "Unable to load route");
+
+  return {
+    pickup_lat: data.pickup.lat,
+    pickup_lng: data.pickup.lng,
+    dropoff_lat: data.dropoff.lat,
+    dropoff_lng: data.dropoff.lng,
+    distance_km: data.distance_km,
+    duration_min: data.duration_min,
+  };
+}
+
+interface VehicleFareQuote {
+  vehicle_type_id: string;
+  estimated_fare: number;
+  original_fare?: number | null;
+  member_discount?: number;
+  discount_percent?: number;
+}
+
+export async function estimateRideFares(payload: {
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_lat: number;
+  dropoff_lng: number;
+}): Promise<{
+  discount_percent: number | null;
+  quotes: Record<string, VehicleFareQuote>;
+}> {
+  const res = await authFetch<{
+    vehicle_types: VehicleFareQuote[];
+    discount_percent?: number | null;
+  }>(
+    "/rides/estimate",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    "Unable to estimate fare"
+  );
+
+  const quotes: Record<string, VehicleFareQuote> = {};
+  for (const item of res.vehicle_types ?? []) {
+    quotes[item.vehicle_type_id] = item;
+  }
+
+  return {
+    discount_percent: res.discount_percent ?? null,
+    quotes,
+  };
 }
 
 export function estimateFare(payload: {
   vehicle_category_id: string;
-  distance_km: number;
-  duration_min: number;
+  pickup_lat: number;
+  pickup_lng: number;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  distance_km?: number;
+  duration_min?: number;
 }): Promise<FareEstimate> {
-  return authFetch<{ vehicle_types: Array<{ vehicle_type_id: string; estimated_fare: number }> }>(
-    "/rides/estimate",
-    {
-      method: "POST",
-      body: JSON.stringify({
-        pickup_lat: 28.6328,
-        pickup_lng: 77.2167,
-        dropoff_lat: 28.4595,
-        dropoff_lng: 77.0266,
-        vehicle_type_id: payload.vehicle_category_id,
-      }),
-    },
-    "Unable to estimate fare"
-  ).then((res) => {
-    const match = res.vehicle_types.find((v) => v.vehicle_type_id === payload.vehicle_category_id)
-      ?? res.vehicle_types[0];
+  return estimateRideFares({
+    pickup_lat: payload.pickup_lat,
+    pickup_lng: payload.pickup_lng,
+    dropoff_lat: payload.dropoff_lat,
+    dropoff_lng: payload.dropoff_lng,
+  }).then((res) => {
+    const match =
+      res.quotes[payload.vehicle_category_id] ??
+      Object.values(res.quotes)[0];
     return {
       category_id: match?.vehicle_type_id ?? payload.vehicle_category_id,
       estimated_fare: match?.estimated_fare ?? 0,
+      original_fare: match?.original_fare ?? null,
+      member_discount: match?.member_discount ?? 0,
+      discount_percent: match?.discount_percent ?? res.discount_percent ?? 0,
       currency: "INR",
     };
   });

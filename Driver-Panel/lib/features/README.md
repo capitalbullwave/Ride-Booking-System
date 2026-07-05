@@ -1,4 +1,4 @@
-# WaveGo Driver Panel — Clean Architecture
+# Fast Bull Driver Panel — Clean Architecture
 
 This app follows **Clean Architecture** with feature-oriented modules. Layers map as follows:
 
@@ -56,4 +56,4 @@ API: `POST /drivers/complete-registration` via `registration_payload.dart`
 
 ## Design system
 
-See `AGENTS.md` and `core/theme/` for WaveGo Captain tokens (Material 3, Inter + Satoshi).
+See `AGENTS.md` and `core/theme/` for Fast Bull Captain tokens (Material 3, Inter + Satoshi).

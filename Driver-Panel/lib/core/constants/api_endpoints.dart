@@ -39,10 +39,15 @@ class ApiEndpoints {
   static const String arrivedRide = '/driver/arrived-ride';
   static const String startRide = '/driver/start-ride';
   static const String endRide = '/driver/end-ride';
+  static const String collectPayment = '/driver/collect-payment';
+  static String collectPaymentStatus(String rideId) =>
+      '/driver/collect-payment/$rideId/status';
+  static String ratePassenger(String rideId) => '/driver/ride/$rideId/rate';
   static const String activeRide = '/driver/active-ride';
   static const String rideHistory = '/driver/ride-history';
 
   // Wallet & earnings
+  static const String dashboard = '/driver/dashboard';
   static const String wallet = '/driver/wallet';
   static const String earnings = '/driver/earnings';
 

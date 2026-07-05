@@ -67,7 +67,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="App Settings"
-        description="Platform-wide WaveGo configuration — maps, payments, commissions, and integrations. Not your personal account."
+        description="Platform-wide Fast Bull configuration — maps, payments, commissions, and integrations. Not your personal account."
       >
         <ButtonLink variant="outline" href={ROUTES.profile}>
           <User className="mr-2 h-4 w-4" />
@@ -80,7 +80,7 @@ export default function SettingsPage() {
       </PageHeader>
 
       <div className="rounded-[1.25rem] border border-primary/15 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-        <span className="font-medium text-primary">App Settings</span> controls the entire WaveGo platform
+        <span className="font-medium text-primary">App Settings</span> controls the entire Fast Bull platform
         (maps, OTP, payments, commissions). To edit your name, email, or password, go to{" "}
         <ButtonLink href={ROUTES.profile} variant="link" className="h-auto p-0 text-primary">
           My Profile
@@ -102,7 +102,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Platform Information</CardTitle>
               <CardDescription>
-                Public-facing details shown across the WaveGo rider and driver apps — not your admin login.
+                Public-facing details shown across the Fast Bull rider and driver apps — not your admin login.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
@@ -113,7 +113,7 @@ export default function SettingsPage() {
                   id="app-name"
                   value={settings.appName}
                   onChange={(e) => updateSetting("appName", e.target.value)}
-                  placeholder="WaveGo"
+                  placeholder="Fast Bull"
                 />
               </div>
               <div className="space-y-2">
@@ -185,7 +185,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label htmlFor="firebase-config">Firebase Configuration (JSON)</Label>
                 <FieldHint>
-                  When users or drivers sign up or log in with their mobile number, WaveGo uses Firebase
+                  When users or drivers sign up or log in with their mobile number, Fast Bull uses Firebase
                   Auth to send and verify OTP. Paste your full Firebase web config here — one setup for the
                   entire platform.
                 </FieldHint>
@@ -263,7 +263,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Commission Settings</CardTitle>
-              <CardDescription>Revenue sharing between drivers and the WaveGo platform</CardDescription>
+              <CardDescription>Revenue sharing between drivers and the Fast Bull platform</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
@@ -284,7 +284,7 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label htmlFor="platform-fee">Platform Fee (%)</Label>
                   <FieldHint>
-                    Share kept by WaveGo. Example: 20% of a ₹100 ride = ₹20 platform fee.
+                    Share kept by Fast Bull. Example: 20% of a ₹100 ride = ₹20 platform fee.
                   </FieldHint>
                   <Input
                     id="platform-fee"

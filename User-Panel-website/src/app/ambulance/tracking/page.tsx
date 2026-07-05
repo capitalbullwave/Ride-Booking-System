@@ -16,7 +16,7 @@ export default function LiveTrackingPage() {
       {/* Mock Map Full Screen */}
       <div className="absolute inset-0 bg-muted/30">
         {/* We use CSS patterns to mock a map grid */}
-        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#31526E 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#73398f 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
         
         {/* Map Route Line (Mock) */}
         <div className="absolute top-[40%] left-[20%] w-[60%] h-1 bg-primary rotate-12 origin-left rounded-full shadow-[0_0_10px_rgba(49,82,110,0.5)]" />

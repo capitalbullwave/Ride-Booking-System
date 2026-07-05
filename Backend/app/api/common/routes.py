@@ -65,7 +65,7 @@ async def app_settings(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AppSetting).where(AppSetting.is_public == True))
     settings = {row.key: row.value for row in result.scalars().all()}
     return {
-        "app_name": settings.get("app_name", "WaveGo"),
+        "app_name": settings.get("app_name", "Fast Bull"),
         "contact_email": settings.get("contact_email", "support@ridebook.com"),
         "contact_phone": settings.get("contact_phone", "+91 98765 43210"),
     }

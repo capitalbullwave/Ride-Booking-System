@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Pencil, Ban, UserX, RotateCcw, CheckCircle } from "lucide-react";
+import { ArrowLeft, Pencil, Ban, UserX, RotateCcw, CheckCircle, Star } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,8 @@ import {
   fetchUser,
   fetchUserActivityLogs,
   fetchUserRides,
+  fetchUserStudentPass,
+  fetchUserSubscription,
   fetchUserSupportTickets,
   fetchUserWallet,
   resetUser,
@@ -41,9 +43,12 @@ import {
   updateUser,
   UserActivityLog,
   UserRide,
+  UserStudentPassDetail,
+  UserSubscriptionDetail,
   UserSupportTicket,
   WalletTransaction,
 } from "@/lib/users-api";
+import { resolveMediaUrl } from "@/lib/api";
 import { toast } from "sonner";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import {
@@ -114,6 +119,8 @@ export default function UserDetailPage({
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
   const [supportTickets, setSupportTickets] = useState<UserSupportTicket[]>([]);
   const [activityLogs, setActivityLogs] = useState<UserActivityLog[]>([]);
+  const [subscription, setSubscription] = useState<UserSubscriptionDetail | null>(null);
+  const [studentPass, setStudentPass] = useState<UserStudentPassDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFoundState, setNotFoundState] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -137,12 +144,15 @@ export default function UserDetailPage({
     }
 
     try {
-      const [userData, rides, wallet, tickets, logs] = await Promise.all([
+      const [userData, rides, wallet, tickets, logs, subscriptionData, studentPassData] =
+        await Promise.all([
         fetchUser(id),
         fetchUserRides(id),
         fetchUserWallet(id),
         fetchUserSupportTickets(id),
         fetchUserActivityLogs(id),
+        fetchUserSubscription(id),
+        fetchUserStudentPass(id),
       ]);
 
       setUser(userData);
@@ -150,6 +160,8 @@ export default function UserDetailPage({
       setWalletTransactions(wallet.transactions);
       setSupportTickets(tickets);
       setActivityLogs(logs);
+      setSubscription(subscriptionData.subscription);
+      setStudentPass(studentPassData.application);
     } catch (error) {
       if (error instanceof Error && error.message.includes("not found")) {
         setNotFoundState(true);
@@ -345,10 +357,16 @@ export default function UserDetailPage({
             {user.email || "—"} · {user.mobile || "—"}
           </p>
         </div>
-        <div className="grid grid-cols-3 gap-6 text-center">
+        <div className="grid grid-cols-4 gap-6 text-center">
           <div>
             <p className="text-2xl font-bold">{user.totalRides}</p>
             <p className="text-xs text-muted-foreground">Total Rides</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold flex items-center justify-center gap-1">
+              <Star className="h-5 w-5 text-amber-500" /> {user.rating.toFixed(1)}
+            </p>
+            <p className="text-xs text-muted-foreground">Rating</p>
           </div>
           <div>
             <p className="text-2xl font-bold">{formatCurrency(user.walletBalance)}</p>
@@ -366,6 +384,8 @@ export default function UserDetailPage({
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="rides">Ride History</TabsTrigger>
           <TabsTrigger value="wallet">Wallet</TabsTrigger>
+          <TabsTrigger value="subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="student-pass">Student Pass</TabsTrigger>
           <TabsTrigger value="support">Support Tickets</TabsTrigger>
           <TabsTrigger value="activity">Activity Logs</TabsTrigger>
         </TabsList>
@@ -383,6 +403,8 @@ export default function UserDetailPage({
                 ["Full Name", user.name],
                 ["Email", user.email],
                 ["Mobile", user.mobile],
+                ["Emergency Contact Name", user.emergencyContactName || "—"],
+                ["Emergency Contact Phone", user.emergencyContactPhone || "—"],
                 ["City", user.city],
                 ["Registration Date", formatDate(user.registrationDate)],
                 ["Status", capitalize(user.status)],
@@ -473,6 +495,122 @@ export default function UserDetailPage({
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="subscription" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Subscription</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!subscription ? (
+                <p className="text-sm text-muted-foreground">
+                  No active subscription plan for this user.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="text-lg font-semibold">{subscription.plan.name}</h3>
+                    <StatusBadge status={subscription.status} />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["Plan slug", subscription.plan.slug],
+                      ["Price", `${subscription.plan.price_label} ${subscription.plan.period_label}`],
+                      ["Ride discount", `${subscription.plan.ride_discount_percent}%`],
+                      ["Subscribed on", subscription.started_at ? formatDate(subscription.started_at) : "—"],
+                      ["Expires", subscription.expires_at ? formatDate(subscription.expires_at) : "—"],
+                      ["Description", subscription.plan.description || "—"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border p-4">
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="mt-1 font-medium">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {subscription.plan.benefits.length > 0 ? (
+                    <div className="rounded-lg border p-4">
+                      <p className="text-xs text-muted-foreground">Benefits</p>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {subscription.plan.benefits.map((benefit) => (
+                          <li key={benefit}>• {benefit}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="student-pass" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Student Pass</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!studentPass || studentPass.status !== "approved" ? (
+                <p className="text-sm text-muted-foreground">
+                  No active student pass for this user.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <StatusBadge status="approved" />
+                    <p className="text-sm font-medium text-primary">
+                      {studentPass.discount_percent}% ride discount active
+                    </p>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["College", studentPass.college_name],
+                      ["Aadhar", studentPass.aadhar_number],
+                      ["Verified on", studentPass.verified_at ? formatDate(studentPass.verified_at) : "—"],
+                      ["Applied on", studentPass.created_at ? formatDate(studentPass.created_at) : "—"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border p-4">
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="mt-1 font-medium">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {studentPass.aadhar_photo_url ? (
+                      <a
+                        href={resolveMediaUrl(studentPass.aadhar_photo_url) ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block"
+                      >
+                        <p className="mb-2 text-xs text-muted-foreground">Aadhar card</p>
+                        <img
+                          src={resolveMediaUrl(studentPass.aadhar_photo_url) ?? ""}
+                          alt="Aadhar"
+                          className="rounded-lg border"
+                        />
+                      </a>
+                    ) : null}
+                    {studentPass.student_id_photo_url ? (
+                      <a
+                        href={resolveMediaUrl(studentPass.student_id_photo_url) ?? "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block"
+                      >
+                        <p className="mb-2 text-xs text-muted-foreground">Student ID</p>
+                        <img
+                          src={resolveMediaUrl(studentPass.student_id_photo_url) ?? ""}
+                          alt="Student ID"
+                          className="rounded-lg border"
+                        />
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

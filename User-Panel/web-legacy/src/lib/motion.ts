@@ -1,4 +1,4 @@
-/** Shared WaveGo motion tokens — Coastal Luxe, smooth ease-out feel */
+/** Shared Fast Bull motion tokens — Coastal Luxe, smooth ease-out feel */
 
 export const easeOut = [0.22, 1, 0.36, 1] as const;
 

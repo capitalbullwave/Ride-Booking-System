@@ -135,7 +135,7 @@ export function HomeView() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-heading text-sm font-bold text-foreground">
-                {dashboard?.banners[0]?.title ?? "Ride smarter with WaveGo"}
+                {dashboard?.banners[0]?.title ?? "Ride smarter with Fast Bull"}
               </p>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {dashboard?.banners[0]?.subtitle ??

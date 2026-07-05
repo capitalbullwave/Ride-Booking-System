@@ -28,6 +28,9 @@ export interface User {
   status: UserStatus;
   avatar?: string;
   city: string;
+  rating: number;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
 }
 
 export interface Driver {

@@ -290,32 +290,10 @@ class ProfileService extends BaseApiService {
       );
     }
 
-    final profile = await getProfile();
-
-    double walletBalance = 0;
-    double todayEarnings = 0;
-
-    try {
-      final wallet = await get<Map<String, dynamic>>(
-        ApiEndpoints.wallet,
-        parser: (data) => data as Map<String, dynamic>,
-      );
-      walletBalance = (wallet['balance'] as num?)?.toDouble() ?? 0;
-    } catch (_) {}
-
-    try {
-      final earnings = await get<Map<String, dynamic>>(
-        ApiEndpoints.earnings,
-        queryParameters: {'period': 'daily'},
-        parser: (data) => data as Map<String, dynamic>,
-      );
-      todayEarnings = (earnings['net_earnings'] as num?)?.toDouble() ?? 0;
-    } catch (_) {}
-
-    return BackendMappers.dashboardStats(
-      profile: profile,
-      walletBalance: walletBalance,
-      todayEarnings: todayEarnings,
+    return get(
+      ApiEndpoints.dashboard,
+      parser: (data) =>
+          DashboardStats.fromJson(data as Map<String, dynamic>),
     );
   }
 

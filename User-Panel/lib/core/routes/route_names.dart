@@ -5,6 +5,7 @@ class RouteNames {
   static const String onboarding = '/onboarding';
   static const String phoneLogin = '/login';
   static const String otpVerification = '/otp';
+  static const String createProfile = '/create-profile';
 
   static const String home = '/home';
   static const String bookings = '/bookings';
@@ -28,6 +29,8 @@ class RouteNames {
   static const String profileSavedPlaces = '/profile/saved-places';
   static const String profileHelp = '/profile/help';
   static const String profileAbout = '/profile/about';
+  static const String profileSubscription = '/profile/subscription';
+  static const String profileStudentPass = '/profile/student-pass';
 
   static const String walletBalance = '/wallet/balance';
   static const String walletBonus = '/wallet/bonus';
@@ -39,6 +42,7 @@ class RouteNames {
   static const String profileEdit = '/profile/edit';
   static const String profilePhone = '/profile/phone';
   static const String profileEmail = '/profile/email';
+  static const String profileEmergencyContact = '/profile/emergency-contact';
   static const String profileNotifications = '/profile/notifications';
   static const String profileHelpTopic = '/profile/help/topic';
 

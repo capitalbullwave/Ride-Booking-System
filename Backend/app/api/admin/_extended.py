@@ -14,10 +14,13 @@ from sqlalchemy.orm import selectinload
 
 from app.api.admin._core import _map_driver, _map_ride
 from app.auth.dependencies import get_current_admin
-from app.core.constants import DriverStatus, RideStatus, SupportTicketPriority, SupportTicketStatus
+from app.core.constants import DriverStatus, KYCStatus, RideStatus, SupportTicketPriority, SupportTicketStatus
 from app.core.exceptions import ConflictException, NotFoundException, ValidationException
 from app.database.session import get_db
 from app.services.image_storage import persist_vehicle_type_image
+from app.services.user_benefits_service import map_student_pass, map_subscription_plan
+from app.notifications.service import NotificationService
+from app.subscriptions.models import StudentPass, SubscriptionPlan, UserSubscription
 from app.models import (
     AdminUser,
     AppSetting,
@@ -40,7 +43,7 @@ DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 DEFAULT_SETTINGS = {
-    "appName": "WaveGo",
+    "appName": "Fast Bull",
     "logo": "",
     "contactEmail": "support@ridebook.com",
     "contactPhone": "+91 98765 43210",
@@ -201,7 +204,7 @@ def _map_support_ticket(
         messages.append(
             {
                 "id": str(reply.id),
-                "sender": "WaveGo Support" if reply.sender_type == "ADMIN" else user_name,
+                "sender": "Fast Bull Support" if reply.sender_type == "ADMIN" else user_name,
                 "senderType": reply.sender_type.lower(),
                 "message": reply.message,
                 "timestamp": reply.created_at.isoformat(),
@@ -1039,3 +1042,330 @@ async def update_settings(
                 db.add(AppSetting(key=db_key, value=value, is_public=db_key in ("app_name", "contact_email", "contact_phone")))
     await db.flush()
     return await _get_settings(db)
+
+
+def _map_student_pass_admin(record: StudentPass, user: User | None = None) -> dict:
+    payload = map_student_pass(record, mask_aadhar=False)
+    if user:
+        payload["user"] = {
+            "id": str(user.id),
+            "name": f"{user.first_name} {user.last_name}".strip(),
+            "phone": user.phone,
+            "email": user.email,
+        }
+    return payload
+
+
+@router.get("/student-passes")
+async def list_student_passes(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    status: str | None = Query(None),
+    search: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    query = select(StudentPass, User).join(User, User.id == StudentPass.user_id)
+    if status:
+        query = query.where(StudentPass.status == status.upper())
+    if search:
+        term = f"%{search.strip()}%"
+        query = query.where(
+            or_(
+                User.first_name.ilike(term),
+                User.last_name.ilike(term),
+                User.phone.ilike(term),
+                StudentPass.college_name.ilike(term),
+                StudentPass.aadhar_number.ilike(term),
+            )
+        )
+    query = query.order_by(StudentPass.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = [_map_student_pass_admin(row[0], row[1]) for row in result.all()]
+    return {"items": items, "page": page, "page_size": page_size}
+
+
+@router.get("/student-passes/{pass_id}")
+async def get_student_pass_detail(
+    pass_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    row = await db.execute(
+        select(StudentPass, User).join(User, User.id == StudentPass.user_id).where(StudentPass.id == pass_id)
+    )
+    data = row.first()
+    if not data:
+        raise NotFoundException("Student pass application not found")
+    return _map_student_pass_admin(data[0], data[1])
+
+
+@router.post("/student-passes/{pass_id}/approve")
+async def approve_student_pass(
+    pass_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    record = await db.get(StudentPass, pass_id)
+    if not record:
+        raise NotFoundException("Student pass application not found")
+    record.status = KYCStatus.APPROVED.value
+    record.verified_by_id = admin.id
+    record.verified_at = _utc_now()
+    record.rejection_reason = None
+    await NotificationService(db).create_in_app(
+        title="Student Pass Approved",
+        message=f"Your student pass is verified. Enjoy {int(record.discount_percent)}% off on every ride.",
+        notification_type="SYSTEM",
+        user_id=record.user_id,
+    )
+    await db.flush()
+    user = await db.get(User, record.user_id)
+    return _map_student_pass_admin(record, user)
+
+
+class RejectStudentPassRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+@router.post("/student-passes/{pass_id}/reject")
+async def reject_student_pass(
+    pass_id: UUID,
+    data: RejectStudentPassRequest,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    record = await db.get(StudentPass, pass_id)
+    if not record:
+        raise NotFoundException("Student pass application not found")
+    record.status = KYCStatus.REJECTED.value
+    record.rejection_reason = data.reason.strip()
+    record.verified_by_id = admin.id
+    record.verified_at = _utc_now()
+    await NotificationService(db).create_in_app(
+        title="Student Pass Rejected",
+        message=data.reason.strip(),
+        notification_type="SYSTEM",
+        user_id=record.user_id,
+    )
+    await db.flush()
+    user = await db.get(User, record.user_id)
+    return _map_student_pass_admin(record, user)
+
+
+@router.get("/subscription-plans")
+async def admin_list_subscription_plans(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(SubscriptionPlan).order_by(SubscriptionPlan.sort_order.asc()))
+    plans = result.scalars().all()
+
+    count_rows = await db.execute(
+        select(UserSubscription.plan_id, func.count(UserSubscription.id))
+        .where(UserSubscription.status == "ACTIVE")
+        .group_by(UserSubscription.plan_id)
+    )
+    counts = {str(plan_id): int(count) for plan_id, count in count_rows.all()}
+
+    mapped_plans = [
+        map_subscription_plan(plan, subscriber_count=counts.get(str(plan.id), 0)) for plan in plans
+    ]
+    breakdown = [
+        {
+            "plan_id": str(plan.id),
+            "plan_name": plan.name,
+            "slug": plan.slug,
+            "subscriber_count": counts.get(str(plan.id), 0),
+        }
+        for plan in plans
+    ]
+    return {
+        "plans": mapped_plans,
+        "stats": {
+            "total_active_subscribers": sum(counts.values()),
+            "plan_breakdown": breakdown,
+        },
+    }
+
+
+@router.post("/subscription-plans")
+async def admin_create_subscription_plan(
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    import json
+
+    slug = str(data.get("slug", "")).strip().lower()
+    if not slug:
+        raise ValidationException("Plan slug is required")
+    existing = await db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.slug == slug))
+    if existing:
+        raise ConflictException("Plan slug already exists")
+    benefits = data.get("benefits") or []
+    plan = SubscriptionPlan(
+        slug=slug,
+        name=data["name"],
+        description=data.get("description"),
+        price=float(data.get("price", 0)),
+        period_label=data.get("periodLabel", data.get("period_label", "month")),
+        benefits_json=json.dumps(benefits),
+        ride_discount_percent=float(data.get("rideDiscountPercent", data.get("ride_discount_percent", 0))),
+        is_popular=bool(data.get("isPopular", data.get("is_popular", False))),
+        is_active=bool(data.get("isActive", data.get("is_active", True))),
+        sort_order=int(data.get("sortOrder", data.get("sort_order", 0))),
+    )
+    db.add(plan)
+    await db.flush()
+    return map_subscription_plan(plan)
+
+
+@router.patch("/subscription-plans/{plan_id}")
+async def admin_update_subscription_plan(
+    plan_id: UUID,
+    data: dict,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    import json
+
+    plan = await db.get(SubscriptionPlan, plan_id)
+    if not plan:
+        raise NotFoundException("Subscription plan not found")
+    if "name" in data:
+        plan.name = data["name"]
+    if "description" in data:
+        plan.description = data["description"]
+    if "price" in data:
+        plan.price = float(data["price"])
+    if "periodLabel" in data or "period_label" in data:
+        plan.period_label = data.get("periodLabel", data.get("period_label"))
+    if "benefits" in data:
+        plan.benefits_json = json.dumps(data["benefits"])
+    if "rideDiscountPercent" in data or "ride_discount_percent" in data:
+        plan.ride_discount_percent = float(
+            data.get("rideDiscountPercent", data.get("ride_discount_percent", 0))
+        )
+    if "isPopular" in data or "is_popular" in data:
+        plan.is_popular = bool(data.get("isPopular", data.get("is_popular")))
+    if "isActive" in data or "is_active" in data:
+        plan.is_active = bool(data.get("isActive", data.get("is_active")))
+    if "sortOrder" in data or "sort_order" in data:
+        plan.sort_order = int(data.get("sortOrder", data.get("sort_order", 0)))
+    await db.flush()
+    return map_subscription_plan(plan)
+
+
+@router.delete("/subscription-plans/{plan_id}")
+async def admin_delete_subscription_plan(
+    plan_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    plan = await db.get(SubscriptionPlan, plan_id)
+    if not plan:
+        raise NotFoundException("Subscription plan not found")
+    if plan.slug == "free":
+        raise ValidationException("The free plan cannot be deleted")
+
+    active_count = await db.scalar(
+        select(func.count(UserSubscription.id)).where(
+            UserSubscription.plan_id == plan_id,
+            UserSubscription.status == "ACTIVE",
+        )
+    )
+    if active_count and active_count > 0:
+        raise ConflictException(
+            "This plan has active subscribers. Deactivate it instead of deleting."
+        )
+
+    await db.delete(plan)
+    await db.flush()
+    return {"message": "Subscription plan deleted"}
+
+
+def _map_subscription_subscriber(sub: UserSubscription, user: User) -> dict:
+    plan = sub.plan
+    return {
+        "id": str(sub.id),
+        "user_id": str(user.id),
+        "name": f"{user.first_name} {user.last_name}".strip(),
+        "phone": user.phone,
+        "email": user.email,
+        "plan_id": str(plan.id) if plan else None,
+        "plan_name": plan.name if plan else "—",
+        "plan_slug": plan.slug if plan else "",
+        "status": sub.status.lower(),
+        "started_at": sub.started_at.isoformat() if sub.started_at else None,
+        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+    }
+
+
+@router.get("/subscription-subscribers")
+async def admin_list_subscription_subscribers(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    plan_id: UUID | None = None,
+    search: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    query = (
+        select(UserSubscription)
+        .options(selectinload(UserSubscription.plan))
+        .join(User, User.id == UserSubscription.user_id)
+        .where(UserSubscription.status == "ACTIVE")
+        .order_by(UserSubscription.started_at.desc())
+    )
+
+    if plan_id:
+        query = query.where(UserSubscription.plan_id == plan_id)
+
+    if search:
+        term = f"%{search.strip().lower()}%"
+        query = query.where(
+            or_(
+                func.lower(User.first_name).like(term),
+                func.lower(User.last_name).like(term),
+                func.lower(User.phone).like(term),
+                func.lower(User.email).like(term),
+            )
+        )
+
+    count_stmt = (
+        select(func.count(UserSubscription.id))
+        .join(User, User.id == UserSubscription.user_id)
+        .where(UserSubscription.status == "ACTIVE")
+    )
+    if plan_id:
+        count_stmt = count_stmt.where(UserSubscription.plan_id == plan_id)
+    if search:
+        term = f"%{search.strip().lower()}%"
+        count_stmt = count_stmt.where(
+            or_(
+                func.lower(User.first_name).like(term),
+                func.lower(User.last_name).like(term),
+                func.lower(User.phone).like(term),
+                func.lower(User.email).like(term),
+            )
+        )
+    total = await db.scalar(count_stmt) or 0
+
+    result = await db.execute(query.offset((page - 1) * page_size).limit(page_size))
+    rows = result.scalars().all()
+
+    user_ids = [sub.user_id for sub in rows]
+    users_result = await db.execute(select(User).where(User.id.in_(user_ids))) if user_ids else None
+    users_by_id = {user.id: user for user in users_result.scalars().all()} if users_result else {}
+
+    return {
+        "items": [
+            _map_subscription_subscriber(sub, users_by_id[sub.user_id])
+            for sub in rows
+            if sub.user_id in users_by_id
+        ],
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+    }

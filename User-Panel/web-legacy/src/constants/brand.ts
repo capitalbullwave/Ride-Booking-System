@@ -1,5 +1,5 @@
 /**
- * WaveGo brand palette — single source of truth.
+ * Fast Bull brand palette — single source of truth.
  * Keep in sync with `.cursor/rules/wavego-design.mdc` and `globals.css`.
  */
 export const WAVEGO_BRAND = {

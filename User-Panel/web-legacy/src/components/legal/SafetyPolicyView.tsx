@@ -55,7 +55,7 @@ const policySections: {
     title: "In-app safety tools",
     points: [
       "Share live location with family or friends during an active trip.",
-      "Contact WaveGo support directly from the tracking screen.",
+      "Contact Fast Bull support directly from the tracking screen.",
       "Ambulance requests share location and medical details only with assigned crews and partner hospitals.",
     ],
   },
@@ -182,7 +182,7 @@ export function SafetyPolicyView() {
             Safety Policy
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
-            How WaveGo protects riders, captains, and patients across rides, deliveries, and
+            How Fast Bull protects riders, captains, and patients across rides, deliveries, and
             emergency ambulance services.
           </p>
           <p className="mt-4 text-xs font-medium text-white/50">Last updated: June 2026</p>
@@ -258,7 +258,7 @@ export function SafetyPolicyView() {
               Life-threatening emergency?
             </p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Call <strong className="text-foreground">112</strong> immediately. WaveGo ambulance
+              Call <strong className="text-foreground">112</strong> immediately. Fast Bull ambulance
               is a supplement to — not a replacement for — national emergency services.
             </p>
           </div>

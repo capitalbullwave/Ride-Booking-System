@@ -1,4 +1,4 @@
-/// WaveGo border radius tokens.
+/// Fast Bull border radius tokens.
 class AppRadius {
   AppRadius._();
 

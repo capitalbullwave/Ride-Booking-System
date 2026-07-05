@@ -93,7 +93,7 @@ export function WalletView() {
                     Rewards
                   </span>
                 </div>
-                <p className="relative mt-5 text-sm font-medium text-muted-foreground">WaveGo Cash</p>
+                <p className="relative mt-5 text-sm font-medium text-muted-foreground">Fast Bull Cash</p>
                 <p className="relative mt-1 font-heading text-4xl font-bold tracking-tight text-foreground">
                   {formatFare(summary?.bonus_balance ?? 0)}
                 </p>

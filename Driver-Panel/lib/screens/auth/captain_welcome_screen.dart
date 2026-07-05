@@ -115,7 +115,7 @@ class _CaptainWelcomeScreenState extends ConsumerState<CaptainWelcomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Please register yourself as a WaveGo Captain',
+                      'Please register yourself as a Fast Bull Captain',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: AppColors.textSecondary,
                             height: 1.4,

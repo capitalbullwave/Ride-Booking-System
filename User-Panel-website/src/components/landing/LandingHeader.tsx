@@ -86,9 +86,9 @@ export function LandingHeader() {
     <header className="wavego-site-header">
       <div className="wavego-site-header-top" aria-hidden />
       <div className="wavego-site-header-body">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+      <div className="mx-auto flex h-24 max-w-6xl items-center justify-between px-6">
         <Link href={ROUTES.landing} onClick={() => handleNavClick(ROUTES.landing)}>
-          <WaveGoLogo size="sm" />
+          <WaveGoLogo size="sm" priority />
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">

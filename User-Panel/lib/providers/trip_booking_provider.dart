@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/services/location_service.dart';
 
@@ -13,11 +14,24 @@ class TripBookingNotifier extends StateNotifier<TripBookingState> {
     state = state.copyWith(dropoff: place, clearRoute: true);
   }
 
+  void setMode(HomeBookingMode mode) {
+    state = state.copyWith(mode: mode, clearRoute: true);
+  }
+
+  void setScheduledAt(DateTime? scheduledAt) {
+    state = state.copyWith(
+      scheduledAt: scheduledAt,
+      clearScheduledAt: scheduledAt == null,
+    );
+  }
+
   void swapLocations() {
     state = TripBookingState(
       pickup: state.dropoff,
       dropoff: state.pickup,
       activeRideId: state.activeRideId,
+      mode: state.mode,
+      scheduledAt: state.scheduledAt,
     );
   }
 
@@ -34,6 +48,8 @@ class TripBookingNotifier extends StateNotifier<TripBookingState> {
       pickup: state.pickup,
       dropoff: state.dropoff,
       route: state.route,
+      mode: state.mode,
+      scheduledAt: state.scheduledAt,
     );
   }
 

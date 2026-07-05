@@ -1,11 +1,11 @@
 {
-    "name": "wavego_driver",
-    "short_name": "wavego_driver",
+    "name": "Fast Bull Captain",
+    "short_name": "Fast Bull Captain",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#73398f",
+    "theme_color": "#73398f",
+    "description": "Fast Bull Captain - Driver application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

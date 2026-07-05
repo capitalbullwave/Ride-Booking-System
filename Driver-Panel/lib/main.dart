@@ -10,6 +10,7 @@ import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/storage/secure_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_theme.dart';
 import 'package:wavego_driver/providers/auth_session_provider.dart';
+import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/connectivity_banner.dart';
 import 'package:wavego_driver/widgets/common/phone_mode_shell.dart';
@@ -74,8 +75,16 @@ class _WaveGoDriverAppState extends ConsumerState<WaveGoDriverApp> {
       }
     });
 
+    ref.listen(rideViewModelProvider.select((s) => s.activeRide?.id), (prev, next) {
+      if (next == null || next.isEmpty) return;
+      final location = router.state.matchedLocation;
+      if (location != RouteNames.activeTrip) {
+        router.go(RouteNames.activeTrip);
+      }
+    });
+
     return MaterialApp.router(
-      title: 'WaveGo Captain',
+      title: 'Fast Bull Captain',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

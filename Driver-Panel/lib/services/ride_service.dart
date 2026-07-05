@@ -38,15 +38,14 @@ class RideService extends BaseApiService {
 
     final resolvedVehicleId =
         vehicleId ?? _localStorage.getString(AppConstants.vehicleIdKey);
-    if (resolvedVehicleId == null || resolvedVehicleId.isEmpty) {
-      throw const ValidationException(
-        'No vehicle registered. Complete vehicle registration first.',
-      );
-    }
 
     return post(
       ApiEndpoints.acceptRide,
-      data: {'ride_id': rideId, 'vehicle_id': resolvedVehicleId},
+      data: {
+        'ride_id': rideId,
+        if (resolvedVehicleId != null && resolvedVehicleId.isNotEmpty)
+          'vehicle_id': resolvedVehicleId,
+      },
       parser: (data) =>
           BackendMappers.activeRideFromJson(data as Map<String, dynamic>),
     );
@@ -93,29 +92,29 @@ class RideService extends BaseApiService {
       return ride.copyWith(status: status);
     }
 
-    Map<String, dynamic> response;
-
-    switch (status) {
-      case 'arrived':
-        response = await post<Map<String, dynamic>>(
-          ApiEndpoints.arrivedRide,
-          data: {'ride_id': rideId},
-          parser: (data) => data as Map<String, dynamic>,
-        );
-      case 'started':
-        if (otp == null || otp.isEmpty) {
-          throw const ValidationException('OTP is required to start the ride.');
-        }
-        response = await post<Map<String, dynamic>>(
-          ApiEndpoints.startRide,
-          data: {'ride_id': rideId, 'otp': otp},
-          parser: (data) => data as Map<String, dynamic>,
-        );
-      default:
-        throw ValidationException('Unsupported ride status: $status');
+    if (status == 'arrived') {
+      final response = await post<Map<String, dynamic>>(
+        ApiEndpoints.arrivedRide,
+        data: {'ride_id': rideId},
+        parser: (data) => data as Map<String, dynamic>,
+      );
+      return BackendMappers.activeRideFromJson(response);
     }
 
-    return BackendMappers.activeRideFromJson(response);
+    if (status == 'started') {
+      final code = otp?.trim();
+      if (code == null || code.isEmpty) {
+        throw const ValidationException('OTP is required to start the ride.');
+      }
+      final response = await post<Map<String, dynamic>>(
+        ApiEndpoints.startRide,
+        data: {'ride_id': rideId, 'otp': code},
+        parser: (data) => data as Map<String, dynamic>,
+      );
+      return BackendMappers.activeRideFromJson(response);
+    }
+
+    throw ValidationException('Unsupported ride status: $status');
   }
 
   Future<PaymentBreakdown> completeRide(String rideId) async {
@@ -132,6 +131,86 @@ class RideService extends BaseApiService {
     );
 
     return BackendMappers.paymentFromRide(response);
+  }
+
+  Future<Map<String, dynamic>> collectCashPayment(String rideId) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      final data = await loadMockJson('payment_breakdown.json');
+      final breakdown = data['data'] as Map<String, dynamic>;
+      return {
+        ...breakdown,
+        'success': true,
+        'payment_status': 'COMPLETED',
+        'payment_collected': true,
+      };
+    }
+
+    return post<Map<String, dynamic>>(
+      ApiEndpoints.collectPayment,
+      data: {'ride_id': rideId, 'method': 'CASH'},
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
+
+  Future<Map<String, dynamic>> createOnlinePaymentQr(String rideId) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      final data = await loadMockJson('payment_breakdown.json');
+      final breakdown = data['data'] as Map<String, dynamic>;
+      return {
+        ...breakdown,
+        'success': true,
+        'payment_status': 'PENDING',
+        'payment_collected': false,
+        'qr_code_id': 'mock_qr_1',
+        'short_url': 'https://rzp.io/rzp/mock-ride-payment',
+        'image_url': null,
+        'amount': breakdown['trip_fare'],
+        'key_id': 'rzp_test_T9MSfwbXZfCFjC',
+      };
+    }
+
+    return post<Map<String, dynamic>>(
+      ApiEndpoints.collectPayment,
+      data: {'ride_id': rideId, 'method': 'RAZORPAY'},
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
+
+  Future<Map<String, dynamic>> checkOnlinePaymentStatus(String rideId) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      return {
+        'success': true,
+        'payment_status': 'COMPLETED',
+        'payment_collected': true,
+      };
+    }
+
+    return get<Map<String, dynamic>>(
+      ApiEndpoints.collectPaymentStatus(rideId),
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
+
+  Future<void> ratePassenger(
+    String rideId, {
+    required int rating,
+    String? comment,
+  }) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      return;
+    }
+
+    await post(
+      ApiEndpoints.ratePassenger(rideId),
+      data: {
+        'rating': rating,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      },
+    );
   }
 
   Future<RideSummary> getRideSummary(String rideId) async {

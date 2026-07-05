@@ -10,6 +10,7 @@ import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/responsive.dart';
 import 'package:wavego_user/core/utils/view_state.dart';
 import 'package:wavego_user/core/utils/profile_refresh.dart';
+import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
@@ -72,7 +73,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
     if (loginState is ViewStateSuccess && mounted) {
       refreshUserProfile(ref);
-      context.go(RouteNames.home);
+
+      final response = (loginState as ViewStateSuccess<LoginResponse?>).data;
+      final needsSetup = response?.user?.isPlaceholderName ?? true;
+
+      context.go(needsSetup ? RouteNames.createProfile : RouteNames.home);
     } else {
       setState(() => _isLoading = false);
     }

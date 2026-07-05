@@ -1,3 +1,4 @@
+export { CreateProfileView } from "./CreateProfileView";
 export { LoginServicesPanel } from "./LoginServicesPanel";
 export { LoginSceneDecor } from "./LoginSceneDecor";
 export { AuthServiceImage } from "./AuthServiceImage";

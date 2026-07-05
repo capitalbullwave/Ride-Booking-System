@@ -21,7 +21,10 @@ from app.schemas.user import RefreshTokenRequest
 from app.schemas.common import TokenResponse
 from app.services.driver_deletion_service import permanently_delete_driver
 from app.services.user_deletion_service import permanently_delete_user
+from app.services.user_benefits_service import map_student_pass, map_subscription_plan
 from app.notifications.service import NotificationService
+from app.subscriptions.models import StudentPass, UserSubscription
+from app.utils.phone import format_phone_display
 
 router = APIRouter(tags=["Admin"])
 
@@ -61,6 +64,11 @@ def _map_user(user: User, wallet_balance: float = 0.0, total_rides: int = 0) -> 
         "status": _user_status(user),
         "avatar": user.profile_photo,
         "city": "",
+        "rating": round(float(getattr(user, "rating_avg", 0.0) or 0.0), 2),
+        "emergencyContactName": user.emergency_contact_name or "",
+        "emergencyContactPhone": format_phone_display(user.emergency_contact_phone)
+        if user.emergency_contact_phone
+        else "",
     }
 
 
@@ -375,12 +383,15 @@ async def user_wallet(user_id: UUID, admin: Annotated[AdminUser, Depends(get_cur
     transactions = []
     for tx in tx_result.scalars().all():
         ride_id = tx.reference_id if (tx.reference_type or "").lower() in ("ride", "rides") else None
+        is_debit = (tx.transaction_type or "").upper() == "DEBIT"
+        signed_amount = -tx.amount if is_debit else tx.amount
         transactions.append(
             {
                 "id": str(tx.id),
                 "userId": str(user_id),
                 "description": tx.description,
-                "amount": tx.amount,
+                "amount": signed_amount,
+                "type": (tx.transaction_type or "").lower(),
                 "status": "completed",
                 "date": tx.created_at.isoformat(),
                 "rideId": ride_id,
@@ -431,6 +442,51 @@ async def user_logs(user_id: UUID, admin: Annotated[AdminUser, Depends(get_curre
         }
         for n in logs
     ]
+
+
+@router.get("/users/{user_id}/subscription")
+async def user_subscription(
+    user_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.scalar(select(User).where(User.id == user_id, User.is_deleted == False))
+    if not user:
+        raise NotFoundException("User not found")
+
+    sub = await db.scalar(
+        select(UserSubscription)
+        .options(selectinload(UserSubscription.plan))
+        .where(UserSubscription.user_id == user_id, UserSubscription.status == "ACTIVE")
+    )
+    if not sub or not sub.plan:
+        return {"subscription": None}
+
+    return {
+        "subscription": {
+            "plan": map_subscription_plan(sub.plan),
+            "status": sub.status.lower(),
+            "started_at": sub.started_at.isoformat() if sub.started_at else None,
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        }
+    }
+
+
+@router.get("/users/{user_id}/student-pass")
+async def user_student_pass(
+    user_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    user = await db.scalar(select(User).where(User.id == user_id, User.is_deleted == False))
+    if not user:
+        raise NotFoundException("User not found")
+
+    record = await db.scalar(select(StudentPass).where(StudentPass.user_id == user_id))
+    if not record:
+        return {"application": None}
+
+    return {"application": map_student_pass(record, mask_aadhar=False)}
 
 
 @router.get("/drivers")

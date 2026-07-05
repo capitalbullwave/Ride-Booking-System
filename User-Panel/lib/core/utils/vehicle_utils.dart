@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
 import 'package:wavego_user/core/constants/services.dart';
 import 'package:wavego_user/core/utils/media_utils.dart';
 import 'package:wavego_user/models/user_models.dart';
@@ -105,6 +106,65 @@ List<HomeServiceItem> fallbackRentalServices() => const [
 
 List<HomeServiceItem> fallbackHomeServices() => AppServices.homeServices;
 
+bool isParcelCategorySlug(String slug) => slug.toLowerCase().contains('parcel');
+
+bool isParcelCategory(VehicleCategory category) => isParcelCategorySlug(category.slug);
+
+List<VehicleCategory> filterCategoriesForMode(
+  List<VehicleCategory> categories,
+  HomeBookingMode mode,
+) {
+  switch (mode) {
+    case HomeBookingMode.ride:
+      return categories
+          .where(
+            (c) => c.serviceGroup != 'rental' && !isParcelCategory(c),
+          )
+          .toList();
+    case HomeBookingMode.parcel:
+      return categories.where(isParcelCategory).toList();
+    case HomeBookingMode.rental:
+      return categories.where((c) => c.serviceGroup == 'rental').toList();
+  }
+}
+
+List<BookableVehicle> filterBookableVehiclesForMode(
+  List<BookableVehicle> vehicles,
+  HomeBookingMode mode,
+) {
+  switch (mode) {
+    case HomeBookingMode.ride:
+      return vehicles.where((v) => !isParcelCategorySlug(v.slug)).toList();
+    case HomeBookingMode.parcel:
+      return vehicles.where((v) => isParcelCategorySlug(v.slug)).toList();
+    case HomeBookingMode.rental:
+      return vehicles;
+  }
+}
+
+List<HomeServiceItem> homeServicesForMode(
+  List<HomeServiceItem> services,
+  HomeBookingMode mode,
+) {
+  switch (mode) {
+    case HomeBookingMode.ride:
+      return services
+          .where(
+            (s) =>
+                !s.name.toLowerCase().contains('parcel') &&
+                !s.name.toLowerCase().contains('rental') &&
+                !s.isEmergency,
+          )
+          .toList();
+    case HomeBookingMode.parcel:
+      return services
+          .where((s) => s.name.toLowerCase().contains('parcel'))
+          .toList();
+    case HomeBookingMode.rental:
+      return fallbackRentalServices();
+  }
+}
+
 List<BookableVehicle> fallbackBookableVehicles() => const [
       BookableVehicle(
         id: 'bike',
@@ -132,5 +192,18 @@ List<BookableVehicle> fallbackBookableVehicles() => const [
         perKmRate: 15,
         icon: Icons.directions_car,
         imageAsset: 'assets/images/services/car.png',
+      ),
+    ];
+
+List<BookableVehicle> fallbackParcelVehicles() => const [
+      BookableVehicle(
+        id: 'parcel',
+        name: 'Parcel',
+        slug: 'parcel',
+        baseFare: 30,
+        perKmRate: 10,
+        icon: Icons.inventory_2_outlined,
+        imageAsset: 'assets/images/services/parcel.png',
+        description: 'Quick, secure deliveries',
       ),
     ];

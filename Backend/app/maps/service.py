@@ -9,7 +9,7 @@ from app.core.config import settings
 class MapsService:
     BASE_URL = "https://maps.googleapis.com/maps/api"
     NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-    USER_AGENT = "WaveGo-RideBooking/1.0 (support@ridebook.com)"
+    USER_AGENT = "FastBull-RideBooking/1.0 (support@ridebook.com)"
 
     def __init__(self):
         self.api_key = settings.google_maps_api_key

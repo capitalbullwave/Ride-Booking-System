@@ -49,6 +49,8 @@ class BackendMappers {
       name: name,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
+      emergencyContactName: json['emergency_contact_name'] as String?,
+      emergencyContactPhone: json['emergency_contact_phone'] as String?,
       rating: rating,
       totalRides: (json['total_rides'] as num?)?.toInt() ?? 0,
       initial: name.isNotEmpty ? name[0].toUpperCase() : 'U',
@@ -92,6 +94,9 @@ class BackendMappers {
       message: json['body'] as String? ?? json['message'] as String? ?? '',
       time: _relativeTime(json['created_at'] as String?),
       read: _parseBool(json['is_read'] ?? json['read']),
+      data: json['data'] is Map<String, dynamic>
+          ? json['data'] as Map<String, dynamic>
+          : null,
     );
   }
 

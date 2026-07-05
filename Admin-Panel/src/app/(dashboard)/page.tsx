@@ -27,7 +27,7 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        description="Welcome back! Here's what's happening with WaveGo today."
+        description="Welcome back! Here's what's happening with Fast Bull today."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

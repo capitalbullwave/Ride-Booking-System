@@ -6,6 +6,7 @@ import 'package:wavego_user/core/utils/extensions.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
+import 'package:wavego_user/widgets/notifications/ride_accepted_notification_card.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -51,10 +52,16 @@ class NotificationsScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               itemCount: notifications.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (_, index) => _NotificationTile(
-                notification: notifications[index],
-                icon: _iconForType(notifications[index].type),
-              ),
+              itemBuilder: (_, index) {
+                final n = notifications[index];
+                if (n.isRideAccepted) {
+                  return RideAcceptedNotificationCard(notification: n);
+                }
+                return _NotificationTile(
+                  notification: n,
+                  icon: _iconForType(n.type),
+                );
+              },
             ),
           );
         },

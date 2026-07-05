@@ -3,8 +3,8 @@ import { inter, playwriteEnglandJoined } from "@/lib/fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WaveGo - Move Smarter. Travel Better.",
-  description: "WaveGo is a premium ride-booking web application.",
+  title: "Fast Bull - Move Smarter. Travel Better.",
+  description: "Fast Bull is a premium ride-booking web application.",
 };
 
 export default function RootLayout({

@@ -1,4 +1,5 @@
 """User Panel API — /api/v1/user/*"""
+from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -12,7 +13,7 @@ from app.api.user.service import UserApiService
 from app.core.constants import RideStatus, SupportTicketPriority, SupportTicketStatus
 from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.database.session import get_db
-from app.models import Notification, Rating, Ride, SavedAddress, SupportTicket, SupportTicketReply, User, VehicleType
+from app.models import Notification, Rating, Ride, SavedAddress, StudentPass, SubscriptionPlan, SupportTicket, SupportTicketReply, User, UserSubscription, VehicleType
 from app.repositories.ride_repository import RideRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import WalletTopUp, WalletTransactionResponse
@@ -21,6 +22,16 @@ from app.schemas.ride import RideDetailResponse, RideResponse
 from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import WalletService
 from app.services.ride_service import RideService
+from app.services.user_benefits_service import (
+    get_user_ride_discount_percent,
+    map_student_pass,
+    map_subscription_plan,
+)
+from app.services.subscription_payment_service import (
+    SubscriptionPaymentService,
+    activate_user_subscription,
+)
+from app.services.wallet_payment_service import WalletPaymentService
 from app.api.websocket.manager import manager
 from app.utils.phone import format_phone_display
 
@@ -52,6 +63,7 @@ class BookRideRequest(BaseModel):
     vehicle_category_id: str | None = None
     payment_method: str = "CASH"
     rental_hours: float | None = Field(default=None, ge=0)
+    scheduled_at: datetime | None = None
 
 
 class SupportRequest(BaseModel):
@@ -92,7 +104,7 @@ def _ticket_messages(ticket: SupportTicket, replies: list[SupportTicketReply], u
         messages.append(
             {
                 "id": str(reply.id),
-                "sender": "WaveGo Support" if reply.sender_type == "ADMIN" else user_name,
+                "sender": "Fast Bull Support" if reply.sender_type == "ADMIN" else user_name,
                 "sender_type": reply.sender_type.lower(),
                 "message": reply.message,
                 "created_at": reply.created_at.isoformat(),
@@ -109,6 +121,16 @@ class CancelRideRequest(BaseModel):
 class PaymentRequest(BaseModel):
     amount: float = Field(gt=0)
     description: str = "Wallet top-up"
+
+
+class WalletCheckoutRequest(BaseModel):
+    amount: float = Field(..., gt=0, le=100000)
+
+
+class WalletVerifyPayment(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 
 def _address_response(address: SavedAddress) -> dict:
@@ -145,6 +167,61 @@ def _ride_summary(ride: Ride) -> dict:
         "fare_estimate": ride.estimated_fare,
         "fare_final": ride.final_fare,
         "created_at": ride.created_at.isoformat(),
+    }
+
+
+def _active_ride_summary(ride: Ride) -> dict:
+    summary = _ride_summary(ride)
+    summary["pickup_lat"] = ride.pickup_lat
+    summary["pickup_lng"] = ride.pickup_lng
+    summary["dropoff_lat"] = ride.dropoff_lat
+    summary["dropoff_lng"] = ride.dropoff_lng
+    if ride.driver:
+        summary["driver"] = {
+            "id": str(ride.driver.id),
+            "name": f"{ride.driver.first_name} {ride.driver.last_name}".strip(),
+            "phone": format_phone_display(ride.driver.phone),
+            "rating": ride.driver.rating_avg,
+        }
+    if ride.vehicle:
+        summary["vehicle_number"] = ride.vehicle.license_plate
+    if ride.ride_otp and ride.status in (
+        RideStatus.DRIVER_ASSIGNED.value,
+        RideStatus.DRIVER_ARRIVED.value,
+    ):
+        summary["start_code"] = ride.ride_otp
+    return summary
+
+
+async def _active_ride_summary_enriched(db: AsyncSession, ride: Ride) -> dict:
+    from app.models import DriverLocation
+
+    summary = _active_ride_summary(ride)
+    if ride.driver_id:
+        loc_result = await db.execute(
+            select(DriverLocation).where(DriverLocation.driver_id == ride.driver_id)
+        )
+        loc = loc_result.scalar_one_or_none()
+        if loc:
+            summary["driver_lat"] = loc.lat
+            summary["driver_lng"] = loc.lng
+    return summary
+
+
+def _serialize_user_notification(notification: Notification) -> dict:
+    raw_type = (notification.notification_type or "SYSTEM").upper()
+    mapped_type = "ride" if raw_type == "RIDE" else raw_type.lower()
+    return {
+        "id": str(notification.id),
+        "title": notification.title,
+        "body": notification.message,
+        "message": notification.message,
+        "type": mapped_type,
+        "notification_type": notification.notification_type,
+        "is_read": notification.is_read,
+        "read": notification.is_read,
+        "created_at": notification.created_at.isoformat(),
+        "data": notification.data,
     }
 
 
@@ -291,6 +368,7 @@ async def book_ride(
         vehicle_type_id=vehicle_type_id,
         payment_method=data.payment_method,
         rental_hours=data.rental_hours,
+        scheduled_at=data.scheduled_at,
     )
     ride = await RideService(db).create_ride(user.id, ride_data)
     notified = await DriverMatchingService(db).dispatch_ride_to_online_drivers(ride, manager)
@@ -316,8 +394,20 @@ async def list_rides(
     repo = RideRepository(db)
     rides = await repo.get_user_rides(user.id, page, page_size, status)
     active = await repo.get_active_ride_for_user(user.id)
+    active_summary = None
+    if active:
+        from sqlalchemy.orm import selectinload
+
+        loaded = await db.execute(
+            select(Ride)
+            .options(selectinload(Ride.driver), selectinload(Ride.vehicle))
+            .where(Ride.id == active.id)
+        )
+        active_ride = loaded.scalar_one_or_none()
+        if active_ride:
+            active_summary = await _active_ride_summary_enriched(db, active_ride)
     return {
-        "active": _ride_summary(active) if active else None,
+        "active": active_summary,
         "items": [_ride_summary(r) for r in rides],
         "page": page,
         "page_size": page_size,
@@ -350,13 +440,42 @@ async def cancel_ride(
     user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
-    ride = await RideService(db).get_ride(data.ride_id)
+    from app.services.driver_matching import DriverMatchingService
+
+    ride_service = RideService(db)
+    matching = DriverMatchingService(db)
+
+    ride = await ride_service.get_ride(data.ride_id)
     if ride.user_id != user.id:
         raise ForbiddenException("Access denied")
-    ride = await RideService(db).cancel_ride(
+    ride = await ride_service.cancel_ride(
         data.ride_id, "USER", data.reason or "Cancelled by user"
     )
-    await manager.broadcast_ride(str(data.ride_id), {"event": "ride_cancelled", "ride_id": str(data.ride_id)})
+    await matching.clear_ride_requests(data.ride_id)
+
+    from app.notifications.service import NotificationService
+
+    await NotificationService(db).close_all_ride_requests_for_ride(data.ride_id, "cancelled")
+
+    extra_cancelled = await ride_service.crud.cancel_orphaned_search_rides(user.id)
+    for ride_id in extra_cancelled:
+        await matching.clear_ride_requests(ride_id)
+        await NotificationService(db).close_all_ride_requests_for_ride(ride_id, "cancelled")
+
+    await manager.broadcast_ride(str(data.ride_id), {
+        "event": "ride_cancelled",
+        "ride_id": str(data.ride_id),
+        "reason": data.reason or "Cancelled by passenger",
+    })
+    if ride.driver_id:
+        await manager.send_personal(
+            str(ride.driver_id),
+            {
+                "event": "ride_cancelled",
+                "ride_id": str(data.ride_id),
+                "reason": data.reason or "Cancelled by passenger",
+            },
+        )
     return RideResponse.model_validate(ride)
 
 
@@ -397,10 +516,34 @@ async def add_payment(
     user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
-    wallet = await WalletService(db).get_or_create_wallet(user_id=user.id)
-    txn = await WalletService(db).credit(wallet.id, data.amount, data.description)
-    wallet = await WalletService(db).get_or_create_wallet(user_id=user.id)
-    return {"transaction": WalletTransactionResponse.model_validate(txn), "balance": wallet.balance}
+    raise ValidationException(
+        "Direct wallet credit is disabled. Use POST /user/wallet/checkout and Razorpay payment."
+    )
+
+
+@router.post("/wallet/checkout")
+async def wallet_checkout(
+    data: WalletCheckoutRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    service = WalletPaymentService(db)
+    return await service.create_checkout(user, data.amount)
+
+
+@router.post("/wallet/verify-payment")
+async def wallet_verify_payment(
+    data: WalletVerifyPayment,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    service = WalletPaymentService(db)
+    return await service.verify_and_credit(
+        user,
+        razorpay_order_id=data.razorpay_order_id,
+        razorpay_payment_id=data.razorpay_payment_id,
+        razorpay_signature=data.razorpay_signature,
+    )
 
 
 @router.get("/notifications")
@@ -417,7 +560,7 @@ async def notifications(
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    return [{"id": str(n.id), "title": n.title, "body": n.message, "is_read": n.is_read} for n in result.scalars().all()]
+    return [_serialize_user_notification(n) for n in result.scalars().all()]
 
 
 @router.put("/notifications/read-all")
@@ -465,40 +608,9 @@ async def rate_ride(
     user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
 ):
-    ride = await RideService(db).get_ride(ride_id)
-    if ride.user_id != user.id:
-        raise ForbiddenException("Access denied")
-    if ride.status != RideStatus.COMPLETED.value:
-        raise ValidationException("Ride must be completed before rating")
-    if not ride.driver_id:
-        raise ValidationException("No driver assigned to this ride")
+    from app.services.rating_service import RatingService
 
-    existing = await db.execute(select(Rating).where(Rating.ride_id == ride.id))
-    if existing.scalar_one_or_none():
-        raise ValidationException("Ride already rated")
-
-    rating = Rating(
-        ride_id=ride.id,
-        user_id=user.id,
-        driver_id=ride.driver_id,
-        rater_type="USER",
-        rating=data.rating,
-        comment=data.comment,
-    )
-    db.add(rating)
-
-    from app.models import Driver
-
-    driver = await db.get(Driver, ride.driver_id)
-    if driver:
-        avg_result = await db.execute(
-            select(func.avg(Rating.rating)).where(Rating.driver_id == ride.driver_id)
-        )
-        avg = avg_result.scalar_one()
-        driver.rating_avg = float(avg) if avg is not None else float(data.rating)
-
-    await db.flush()
-    return {"ride_id": str(ride.id), "rating": data.rating}
+    return await RatingService(db).rate_driver(ride_id, user, data.rating, data.comment)
 
 
 @router.post("/support")
@@ -593,4 +705,178 @@ async def ride_driver(ride_id: UUID, user: Annotated[User, Depends(get_current_u
         "rating": driver.rating_avg,
         "vehicle_number": ride.vehicle.license_plate if ride.vehicle else "",
         "photo_url": driver.profile_photo,
+    }
+
+
+class StudentPassSubmit(BaseModel):
+    aadhar_number: str = Field(..., min_length=12, max_length=12)
+    college_name: str = Field(..., min_length=2, max_length=200)
+    aadhar_photo: str | None = None
+    student_id_photo: str | None = None
+
+
+class SubscriptionSelect(BaseModel):
+    plan_slug: str = Field(..., min_length=2, max_length=50)
+
+
+class SubscriptionCheckoutRequest(BaseModel):
+    plan_slug: str = Field(..., min_length=2, max_length=50)
+
+
+class SubscriptionVerifyPayment(BaseModel):
+    plan_slug: str = Field(..., min_length=2, max_length=50)
+    razorpay_order_id: str = Field(..., min_length=5, max_length=100)
+    razorpay_payment_id: str = Field(..., min_length=5, max_length=100)
+    razorpay_signature: str = Field(..., min_length=5, max_length=255)
+
+
+@router.get("/student-pass")
+async def get_student_pass(
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    record = await db.scalar(select(StudentPass).where(StudentPass.user_id == user.id))
+    if not record:
+        return {"application": None}
+    return {"application": map_student_pass(record)}
+
+
+@router.post("/student-pass")
+async def submit_student_pass(
+    data: StudentPassSubmit,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    if not data.aadhar_number.isdigit():
+        raise ValidationException("Aadhar number must contain 12 digits")
+    if not data.aadhar_photo or not data.student_id_photo:
+        raise ValidationException("Aadhar photo and student ID photo are required")
+
+    existing = await db.scalar(select(StudentPass).where(StudentPass.user_id == user.id))
+    aadhar_url = persist_user_image(data.aadhar_photo, str(user.id), "aadhar")
+    student_id_url = persist_user_image(data.student_id_photo, str(user.id), "student_id")
+
+    if existing:
+        if existing.status == "APPROVED":
+            raise ValidationException("Your student pass is already verified")
+        existing.aadhar_number = data.aadhar_number
+        existing.college_name = data.college_name.strip()
+        existing.aadhar_photo_url = aadhar_url
+        existing.student_id_photo_url = student_id_url
+        existing.status = "PENDING"
+        existing.rejection_reason = None
+        existing.verified_at = None
+        existing.verified_by_id = None
+        record = existing
+    else:
+        record = StudentPass(
+            user_id=user.id,
+            aadhar_number=data.aadhar_number,
+            college_name=data.college_name.strip(),
+            aadhar_photo_url=aadhar_url,
+            student_id_photo_url=student_id_url,
+            status="PENDING",
+            discount_percent=20.0,
+        )
+        db.add(record)
+
+    await db.commit()
+    await db.refresh(record)
+    return {"application": map_student_pass(record), "message": "Application submitted for verification"}
+
+
+@router.get("/subscription-plans")
+async def list_subscription_plans(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(SubscriptionPlan)
+        .where(SubscriptionPlan.is_active.is_(True))
+        .order_by(SubscriptionPlan.sort_order.asc())
+    )
+    return {"plans": [map_subscription_plan(plan) for plan in result.scalars().all()]}
+
+
+@router.get("/subscription")
+async def get_user_subscription(
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy.orm import selectinload
+
+    sub = await db.scalar(
+        select(UserSubscription)
+        .options(selectinload(UserSubscription.plan))
+        .where(UserSubscription.user_id == user.id, UserSubscription.status == "ACTIVE")
+    )
+    if not sub or not sub.plan:
+        free_plan = await db.scalar(select(SubscriptionPlan).where(SubscriptionPlan.slug == "free"))
+        return {
+            "subscription": {
+                "plan": map_subscription_plan(free_plan) if free_plan else None,
+                "status": "active",
+            }
+        }
+    return {
+        "subscription": {
+            "plan": map_subscription_plan(sub.plan),
+            "status": sub.status.lower(),
+            "started_at": sub.started_at.isoformat(),
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        }
+    }
+
+
+@router.post("/subscription/checkout")
+async def subscription_checkout(
+    data: SubscriptionCheckoutRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    service = SubscriptionPaymentService(db)
+    return await service.create_checkout(user, data.plan_slug)
+
+
+@router.post("/subscription/verify-payment")
+async def subscription_verify_payment(
+    data: SubscriptionVerifyPayment,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    service = SubscriptionPaymentService(db)
+    return await service.verify_and_activate(
+        user,
+        plan_slug=data.plan_slug,
+        razorpay_order_id=data.razorpay_order_id,
+        razorpay_payment_id=data.razorpay_payment_id,
+        razorpay_signature=data.razorpay_signature,
+    )
+
+
+@router.post("/subscription")
+async def select_subscription_plan(
+    data: SubscriptionSelect,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    plan = await db.scalar(
+        select(SubscriptionPlan).where(
+            SubscriptionPlan.slug == data.plan_slug,
+            SubscriptionPlan.is_active.is_(True),
+        )
+    )
+    if not plan:
+        raise NotFoundException("Subscription plan not found")
+    if plan.price > 0:
+        raise ValidationException("Paid plans require Razorpay payment. Use subscription checkout.")
+
+    sub = await activate_user_subscription(db, user.id, plan)
+    await db.commit()
+    await db.refresh(sub, attribute_names=["plan"])
+    return {
+        "subscription": {
+            "plan": map_subscription_plan(plan),
+            "status": "active",
+            "started_at": sub.started_at.isoformat(),
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        },
+        "message": f"{plan.name} plan activated",
     }

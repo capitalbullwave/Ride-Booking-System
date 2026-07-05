@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.auth.dependencies import get_current_driver, get_current_token, get_current_user
+from app.auth.dependencies import get_current_driver, get_current_token, get_current_user, get_optional_current_user
 from app.core.constants import UserRole
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.models import Driver, User
@@ -33,8 +33,9 @@ router = APIRouter(tags=["Rides"])
 async def estimate_fare(
     payload: RideEstimateRequest,
     service: Annotated[RideService, Depends(get_ride_service)],
+    user: Annotated[Optional[User], Depends(get_optional_current_user)] = None,
 ):
-    return await service.fare.estimate(payload)
+    return await service.fare.estimate(payload, user_id=user.id if user else None)
 
 
 @router.post(

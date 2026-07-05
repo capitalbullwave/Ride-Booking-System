@@ -21,19 +21,19 @@ export function RideMapPreview({ className }: RideMapPreviewProps) {
         <defs>
           <linearGradient id="mapBg" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" stopColor="#E8E4DD" />
-            <stop offset="100%" stopColor="#FAF8F4" />
+            <stop offset="100%" stopColor="#f5f0ff" />
           </linearGradient>
         </defs>
         <rect width="400" height="180" fill="url(#mapBg)" />
         <path
           d="M0 90 H400 M0 45 H400 M0 135 H400 M100 0 V180 M200 0 V180 M300 0 V180"
-          stroke="#31526E"
+          stroke="#73398f"
           strokeOpacity="0.08"
           strokeWidth="1"
         />
         <path
           d="M60 120 C120 80, 180 100, 240 70 S340 50, 340 50"
-          stroke="#31526E"
+          stroke="#73398f"
           strokeWidth="3"
           strokeDasharray="6 8"
           fill="none"
@@ -41,7 +41,7 @@ export function RideMapPreview({ className }: RideMapPreviewProps) {
         />
         <path
           d="M70 115 C130 85, 190 95, 250 72 S330 58, 335 58"
-          stroke="#31526E"
+          stroke="#73398f"
           strokeWidth="4"
           fill="none"
           strokeLinecap="round"

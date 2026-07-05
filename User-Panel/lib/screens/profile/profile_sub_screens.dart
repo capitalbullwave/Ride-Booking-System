@@ -19,6 +19,15 @@ import 'package:wavego_user/services/user_services.dart';
 import 'package:wavego_user/screens/profile/support_screens.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
+String _emergencyContactLabel(UserProfile? profile) {
+  final name = profile?.emergencyContactName?.trim() ?? '';
+  final phone = profile?.emergencyContactPhone?.trim() ?? '';
+  if (name.isNotEmpty && phone.isNotEmpty) return '$name • $phone';
+  if (phone.isNotEmpty) return phone;
+  if (name.isNotEmpty) return name;
+  return 'Add emergency contact';
+}
+
 class ProfileSettingsScreen extends ConsumerWidget {
   const ProfileSettingsScreen({super.key});
 
@@ -54,6 +63,15 @@ class ProfileSettingsScreen extends ConsumerWidget {
               subtitle: Text(profile?.email ?? 'Add your email'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(RouteNames.profileEmail),
+            ),
+            ListTile(
+              leading: const Icon(Icons.contact_emergency_outlined),
+              title: const Text('Emergency contact'),
+              subtitle: Text(
+                _emergencyContactLabel(profile),
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(RouteNames.profileEmergencyContact),
             ),
             ListTile(
               leading: const Icon(Icons.notifications_outlined),
@@ -348,6 +366,127 @@ class _EmailSettingsScreenState extends ConsumerState<EmailSettingsScreen> {
                           } catch (_) {
                             if (context.mounted) {
                               context.showSnackBar('Could not save email');
+                            }
+                          } finally {
+                            if (mounted) setState(() => _saving = false);
+                          }
+                        },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class EmergencyContactSettingsScreen extends ConsumerStatefulWidget {
+  const EmergencyContactSettingsScreen({super.key});
+
+  @override
+  ConsumerState<EmergencyContactSettingsScreen> createState() =>
+      _EmergencyContactSettingsScreenState();
+}
+
+class _EmergencyContactSettingsScreenState
+    extends ConsumerState<EmergencyContactSettingsScreen> {
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  bool _saving = false;
+  bool _hydrated = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  String _normalizePhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 12 && digits.startsWith('91')) {
+      return digits.substring(2);
+    }
+    if (digits.length == 11 && digits.startsWith('0')) {
+      return digits.substring(1);
+    }
+    return digits;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profileAsync = ref.watch(userProfileProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Emergency contact')),
+      body: profileAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Unable to load')),
+        data: (user) {
+          if (!_hydrated) {
+            _nameController.text = user?.emergencyContactName ?? '';
+            _phoneController.text = user?.emergencyContactPhone ?? '';
+            _hydrated = true;
+          }
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Add someone we can reach in an emergency during your rides.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _nameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact name',
+                    hintText: 'e.g. Parent, spouse, friend',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact phone',
+                    hintText: '10-digit mobile number',
+                    prefixText: '+91 ',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                AppButton(
+                  label: 'Save emergency contact',
+                  isLoading: _saving,
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          final name = _nameController.text.trim();
+                          final phone = _normalizePhone(_phoneController.text);
+                          if (name.isEmpty) {
+                            context.showSnackBar('Please enter contact name');
+                            return;
+                          }
+                          if (phone.length != 10) {
+                            context.showSnackBar('Enter a valid 10-digit phone number');
+                            return;
+                          }
+                          setState(() => _saving = true);
+                          try {
+                            await ref.read(authRepositoryProvider).updateProfile(
+                                  emergencyContactName: name,
+                                  emergencyContactPhone: phone,
+                                );
+                            refreshUserProfile(ref);
+                            if (!context.mounted) return;
+                            Navigator.pop(context);
+                            context.showSnackBar('Emergency contact saved');
+                          } catch (_) {
+                            if (context.mounted) {
+                              context.showSnackBar('Could not save emergency contact');
                             }
                           } finally {
                             if (mounted) setState(() => _saving = false);
@@ -670,7 +809,7 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('About WaveGo')),
+      appBar: AppBar(title: const Text('About Fast Bull')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -693,7 +832,7 @@ class AboutScreen extends StatelessWidget {
             const Text('Version 1.0.0', style: TextStyle(color: AppColors.mutedForeground)),
             const SizedBox(height: 24),
             const Text(
-              'WaveGo is your all-in-one mobility platform for rides, parcel delivery, and emergency ambulance services across your city.',
+              'Fast Bull is your all-in-one mobility platform for rides, parcel delivery, and emergency ambulance services across your city.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.mutedForeground, height: 1.5),
             ),

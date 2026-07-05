@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wavego_driver/core/theme/app_colors.dart';
 
 /// Captain onboarding vehicle categories (Rapido-style).
 class CaptainVehicleOption {
@@ -30,15 +31,15 @@ class CaptainVehicleOptions {
       label: 'Bike',
       registrationType: 'Bike',
       icon: Icons.two_wheeler_rounded,
-      iconColor: Color(0xFF31526E),
-      backgroundColor: Color(0xFFF3F6F9),
+      iconColor: AppColors.primary,
+      backgroundColor: Color(0xFFF5F0FF),
     ),
     CaptainVehicleOption(
       id: 'auto',
       label: 'Auto',
       registrationType: 'Auto',
       icon: Icons.electric_rickshaw_rounded,
-      iconColor: Color(0xFF5FA87A),
+      iconColor: AppColors.success,
       backgroundColor: Color(0xFFF2FAF5),
     ),
     CaptainVehicleOption(
@@ -46,16 +47,16 @@ class CaptainVehicleOptions {
       label: 'E-Rickshaw',
       registrationType: 'E-Rickshaw',
       icon: Icons.electric_moped_rounded,
-      iconColor: Color(0xFF6086A8),
-      backgroundColor: Color(0xFFF2F6FA),
+      iconColor: AppColors.info,
+      backgroundColor: Color(0xFFF5F0FF),
     ),
     CaptainVehicleOption(
       id: 'cab',
       label: 'Cab',
       registrationType: 'Cab',
       icon: Icons.directions_car_filled_rounded,
-      iconColor: Color(0xFF263F54),
-      backgroundColor: Color(0xFFF5F5F5),
+      iconColor: AppColors.primaryDark,
+      backgroundColor: Color(0xFFF5F0FF),
     ),
   ];
 

@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "WaveGo Admin Panel",
-  description: "Enterprise admin dashboard for WaveGo rides & ambulance mobility",
+  title: "Fast Bull Admin Panel",
+  description: "Enterprise admin dashboard for Fast Bull rides & ambulance mobility",
 };
 
 export default function RootLayout({

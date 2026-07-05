@@ -30,7 +30,7 @@ class _DrivingLicenseQuestionScreenState
 
     if (choice == DrivingLicenseChoice.no) {
       context.showSnackBar(
-        'A valid driving license is required for WaveGo Captain rides.',
+        'A valid driving license is required for Fast Bull Captain rides.',
         isError: true,
       );
       return;
@@ -195,9 +195,9 @@ class _HeroBackground extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF1F3344),
-            Color(0xFF31526E),
-            Color(0xFF4A6B87),
+            AppColors.primaryDark,
+            AppColors.primary,
+            AppColors.primaryLight,
           ],
         ),
       ),
@@ -244,7 +244,7 @@ class _HeroBackground extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'WaveGo Captain',
+                  'Fast Bull Captain',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

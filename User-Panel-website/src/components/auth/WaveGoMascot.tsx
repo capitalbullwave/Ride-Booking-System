@@ -218,7 +218,7 @@ export function WaveGoMascot({ state, className, showCaption = true }: WaveGoMas
           {/* Hood line */}
           <path d="M 88 228 L 232 228" stroke={WAVEGO_BRAND.foreground} strokeWidth="2" strokeOpacity="0.5" />
 
-          {/* WaveGo W on hood */}
+          {/* Fast Bull W on hood */}
           <path
             d="M 138 248 L 146 268 L 160 242 L 174 268 L 182 248"
             stroke={WAVEGO_BRAND.mutedForeground}

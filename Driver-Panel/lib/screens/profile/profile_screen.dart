@@ -57,6 +57,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     };
     final isOnline = dashboard.isOnline;
     final isVerified = profile?.verificationStatus == 'verified';
+    final tripCount = stats?.completedTrips ?? profile?.totalTrips ?? 0;
+    final ratingValue = stats?.rating ?? profile?.rating ?? 4.5;
 
     return Scaffold(
       body: CustomScrollView(
@@ -144,7 +146,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             const SizedBox(width: 8),
                             _HeaderChip(
                               icon: Icons.star_rounded,
-                              label: '${profile?.rating ?? stats?.rating ?? 4.5}',
+                              label: ratingValue.toStringAsFixed(1),
                             ),
                           ],
                         ),
@@ -172,7 +174,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Expanded(
                         child: _StatTile(
                           label: 'Trips',
-                          value: '${profile?.totalTrips ?? stats?.completedTrips ?? 0}',
+                          value: '$tripCount',
                           icon: Icons.local_taxi_outlined,
                         ),
                       ),
@@ -180,7 +182,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       Expanded(
                         child: _StatTile(
                           label: 'Rating',
-                          value: '${profile?.rating ?? stats?.rating ?? 4.5}',
+                          value: ratingValue.toStringAsFixed(1),
                           icon: Icons.star_outline,
                         ),
                       ),

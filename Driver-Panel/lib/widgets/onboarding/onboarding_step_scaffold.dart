@@ -127,7 +127,7 @@ class _HeroPanel extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1F3344), Color(0xFF31526E)],
+          colors: [AppColors.primaryDark, AppColors.primary],
         ),
       ),
       child: Center(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
+import 'package:wavego_driver/models/payment_completion_data.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/models/wallet_model.dart';
 import 'package:wavego_driver/providers/auth_session_provider.dart';
@@ -158,12 +159,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.payment,
         builder: (_, state) => PaymentScreen(
-          payment: state.extra! as PaymentBreakdown,
+          completion: state.extra! as PaymentCompletionData,
         ),
       ),
       GoRoute(
         path: RouteNames.rideSummary,
-        builder: (_, __) => const RideSummaryScreen(),
+        builder: (_, state) => RideSummaryScreen(
+          rideId: state.extra as String?,
+        ),
       ),
       GoRoute(
         path: RouteNames.trips,

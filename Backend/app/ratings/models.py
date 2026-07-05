@@ -2,7 +2,7 @@
 import uuid
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,9 +17,10 @@ if TYPE_CHECKING:
 
 class Rating(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "ratings"
+    __table_args__ = (UniqueConstraint("ride_id", "rater_type", name="uq_ratings_ride_rater"),)
 
     ride_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("rides.id", ondelete="CASCADE"), unique=True, nullable=False
+        UUID(as_uuid=True), ForeignKey("rides.id", ondelete="CASCADE"), nullable=False
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
@@ -31,6 +32,6 @@ class Rating(UUIDMixin, TimestampMixin, Base):
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    ride: Mapped["Ride"] = relationship("Ride", back_populates="rating")
+    ride: Mapped["Ride"] = relationship("Ride", back_populates="ratings")
     user: Mapped["User"] = relationship("User", back_populates="ratings_given", foreign_keys=[user_id])
     driver: Mapped["Driver"] = relationship("Driver", back_populates="ratings_received", foreign_keys=[driver_id])

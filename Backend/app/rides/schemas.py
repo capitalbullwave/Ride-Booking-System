@@ -20,6 +20,9 @@ class VehicleTypeEstimate(BaseModel):
     vehicle_type_id: uuid.UUID
     name: str
     estimated_fare: float
+    original_fare: Optional[float] = None
+    member_discount: float = 0.0
+    discount_percent: float = 0.0
     base_fare: float
     distance_fare: float
     time_fare: float
@@ -33,6 +36,7 @@ class RideEstimateResponse(BaseModel):
     distance_km: float
     duration_min: float
     vehicle_types: List[VehicleTypeEstimate]
+    discount_percent: Optional[float] = None
 
 
 class RideBookRequest(BaseModel):

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/services/ride_service.dart';
 
@@ -27,6 +28,27 @@ class RideRepository {
 
   Future<PaymentBreakdown> completeRide(String rideId) =>
       _service.completeRide(rideId);
+
+  Future<PaymentBreakdown> collectCashPayment(String rideId) async {
+    final response = await _service.collectCashPayment(rideId);
+    return BackendMappers.paymentFromRide(response);
+  }
+
+  Future<Map<String, dynamic>> createOnlinePaymentQr(String rideId) =>
+      _service.createOnlinePaymentQr(rideId);
+
+  Future<bool> checkOnlinePaymentStatus(String rideId) async {
+    final response = await _service.checkOnlinePaymentStatus(rideId);
+    return response['payment_collected'] == true ||
+        response['payment_status']?.toString().toUpperCase() == 'COMPLETED';
+  }
+
+  Future<void> ratePassenger(
+    String rideId, {
+    required int rating,
+    String? comment,
+  }) =>
+      _service.ratePassenger(rideId, rating: rating, comment: comment);
 
   Future<RideSummary> getRideSummary(String rideId) =>
       _service.getRideSummary(rideId);

@@ -36,7 +36,7 @@ export function LandingFaqSection() {
           </h2>
           <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
             Everything you need to know about booking rides, parcels, ambulance SOS,
-            payments, and driving with WaveGo.
+            payments, and driving with Fast Bull.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">

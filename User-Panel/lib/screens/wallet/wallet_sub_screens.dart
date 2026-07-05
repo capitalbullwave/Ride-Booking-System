@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,7 +11,10 @@ import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/core/utils/wallet_refresh.dart';
 import 'package:wavego_user/providers/app_providers.dart';
+import 'package:wavego_user/repositories/user_repositories.dart';
+import 'package:wavego_user/services/wallet_payment_service.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
 class WalletTransaction {
@@ -38,63 +42,385 @@ class WalletTransaction {
         date: json['date'] as String? ?? '',
         type: json['type'] as String? ?? 'debit',
       );
+
+  factory WalletTransaction.fromApi(Map<String, dynamic> json) {
+    final type = (json['transaction_type'] as String? ?? '').toLowerCase();
+    final rawAmount = (json['amount'] as num?)?.toDouble() ?? 0;
+    final isCredit = type == 'credit' || type == 'refund';
+    final description = json['description'] as String? ?? 'Transaction';
+    return WalletTransaction(
+      id: json['id']?.toString() ?? '',
+      title: _transactionTitle(description),
+      subtitle: description,
+      amount: isCredit ? rawAmount : -rawAmount,
+      date: _formatTransactionDate(json['created_at'] as String? ?? ''),
+      type: isCredit ? 'credit' : 'debit',
+    );
+  }
 }
 
-final walletTransactionsProvider = FutureProvider<List<WalletTransaction>>((ref) async {
+String _transactionTitle(String description) {
+  final lower = description.toLowerCase();
+  if (lower.contains('top-up') || lower.contains('top up')) return 'Wallet top-up';
+  if (lower.contains('ride')) return 'Ride payment';
+  if (lower.contains('parcel') || lower.contains('delivery')) return 'Parcel delivery';
+  return description;
+}
+
+String _formatTransactionDate(String iso) {
+  if (iso.isEmpty) return '';
+  try {
+    final dt = DateTime.parse(iso).toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(dt.year, dt.month, dt.day);
+    final time = DateFormat('hh:mm a').format(dt);
+    if (day == today) return 'Today, $time';
+    if (day == today.subtract(const Duration(days: 1))) return 'Yesterday, $time';
+    return DateFormat('d MMM, hh:mm a').format(dt);
+  } catch (_) {
+    return iso;
+  }
+}
+
+Future<List<WalletTransaction>> _loadMockWalletTransactions() async {
   final raw = await rootBundle.loadString('assets/mock/wallet_transactions.json');
   final list = jsonDecode(raw) as List<dynamic>;
   return list.map((e) => WalletTransaction.fromJson(e as Map<String, dynamic>)).toList();
+}
+
+final walletTransactionsOverrideProvider =
+    StateProvider<List<WalletTransaction>?>((ref) => null);
+
+final resolvedWalletTransactionsProvider =
+    Provider<AsyncValue<List<WalletTransaction>>>((ref) {
+  final override = ref.watch(walletTransactionsOverrideProvider);
+  if (override != null) {
+    return AsyncData(override);
+  }
+  return ref.watch(walletTransactionsProvider);
+});
+
+void prependWalletTransaction(WidgetRef ref, WalletTransaction txn) {
+  final current = ref.read(resolvedWalletTransactionsProvider).valueOrNull ?? [];
+  ref.read(walletTransactionsOverrideProvider.notifier).state = [txn, ...current];
+}
+
+Future<void> refreshWalletTransactions(WidgetRef ref) async {
+  try {
+    final rows = await ref.read(walletRepositoryProvider).getTransactions();
+    final txns = rows.map(WalletTransaction.fromApi).toList();
+    if (txns.isEmpty) return;
+    ref.read(walletTransactionsOverrideProvider.notifier).state = txns;
+  } catch (_) {
+    // Keep optimistic list when sync fails.
+  }
+}
+
+WalletTransaction _topUpTransactionFromResult(
+  WalletTopUpResult result,
+  double amount,
+) {
+  final txn = result.transaction;
+  if (txn != null) {
+    return WalletTransaction.fromApi(txn);
+  }
+  return WalletTransaction(
+    id: 'topup-${DateTime.now().millisecondsSinceEpoch}',
+    title: 'Wallet top-up',
+    subtitle: 'Wallet top-up via Razorpay',
+    amount: amount,
+    date: _formatTransactionDate(DateTime.now().toUtc().toIso8601String()),
+    type: 'credit',
+  );
+}
+
+final walletTransactionsProvider = FutureProvider<List<WalletTransaction>>((ref) async {
+  try {
+    final rows = await ref.watch(walletRepositoryProvider).getTransactions();
+    return rows.map(WalletTransaction.fromApi).toList();
+  } catch (_) {
+    return _loadMockWalletTransactions();
+  }
 });
 
 String _formatAmount(double amount) =>
     NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(amount.abs());
 
-class WalletBalanceScreen extends ConsumerWidget {
+class WalletBalanceScreen extends ConsumerStatefulWidget {
   const WalletBalanceScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final walletAsync = ref.watch(walletProvider);
-    final txAsync = ref.watch(walletTransactionsProvider);
+  ConsumerState<WalletBalanceScreen> createState() => _WalletBalanceScreenState();
+}
+
+class _WalletBalanceScreenState extends ConsumerState<WalletBalanceScreen> {
+  bool _paying = false;
+  double? _localBalance;
+  List<WalletTransaction>? _localTransactions;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_syncWalletFromServer());
+    });
+  }
+
+  Future<void> _syncWalletFromServer() async {
+    try {
+      final wallet = await refreshWallet(ref);
+      final rows = await ref.read(walletRepositoryProvider).getTransactions();
+      if (!mounted) return;
+      setState(() {
+        _localBalance = wallet.balance;
+        if (rows.isNotEmpty) {
+          _localTransactions = rows.map(WalletTransaction.fromApi).toList();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _applyTopUpLocally(double amount) {
+    final currentBalance =
+        _localBalance ?? ref.read(resolvedWalletProvider).valueOrNull?.balance ?? 0;
+    final txn = WalletTransaction(
+      id: 'topup-${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Wallet top-up',
+      subtitle: 'Wallet top-up via Razorpay',
+      amount: amount,
+      date: _formatTransactionDate(DateTime.now().toUtc().toIso8601String()),
+      type: 'credit',
+    );
+    final existing = _localTransactions ??
+        ref.read(resolvedWalletTransactionsProvider).valueOrNull ??
+        const <WalletTransaction>[];
+
+    setState(() {
+      _localBalance = currentBalance + amount;
+      _localTransactions = [txn, ...existing];
+    });
+
+    applyWalletTopUp(ref, amount);
+    prependWalletTransaction(ref, txn);
+    if (mounted) {
+      context.showSnackBar('Payment successful! Wallet updated.');
+    }
+  }
+
+  Future<void> _openAddMoneySheet() async {
+    final amountController = TextEditingController();
+    var selectedAmount = 0.0;
+
+    final amount = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              void pickAmount(double value) {
+                setSheetState(() {
+                  selectedAmount = value;
+                  amountController.text = value.toStringAsFixed(0);
+                });
+              }
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Add money to wallet',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Enter amount and pay securely with Razorpay.',
+                    style: TextStyle(color: AppColors.mutedForeground),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [100, 200, 500, 1000].map((value) {
+                      final selected = selectedAmount == value.toDouble();
+                      return ChoiceChip(
+                        label: Text('₹$value'),
+                        selected: selected,
+                        onSelected: (_) => pickAmount(value.toDouble()),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: const InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: '₹ ',
+                      hintText: '500',
+                    ),
+                    onChanged: (value) {
+                      setSheetState(() {
+                        selectedAmount = double.tryParse(value) ?? 0;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  AppButton(
+                    label: 'Pay with Razorpay',
+                    isLoading: _paying,
+                    onPressed: () {
+                      final parsed = double.tryParse(amountController.text.trim()) ?? selectedAmount;
+                      if (parsed <= 0) {
+                        context.showSnackBar('Enter a valid amount');
+                        return;
+                      }
+                      Navigator.pop(ctx, parsed);
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    amountController.dispose();
+    if (!mounted || amount == null || amount <= 0) return;
+
+    setState(() => _paying = true);
+    var paymentAuthorized = false;
+    try {
+      final result = await ref.read(walletPaymentControllerProvider).addMoney(
+            amount,
+            onCheckoutOpened: () {
+              if (mounted) setState(() => _paying = false);
+            },
+            onPaymentAuthorized: (paidAmount) {
+              paymentAuthorized = true;
+              _applyTopUpLocally(paidAmount);
+              if (mounted) {
+                setState(() => _paying = false);
+              }
+            },
+          );
+      applyWalletBalance(ref, result.balance);
+      final serverTxn = _topUpTransactionFromResult(result, amount);
+      prependWalletTransaction(ref, serverTxn);
+      if (!mounted) return;
+      setState(() {
+        _localBalance = result.balance;
+        final existing = _localTransactions ??
+            ref.read(resolvedWalletTransactionsProvider).valueOrNull ??
+            const <WalletTransaction>[];
+        _localTransactions = [
+          serverTxn,
+          ...existing.where((t) => t.id != serverTxn.id),
+        ];
+      });
+      context.showSnackBar(result.message);
+    } catch (error) {
+      if (mounted) {
+        if (paymentAuthorized) {
+          context.showSnackBar('₹${amount.toStringAsFixed(0)} added to your wallet!');
+          unawaited(_syncWalletFromServer());
+          return;
+        }
+        final message = error.toString().toLowerCase();
+        if (message.contains('cancel')) {
+          context.showSnackBar('Payment cancelled');
+        } else {
+          context.showSnackBar(
+            'Could not confirm payment. If amount was deducted, please contact support.',
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _paying = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final walletAsync = ref.watch(resolvedWalletProvider);
+    final txAsync = ref.watch(resolvedWalletTransactionsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Wallet Balance')),
       body: walletAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () {
+          if (walletAsync.hasValue) {
+            return _walletBalanceBody(walletAsync.value!, txAsync);
+          }
+          return const Center(child: CircularProgressIndicator());
+        },
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (wallet) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _SummaryCard(
-              label: 'Available balance',
-              amount: _formatAmount(wallet.balance),
-              icon: Icons.account_balance_wallet,
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Recent transactions',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            txAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Text('Unable to load transactions'),
-              data: (txns) => Column(
-                children: txns
-                    .where((t) => t.type != 'bonus')
-                    .map((txn) => _TransactionTile(txn: txn))
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            AppButton(
-              label: 'Add money',
-              icon: Icons.add,
-              onPressed: () => context.showSnackBar('Add money — coming soon'),
-            ),
-          ],
-        ),
+        data: (wallet) => _walletBalanceBody(wallet, txAsync),
       ),
+    );
+  }
+
+  Widget _walletBalanceBody(WalletSummary wallet, AsyncValue<List<WalletTransaction>> txAsync) {
+    final displayBalance = _localBalance ?? wallet.balance;
+    final displayTransactions = _localTransactions ?? txAsync.valueOrNull ?? const <WalletTransaction>[];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _SummaryCard(
+          label: 'Available balance',
+          amount: _formatAmount(displayBalance),
+          icon: Icons.account_balance_wallet,
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Recent transactions',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        txAsync.when(
+          loading: () => _transactionList(displayTransactions),
+          error: (_, __) => _transactionList(displayTransactions),
+          data: (_) => _transactionList(displayTransactions),
+        ),
+        const SizedBox(height: 24),
+        AppButton(
+          label: 'Add money',
+          icon: Icons.add,
+          isLoading: _paying,
+          onPressed: _paying ? null : _openAddMoneySheet,
+        ),
+      ],
+    );
+  }
+
+  Widget _transactionList(List<WalletTransaction> txns) {
+    final items = txns.where((t) => t.type != 'bonus').toList();
+    if (items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24),
+        child: Text(
+          'No transactions yet. Add money to get started.',
+          style: TextStyle(color: AppColors.mutedForeground),
+        ),
+      );
+    }
+    return Column(
+      children: items.map((txn) => _TransactionTile(txn: txn)).toList(),
     );
   }
 }
@@ -104,8 +430,8 @@ class WalletBonusScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final walletAsync = ref.watch(walletProvider);
-    final txAsync = ref.watch(walletTransactionsProvider);
+    final walletAsync = ref.watch(resolvedWalletProvider);
+    final txAsync = ref.watch(resolvedWalletTransactionsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Bonus & Rewards')),

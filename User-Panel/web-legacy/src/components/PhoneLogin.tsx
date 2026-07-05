@@ -13,8 +13,8 @@ import { LoginSceneDecor } from "@/components/auth/LoginSceneDecor";
 import { ROUTES } from "@/constants/routes";
 import { isFirebaseConfigured } from "@/firebase/firebase";
 import {
-  clearPostLoginRedirect,
-  getPostLoginRedirect,
+  needsProfileSetup,
+  resolvePostAuthDestination,
   setAuthSession,
   setDevOtpHint,
   setPostLoginRedirect,
@@ -73,6 +73,7 @@ export function PhoneLogin() {
 
   const finishLogin = useCallback(
     (phoneDisplay: string, tokens: { accessToken: string; refreshToken?: string; name?: string; email?: string }) => {
+      const profileComplete = !needsProfileSetup(tokens.name);
       setAuthSession({
         phone: phoneDisplay,
         verified: true,
@@ -80,11 +81,15 @@ export function PhoneLogin() {
         ...(tokens.email ? { email: tokens.email } : {}),
         accessToken: tokens.accessToken,
         ...(tokens.refreshToken ? { refreshToken: tokens.refreshToken } : {}),
+        profileComplete,
       });
 
-      const redirectTo = getPostLoginRedirect();
-      clearPostLoginRedirect();
-      router.push(redirectTo || ROUTES.home);
+      if (!profileComplete) {
+        router.push(ROUTES.createProfile);
+        return;
+      }
+
+      router.push(resolvePostAuthDestination());
     },
     [router]
   );

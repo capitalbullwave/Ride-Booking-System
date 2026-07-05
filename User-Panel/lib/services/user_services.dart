@@ -177,6 +177,19 @@ class WalletService extends BaseApiService {
       parser: (data) => WalletSummary.fromJson(data as Map<String, dynamic>),
     );
   }
+
+  Future<List<Map<String, dynamic>>> getTransactions() async {
+    if (useMock) {
+      final raw = await loadMockJsonList('wallet_transactions.json');
+      return raw.cast<Map<String, dynamic>>();
+    }
+    return get(
+      ApiEndpoints.walletTransactions,
+      parser: (data) => (data as List<dynamic>)
+          .map((e) => e as Map<String, dynamic>)
+          .toList(),
+    );
+  }
 }
 
 class NotificationService extends BaseApiService {

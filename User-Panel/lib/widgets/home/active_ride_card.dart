@@ -41,7 +41,7 @@ class ActiveRideCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.primary, Color(0xFF4A6D8A)],
+                colors: [AppColors.primary, AppColors.primaryLight],
               ),
             ),
             child: Row(

@@ -18,10 +18,11 @@ export interface UserUpdatePayload {
   registrationDate?: string;
 }
 
-function normalizeUser(user: User & { walletBalance?: number | string }): User {
+function normalizeUser(user: User & { walletBalance?: number | string; rating?: number | string }): User {
   return {
     ...user,
     walletBalance: Number(user.walletBalance),
+    rating: Number(user.rating ?? 0),
   };
 }
 
@@ -192,4 +193,48 @@ export async function fetchUserActivityLogs(
   userId: string,
 ): Promise<UserActivityLog[]> {
   return apiFetch<UserActivityLog[]>(`/api/v1/admin/users/${userId}/activity-logs`);
+}
+
+export interface UserSubscriptionDetail {
+  plan: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string;
+    price: number;
+    price_label: string;
+    period_label: string;
+    benefits: string[];
+    ride_discount_percent: number;
+    is_popular: boolean;
+    is_active: boolean;
+  };
+  status: string;
+  started_at?: string | null;
+  expires_at?: string | null;
+}
+
+export interface UserStudentPassDetail {
+  id: string;
+  aadhar_number: string;
+  college_name: string;
+  aadhar_photo_url?: string | null;
+  student_id_photo_url?: string | null;
+  status: string;
+  discount_percent: number;
+  rejection_reason?: string | null;
+  verified_at?: string | null;
+  created_at?: string | null;
+}
+
+export async function fetchUserSubscription(userId: string) {
+  return apiFetch<{ subscription: UserSubscriptionDetail | null }>(
+    `/api/v1/admin/users/${userId}/subscription`,
+  );
+}
+
+export async function fetchUserStudentPass(userId: string) {
+  return apiFetch<{ application: UserStudentPassDetail | null }>(
+    `/api/v1/admin/users/${userId}/student-pass`,
+  );
 }

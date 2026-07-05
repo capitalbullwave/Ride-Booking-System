@@ -12,6 +12,10 @@ from app.core.constants import ActorType, RideEventType, RideStatus
 from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.core.security import generate_otp
 from app.maps.service import MapsService
+from app.services.user_benefits_service import (
+    apply_member_discount_to_fare,
+    get_user_ride_discount_percent,
+)
 from app.models import PricingRule, Ride, VehicleType
 from app.rides.crud import RideCRUD
 from app.rides.schemas import (
@@ -117,7 +121,9 @@ class FareEngine:
             "estimated_fare": round(max(total, 0), 2),
         }
 
-    async def estimate(self, data: RideEstimateRequest) -> RideEstimateResponse:
+    async def estimate(
+        self, data: RideEstimateRequest, user_id: Optional[UUID] = None
+    ) -> RideEstimateResponse:
         distance_km = self.calculate_distance_km(
             data.pickup_lat, data.pickup_lng, data.dropoff_lat, data.dropoff_lng
         )
@@ -127,15 +133,24 @@ class FareEngine:
         if data.vehicle_type_id:
             vehicle_types = [vt for vt in vehicle_types if vt.id == data.vehicle_type_id]
 
+        discount_pct = 0.0
+        if user_id is not None:
+            discount_pct = await get_user_ride_discount_percent(self.db, user_id)
+
         estimates: list[VehicleTypeEstimate] = []
         for vt in vehicle_types:
             rule = await self.get_pricing_rule(vt.id)
             fare = await self.calculate_fare(vt, distance_km, duration_min, pricing_rule=rule)
+            if discount_pct > 0:
+                fare = apply_member_discount_to_fare(fare, discount_pct)
             estimates.append(
                 VehicleTypeEstimate(
                     vehicle_type_id=vt.id,
                     name=vt.name,
                     estimated_fare=fare["estimated_fare"],
+                    original_fare=fare.get("original_fare"),
+                    member_discount=fare.get("member_discount", 0),
+                    discount_percent=fare.get("discount_percent", 0),
                     base_fare=fare["base_fare"],
                     distance_fare=fare["distance_fare"],
                     time_fare=fare["time_fare"],
@@ -150,6 +165,7 @@ class FareEngine:
             distance_km=round(distance_km, 2),
             duration_min=round(duration_min, 2),
             vehicle_types=estimates,
+            discount_percent=round(discount_pct, 2) if discount_pct > 0 else None,
         )
 
 
@@ -205,6 +221,7 @@ class RideService:
         return updated
 
     async def book(self, user_id: UUID, data: RideBookRequest) -> Ride:
+        await self.crud.cancel_orphaned_search_rides(user_id)
         if await self.crud.get_active_for_user(user_id):
             raise ValidationException("You already have an active ride")
 
@@ -236,6 +253,10 @@ class RideService:
             rental_hours=data.rental_hours,
         )
 
+        discount_pct = await get_user_ride_discount_percent(self.db, user_id)
+        if discount_pct > 0:
+            fare = apply_member_discount_to_fare(fare, discount_pct)
+
         # Rental bookings are hour-based; don't block on external routing.
         if (vehicle_type.service_group or "ride") != "rental":
             await self.maps.get_route_between(data.pickup_address, data.dropoff_address)
@@ -260,6 +281,7 @@ class RideService:
             peak_charges=fare["peak_charges"],
             tax_amount=fare["tax_amount"],
             platform_fee=fare["platform_fee"],
+            promo_discount=fare.get("promo_discount", 0),
             payment_method=data.payment_method,
             ride_otp=generate_otp(4),
             scheduled_at=data.scheduled_at,
@@ -344,6 +366,8 @@ class RideService:
     async def driver_arrived(self, ride_id: UUID, driver_id: UUID) -> Ride:
         ride = await self.get_ride(ride_id)
         self._ensure_participant(ride, None, driver_id)
+        if ride.status == RideStatus.DRIVER_ARRIVED.value:
+            return ride
         if ride.status != RideStatus.DRIVER_ASSIGNED.value:
             raise ValidationException("Invalid ride status")
         ride.arrived_at = datetime.now(timezone.utc)
@@ -357,10 +381,13 @@ class RideService:
     async def verify_otp(self, ride_id: UUID, driver_id: UUID, otp: str) -> Ride:
         ride = await self.get_ride(ride_id)
         self._ensure_participant(ride, None, driver_id)
-        if ride.status != RideStatus.DRIVER_ARRIVED.value:
+        if ride.status == RideStatus.DRIVER_ASSIGNED.value:
+            ride = await self.driver_arrived(ride_id, driver_id)
+        elif ride.status != RideStatus.DRIVER_ARRIVED.value:
             raise ValidationException("Invalid ride status")
-        if ride.ride_otp != otp:
-            raise ValidationException("Invalid OTP")
+        normalized_otp = str(otp).strip()
+        if ride.ride_otp != normalized_otp:
+            raise ValidationException("Invalid start code. Ask the passenger for the code shown in their app.")
         return await self._transition(
             ride,
             RideStatus.OTP_VERIFIED,
@@ -445,8 +472,13 @@ class RideService:
         ride = await self.get_ride(ride_id)
         if not ride.driver_id:
             raise ValidationException("Driver not assigned")
-        ride = await self.verify_otp(ride_id, ride.driver_id, otp)
-        return await self.start(ride_id, ride.driver_id)
+        driver_id = ride.driver_id
+        if ride.status in (RideStatus.STARTED.value, RideStatus.IN_PROGRESS.value):
+            return ride
+        if ride.status == RideStatus.OTP_VERIFIED.value:
+            return await self.start(ride_id, driver_id)
+        ride = await self.verify_otp(ride_id, driver_id, str(otp).strip())
+        return await self.start(ride_id, driver_id)
 
     async def complete_ride(self, ride_id: UUID, actual_distance_km: Optional[float] = None) -> Ride:
         ride = await self.get_ride(ride_id)

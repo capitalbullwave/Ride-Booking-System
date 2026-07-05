@@ -73,14 +73,14 @@ export const recentActivities: ActivityItem[] = [
 ];
 
 export const users: User[] = [
-  { id: "USR-001", name: "Rajesh Kumar", mobile: "+91 98765 43210", email: "rajesh.k@email.com", registrationDate: "2024-01-15", totalRides: 156, walletBalance: 1250, status: "active", city: "Bangalore" },
-  { id: "USR-002", name: "Priya Sharma", mobile: "+91 87654 32109", email: "priya.s@email.com", registrationDate: "2024-02-20", totalRides: 89, walletBalance: 500, status: "active", city: "Mumbai" },
-  { id: "USR-003", name: "Amit Patel", mobile: "+91 76543 21098", email: "amit.p@email.com", registrationDate: "2024-03-10", totalRides: 234, walletBalance: 2100, status: "active", city: "Delhi" },
-  { id: "USR-004", name: "Sneha Reddy", mobile: "+91 65432 10987", email: "sneha.r@email.com", registrationDate: "2024-04-05", totalRides: 45, walletBalance: 0, status: "suspended", city: "Hyderabad" },
-  { id: "USR-005", name: "Vikram Singh", mobile: "+91 54321 09876", email: "vikram.s@email.com", registrationDate: "2024-05-18", totalRides: 312, walletBalance: 3500, status: "active", city: "Chennai" },
-  { id: "USR-006", name: "Anita Desai", mobile: "+91 43210 98765", email: "anita.d@email.com", registrationDate: "2024-06-22", totalRides: 12, walletBalance: 200, status: "blocked", city: "Pune" },
-  { id: "USR-007", name: "Rahul Mehta", mobile: "+91 32109 87654", email: "rahul.m@email.com", registrationDate: "2024-07-30", totalRides: 178, walletBalance: 890, status: "active", city: "Bangalore" },
-  { id: "USR-008", name: "Kavita Nair", mobile: "+91 21098 76543", email: "kavita.n@email.com", registrationDate: "2024-08-14", totalRides: 67, walletBalance: 450, status: "inactive", city: "Kochi" },
+  { id: "USR-001", name: "Rajesh Kumar", mobile: "+91 98765 43210", email: "rajesh.k@email.com", registrationDate: "2024-01-15", totalRides: 156, walletBalance: 1250, status: "active", city: "Bangalore", rating: 4.7 },
+  { id: "USR-002", name: "Priya Sharma", mobile: "+91 87654 32109", email: "priya.s@email.com", registrationDate: "2024-02-20", totalRides: 89, walletBalance: 500, status: "active", city: "Mumbai", rating: 4.5 },
+  { id: "USR-003", name: "Amit Patel", mobile: "+91 76543 21098", email: "amit.p@email.com", registrationDate: "2024-03-10", totalRides: 234, walletBalance: 2100, status: "active", city: "Delhi", rating: 4.8 },
+  { id: "USR-004", name: "Sneha Reddy", mobile: "+91 65432 10987", email: "sneha.r@email.com", registrationDate: "2024-04-05", totalRides: 45, walletBalance: 0, status: "suspended", city: "Hyderabad", rating: 4.2 },
+  { id: "USR-005", name: "Vikram Singh", mobile: "+91 54321 09876", email: "vikram.s@email.com", registrationDate: "2024-05-18", totalRides: 312, walletBalance: 3500, status: "active", city: "Chennai", rating: 4.9 },
+  { id: "USR-006", name: "Anita Desai", mobile: "+91 43210 98765", email: "anita.d@email.com", registrationDate: "2024-06-22", totalRides: 12, walletBalance: 200, status: "blocked", city: "Pune", rating: 3.8 },
+  { id: "USR-007", name: "Rahul Mehta", mobile: "+91 32109 87654", email: "rahul.m@email.com", registrationDate: "2024-07-30", totalRides: 178, walletBalance: 890, status: "active", city: "Bangalore", rating: 4.6 },
+  { id: "USR-008", name: "Kavita Nair", mobile: "+91 21098 76543", email: "kavita.n@email.com", registrationDate: "2024-08-14", totalRides: 67, walletBalance: 450, status: "inactive", city: "Kochi", rating: 4.4 },
 ];
 
 export const drivers: Driver[] = [
@@ -255,7 +255,7 @@ export const adminAlerts: AdminAlert[] = [
   {
     id: "ALT-006",
     title: "System health check passed",
-    message: "All WaveGo services are operational. Last checked at 6:00 AM IST.",
+    message: "All Fast Bull services are operational. Last checked at 6:00 AM IST.",
     type: "system",
     time: "Yesterday",
     createdAt: "2025-06-22T06:00:00",
@@ -274,7 +274,7 @@ export const driverDocuments: DriverDocument[] = [
 ];
 
 export const appSettings: AppSettings = {
-  appName: "WaveGo",
+  appName: "Fast Bull",
   logo: "/logo.svg",
   contactEmail: "support@wavego.com",
   contactPhone: "+91 1800-WAVE-GO",

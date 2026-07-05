@@ -37,7 +37,7 @@ class RideCRUD:
                 selectinload(Ride.driver),
                 selectinload(Ride.vehicle),
                 selectinload(Ride.vehicle_type),
-                selectinload(Ride.rating),
+                selectinload(Ride.ratings),
                 selectinload(Ride.events),
             )
             .where(Ride.id == ride_id)
@@ -46,18 +46,50 @@ class RideCRUD:
 
     async def get_active_for_user(self, user_id: uuid.UUID) -> Optional[Ride]:
         result = await self.db.execute(
-            select(Ride).where(Ride.user_id == user_id, Ride.status.in_(ACTIVE_RIDE_STATUSES))
+            select(Ride)
+            .where(Ride.user_id == user_id, Ride.status.in_(ACTIVE_RIDE_STATUSES))
+            .order_by(Ride.created_at.desc())
+            .limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_active_for_driver(self, driver_id: uuid.UUID) -> Optional[Ride]:
         result = await self.db.execute(
-            select(Ride).where(
+            select(Ride)
+            .where(
                 Ride.driver_id == driver_id,
                 Ride.status.in_(DRIVER_ACTIVE_RIDE_STATUSES),
             )
+            .order_by(Ride.created_at.desc())
+            .limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
+
+    async def cancel_orphaned_search_rides(self, user_id: uuid.UUID) -> list[uuid.UUID]:
+        """Cancel stale driver-search rides so a new booking can proceed."""
+        from datetime import datetime, timezone
+
+        from app.core.constants import RideStatus
+
+        result = await self.db.execute(
+            select(Ride).where(
+                Ride.user_id == user_id,
+                Ride.status.in_(
+                    (RideStatus.REQUESTED.value, RideStatus.SEARCHING_DRIVER.value)
+                ),
+            )
+        )
+        rides = list(result.scalars().all())
+        now = datetime.now(timezone.utc)
+        cancelled_ids: list[uuid.UUID] = []
+        for ride in rides:
+            ride.status = RideStatus.CANCELLED.value
+            ride.cancelled_at = now
+            ride.cancelled_by = "USER"
+            ride.cancellation_reason = "Superseded by new booking"
+            await self.update(ride)
+            cancelled_ids.append(ride.id)
+        return cancelled_ids
 
     async def list_for_user(
         self,

@@ -44,7 +44,7 @@ export default function AmbulanceLandingPage() {
           </button>
         </div>
 
-        <h3 className="mb-4 font-heading text-lg font-bold text-foreground">Why WaveGo Emergency?</h3>
+        <h3 className="mb-4 font-heading text-lg font-bold text-foreground">Why Fast Bull Emergency?</h3>
         
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="rounded-[20px] border border-border bg-white p-4 shadow-sm flex flex-col gap-3">

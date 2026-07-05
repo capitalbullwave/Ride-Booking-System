@@ -320,7 +320,7 @@ class _InfoChipRow extends StatelessWidget {
     final chips = [
       ('Learn to upload', Icons.badge_outlined),
       ('Questions', Icons.chat_bubble_outline_rounded),
-      ('Why WaveGo', Icons.waves_rounded),
+      ('Why Fast Bull', Icons.waves_rounded),
       ('Earnings', Icons.account_balance_wallet_outlined),
       ('Timings', Icons.schedule_rounded),
     ];

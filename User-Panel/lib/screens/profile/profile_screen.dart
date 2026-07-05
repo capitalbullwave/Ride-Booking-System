@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/models/membership_models.dart';
 import 'package:wavego_user/providers/profile_display_provider.dart';
 import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
+import 'package:wavego_user/services/membership_service.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -21,6 +23,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       refreshUserProfile(ref);
+      ref.invalidate(studentPassProvider);
+      refreshActiveMembershipPlan(ref);
     });
   }
 
@@ -36,13 +40,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       route: RouteNames.profileSavedPlaces,
     ),
     _ProfileMenuItem(
+      icon: Icons.workspace_premium_outlined,
+      label: 'Subscriptions',
+      route: RouteNames.profileSubscription,
+    ),
+    _ProfileMenuItem(
+      icon: Icons.school_outlined,
+      label: 'Student Pass',
+      route: RouteNames.profileStudentPass,
+    ),
+    _ProfileMenuItem(
       icon: Icons.help_outline,
       label: 'Help & Support',
       route: RouteNames.profileHelp,
     ),
     _ProfileMenuItem(
       icon: Icons.info_outline,
-      label: 'About WaveGo',
+      label: 'About Fast Bull',
       route: RouteNames.profileAbout,
     ),
   ];
@@ -50,6 +64,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final labelAsync = ref.watch(resolvedProfileLabelProvider);
+    final activePlanAsync = ref.watch(resolvedActiveMembershipPlanProvider);
+    final studentPassAsync = ref.watch(studentPassProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -166,10 +182,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              _SubscriptionSection(
+                plan: activePlanAsync.valueOrNull,
+                onOpenSubscription: () async {
+                  final updated = await context.push<bool>(RouteNames.profileSubscription);
+                  if (updated == true) {
+                    await refreshActiveMembershipPlan(ref);
+                  }
+                },
+              ),
+              if (studentPassAsync.valueOrNull != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _StudentPassStatusChip(application: studentPassAsync.value!),
+                ),
+              const SizedBox(height: 16),
               ..._menuItems.map(
                 (item) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: _MenuTile(item: item),
+                  child: _MenuTile(
+                    item: item,
+                    onTap: item.route == RouteNames.profileSubscription
+                        ? () async {
+                            final updated =
+                                await context.push<bool>(RouteNames.profileSubscription);
+                            if (updated == true) {
+                              await refreshActiveMembershipPlan(ref);
+                            }
+                          }
+                        : null,
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -213,6 +255,133 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
+class _SubscriptionSection extends StatelessWidget {
+  const _SubscriptionSection({
+    required this.plan,
+    required this.onOpenSubscription,
+  });
+
+  final SubscriptionPlanModel? plan;
+  final Future<void> Function() onOpenSubscription;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFree = plan == null || plan!.slug == 'free';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpenSubscription,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.18),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isFree ? 'Upgrade to Fast Bull Plus' : '${plan!.name} Member',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isFree
+                            ? 'Priority rides, ride discounts & more'
+                            : plan!.benefits.isNotEmpty
+                                ? plan!.benefits.first
+                                : 'Member benefits active',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentPassStatusChip extends StatelessWidget {
+  const _StudentPassStatusChip({required this.application});
+
+  final StudentPassApplication application;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (application.status) {
+      'approved' => ('Student Pass verified • 20% off', AppColors.success),
+      'rejected' => ('Student Pass rejected', AppColors.error),
+      _ => ('Student Pass pending verification', AppColors.warning),
+    };
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: InkWell(
+        onTap: () => context.push(RouteNames.profileStudentPass),
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.school_outlined, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: color)),
+              ),
+              const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileMenuItem {
   const _ProfileMenuItem({
     required this.icon,
@@ -226,9 +395,13 @@ class _ProfileMenuItem {
 }
 
 class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.item});
+  const _MenuTile({
+    required this.item,
+    this.onTap,
+  });
 
   final _ProfileMenuItem item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -236,7 +409,7 @@ class _MenuTile extends StatelessWidget {
       color: Colors.white,
       borderRadius: BorderRadius.circular(AppRadius.card),
       child: InkWell(
-        onTap: () => context.push(item.route),
+        onTap: onTap ?? () => context.push(item.route),
         borderRadius: BorderRadius.circular(AppRadius.card),
         child: Container(
           padding: const EdgeInsets.all(16),

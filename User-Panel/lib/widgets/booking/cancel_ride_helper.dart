@@ -51,6 +51,7 @@ Future<bool> cancelRideWithConfirmation({
     await ref.read(rideBookingServiceProvider).cancelRide(rideId);
     ref.read(tripBookingProvider.notifier).clearActiveRideId();
     ref.invalidate(activeRideProvider);
+    await ref.refresh(activeRideProvider.future);
 
     if (context.mounted) {
       context.showSnackBar('Ride cancelled');

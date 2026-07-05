@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "WaveGo — iPhone Simulator",
+      "name": "Fast Bull — iPhone Simulator",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "name": "WaveGo — macOS Phone Frame (fallback)",
+      "name": "Fast Bull — macOS Phone Frame (fallback)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",

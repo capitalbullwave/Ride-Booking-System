@@ -26,5 +26,5 @@ export const ROUTES = {
   settings: "/settings",
 } as const;
 
-export const APP_NAME = "WaveGo";
+export const APP_NAME = "Fast Bull";
 export const APP_TAGLINE = "Rides & ambulance mobility";

@@ -188,6 +188,15 @@ class DriverEarningsResponse(BaseModel):
     net_earnings: float
 
 
+class DriverDashboardResponse(BaseModel):
+    today_earnings: float
+    wallet_balance: float
+    completed_trips: int
+    today_trips: int
+    rating: float
+    acceptance_rate: float
+
+
 class DriverBankCreate(BaseModel):
     account_holder_name: str = Field(..., min_length=2, max_length=150)
     account_number: str = Field(..., min_length=9, max_length=30)

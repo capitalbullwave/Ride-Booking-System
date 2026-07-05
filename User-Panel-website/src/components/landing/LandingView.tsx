@@ -284,7 +284,7 @@ export function LandingView() {
           <div className="relative grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14">
             <div className="flex flex-col gap-5 text-white">
               <p className="inline-flex w-fit rounded-full bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-secondary">
-                Drive with WaveGo
+                Drive with Fast Bull
               </p>
               <h2 className="font-heading text-3xl font-bold leading-tight sm:text-4xl">
                 Earn on your terms.
@@ -322,7 +322,7 @@ export function LandingView() {
               <div className="relative aspect-[5/4] overflow-hidden rounded-2xl shadow-2xl ring-2 ring-white/15">
                 <Image
                   src={landingCaptainImage}
-                  alt="WaveGo captain partner"
+                  alt="Fast Bull captain partner"
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 40vw"
@@ -348,7 +348,7 @@ export function LandingView() {
                   Download
                 </p>
                 <h2 className="mt-2 font-heading text-2xl font-bold sm:text-3xl">
-                  Get the WaveGo app
+                  Get the Fast Bull app
                 </h2>
                 <p className="mt-3 max-w-md text-sm leading-relaxed text-white/80 sm:text-base">
                   Book rides, track trips, send parcels, and access emergency SOS — everything
@@ -396,7 +396,7 @@ export function LandingView() {
                     Services
                   </Link>
                   <Link href="#why-wavego" className="transition-colors hover:text-primary">
-                    Why WaveGo
+                    Why Fast Bull
                   </Link>
                   <Link href="#captains" className="transition-colors hover:text-primary">
                     Become a captain
@@ -439,7 +439,7 @@ export function LandingView() {
             </div>
 
             <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 text-sm text-muted-foreground sm:flex-row">
-              <p>© 2026 WaveGo Technologies. All rights reserved.</p>
+              <p>© 2026 Fast Bull Technologies. All rights reserved.</p>
               <p className="text-xs">Made for riders, captains &amp; cities across India.</p>
             </div>
           </div>

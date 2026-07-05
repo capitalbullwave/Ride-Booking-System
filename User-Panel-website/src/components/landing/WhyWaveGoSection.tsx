@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 const featureMeta = [
   { icon: Zap, accent: "bg-primary", bar: "bg-primary" },
   { icon: Tag, accent: "bg-secondary", bar: "bg-secondary" },
-  { icon: MapPin, accent: "bg-[#6086A8]", bar: "bg-[#6086A8]" },
+  { icon: MapPin, accent: "bg-[#7346f4]", bar: "bg-[#7346f4]" },
 ] as const;
 
 const AUTO_MS = 6000;
@@ -44,14 +44,14 @@ export function WhyWaveGoSection() {
     >
       <div className="mx-auto max-w-6xl">
         <p className="text-base font-bold uppercase tracking-[0.24em] text-primary sm:text-lg">
-          Why WaveGo
+          Why Fast Bull
         </p>
         <div className="mt-4 h-px w-full bg-border" />
 
         {/* Header — left aligned, editorial */}
         <div className="mt-10 mb-12 max-w-2xl lg:mb-16">
           <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-            The WaveGo difference
+            The Fast Bull difference
           </h2>
           <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Premium experience inspired by global standards — with a distinctly Indian touch.

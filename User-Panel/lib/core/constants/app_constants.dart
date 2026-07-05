@@ -10,4 +10,5 @@ class AppConstants {
 
   static const String savedPlacesKey = 'user_saved_places_v1';
   static const String recentPlacesKey = 'user_recent_places_v1';
+  static const String subscriptionPlanKey = 'user_subscription_plan';
 }

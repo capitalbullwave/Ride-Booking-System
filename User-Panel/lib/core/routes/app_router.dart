@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
+import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/screens/ambulance/ambulance_screen.dart';
+import 'package:wavego_user/screens/auth/create_profile_screen.dart';
 import 'package:wavego_user/screens/auth/otp_verification_screen.dart';
 import 'package:wavego_user/screens/auth/phone_login_screen.dart';
 import 'package:wavego_user/screens/booking/booking_screens.dart';
@@ -13,6 +15,8 @@ import 'package:wavego_user/screens/notifications/notification_detail_screen.dar
 import 'package:wavego_user/screens/notifications/notifications_screen.dart';
 import 'package:wavego_user/screens/onboarding/onboarding_screen.dart';
 import 'package:wavego_user/screens/rental/rental_flow_screens.dart';
+import 'package:wavego_user/screens/profile/student_pass_screen.dart';
+import 'package:wavego_user/screens/profile/subscription_screen.dart';
 import 'package:wavego_user/screens/profile/profile_screen.dart';
 import 'package:wavego_user/screens/profile/profile_sub_screens.dart';
 import 'package:wavego_user/screens/profile/support_screens.dart';
@@ -29,10 +33,45 @@ final _shellNavigatorWalletKey = GlobalKey<NavigatorState>(debugLabel: 'wallet')
 final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'profile');
 
 final routerProvider = Provider<GoRouter>((ref) {
+  final authRepo = ref.watch(authRepositoryProvider);
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RouteNames.splash,
     debugLogDiagnostics: true,
+    redirect: (context, state) async {
+      final path = state.uri.path;
+
+      if (path == RouteNames.splash) return null;
+
+      const preAuthPaths = {
+        RouteNames.onboarding,
+        RouteNames.phoneLogin,
+        RouteNames.otpVerification,
+      };
+
+      final loggedIn = await authRepo.isLoggedIn();
+
+      if (!loggedIn) {
+        if (preAuthPaths.contains(path)) return null;
+        return RouteNames.phoneLogin;
+      }
+
+      if (path == RouteNames.phoneLogin || path == RouteNames.otpVerification) {
+        final needsSetup = await authRepo.needsProfileSetup();
+        return needsSetup ? RouteNames.createProfile : RouteNames.home;
+      }
+
+      if (path == RouteNames.createProfile) {
+        final needsSetup = await authRepo.needsProfileSetup();
+        return needsSetup ? null : RouteNames.home;
+      }
+
+      final needsSetup = await authRepo.needsProfileSetup();
+      if (needsSetup) return RouteNames.createProfile;
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: RouteNames.splash,
@@ -49,6 +88,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.otpVerification,
         builder: (_, __) => const OtpVerificationScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.createProfile,
+        builder: (_, __) => const CreateProfileScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) =>
@@ -178,6 +221,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.profileSubscription,
+        builder: (_, __) => const SubscriptionScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.profileStudentPass,
+        builder: (_, __) => const StudentPassScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: RouteNames.walletBalance,
         builder: (_, __) => const WalletBalanceScreen(),
       ),
@@ -226,6 +279,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: RouteNames.profileEmail,
         builder: (_, __) => const EmailSettingsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.profileEmergencyContact,
+        builder: (_, __) => const EmergencyContactSettingsScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

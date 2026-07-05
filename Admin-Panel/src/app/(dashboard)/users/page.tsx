@@ -282,6 +282,7 @@ export default function UsersPage() {
     { key: "email", header: "Email", cell: (u) => <span className="text-muted-foreground">{u.email}</span> },
     { key: "registrationDate", header: "Registered", cell: (u) => formatDate(u.registrationDate), sortable: true },
     { key: "totalRides", header: "Total Rides", cell: (u) => u.totalRides, sortable: true },
+    { key: "rating", header: "Rating", cell: (u) => <span className="font-medium">⭐ {u.rating.toFixed(1)}</span>, sortable: true },
     { key: "walletBalance", header: "Wallet", cell: (u) => formatCurrency(u.walletBalance), sortable: true },
     { key: "status", header: "Status", cell: (u) => <StatusBadge status={u.status} /> },
     {

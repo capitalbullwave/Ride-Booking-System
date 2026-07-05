@@ -64,7 +64,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     refreshUserProfile(ref);
     if (!mounted) return;
 
-    context.go(RouteNames.home);
+    final needsSetup = await authRepo.needsProfileSetup();
+    context.go(needsSetup ? RouteNames.createProfile : RouteNames.home);
   }
 
   @override

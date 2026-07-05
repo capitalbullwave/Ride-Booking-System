@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
+import 'package:wavego_user/widgets/home/ride_schedule_section.dart';
 
 class LocationCard extends StatelessWidget {
   const LocationCard({
@@ -13,6 +14,13 @@ class LocationCard extends StatelessWidget {
     required this.onDropoffTap,
     required this.onFindRide,
     this.isBookingLocked = false,
+    this.actionLabel = 'Find a ride',
+    this.dropPlaceholder = 'Where are you going?',
+    this.dropFieldLabel = 'Drop',
+    this.header,
+    this.showSchedule = false,
+    this.scheduledAt,
+    this.onScheduleChanged,
   });
 
   final String pickup;
@@ -22,6 +30,13 @@ class LocationCard extends StatelessWidget {
   final VoidCallback onDropoffTap;
   final VoidCallback onFindRide;
   final bool isBookingLocked;
+  final String actionLabel;
+  final String dropPlaceholder;
+  final String dropFieldLabel;
+  final Widget? header;
+  final bool showSchedule;
+  final DateTime? scheduledAt;
+  final ValueChanged<DateTime?>? onScheduleChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +56,10 @@ class LocationCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          if (header != null) ...[
+            header!,
+            const SizedBox(height: 16),
+          ],
           IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,9 +88,9 @@ class LocationCard extends StatelessWidget {
                       const SizedBox(height: 12),
                       _LocationRow(
                         dotColor: AppColors.error,
-                        label: 'Drop',
+                        label: dropFieldLabel,
                         labelColor: AppColors.error,
-                        value: dropoff.isEmpty ? 'Where are you going?' : dropoff,
+                        value: dropoff.isEmpty ? dropPlaceholder : dropoff,
                         isPlaceholder: dropoff.isEmpty,
                         onTap: onDropoffTap,
                       ),
@@ -101,9 +120,16 @@ class LocationCard extends StatelessWidget {
               ],
             ),
           ),
+          if (showSchedule && onScheduleChanged != null) ...[
+            const SizedBox(height: 12),
+            RideScheduleSection(
+              scheduledAt: scheduledAt,
+              onChanged: onScheduleChanged!,
+            ),
+          ],
           const SizedBox(height: 16),
           AppButton(
-            label: isBookingLocked ? 'Active ride in progress' : 'Find a ride',
+            label: isBookingLocked ? 'Active ride in progress' : actionLabel,
             onPressed: isBookingLocked ? null : onFindRide,
             variant: isBookingLocked ? AppButtonVariant.outline : AppButtonVariant.primary,
           ),

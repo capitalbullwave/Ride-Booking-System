@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Boolean, CheckConstraint, Float, ForeignKey, Index, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import WithdrawalStatus
@@ -60,6 +60,23 @@ class WalletTransaction(UUIDMixin, TimestampMixin, Base):
     reference_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     wallet: Mapped["Wallet"] = relationship("Wallet", back_populates="transactions")
+
+
+class WalletTopUpPayment(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "wallet_topup_payments"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="INR", nullable=False)
+    razorpay_order_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False, index=True)
+    gateway_response: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    wallet_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("wallet_transactions.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 class WithdrawalRequest(UUIDMixin, TimestampMixin, Base):

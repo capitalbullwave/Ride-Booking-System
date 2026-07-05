@@ -12,13 +12,11 @@ import {
   RIDE_VEHICLE_OPTIONS,
 } from "@/data/ride-options";
 import { getVehicleCategories } from "@/lib/home-api";
-import { estimateFare } from "@/lib/ride-api";
+import { estimateRideFares, getRideDirections } from "@/lib/ride-api";
 import { buildLocationSearchUrl } from "@/lib/location-search";
 import { buildBookUrl, buildSearchingUrl, formatFare } from "@/lib/ride-booking";
 import {
   categoryVehicleId,
-  estimateDistanceKm,
-  estimateDurationMin,
   vehicleImageForCategory,
 } from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
@@ -32,6 +30,7 @@ interface BookableOption {
   name: string;
   eta: string;
   price: number;
+  originalPrice?: number | null;
   image: string;
 }
 
@@ -49,6 +48,7 @@ export function RideBookingView() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [payment] = useState(PAYMENT_METHODS[0]);
+  const [memberDiscountPercent, setMemberDiscountPercent] = useState(0);
 
   useEffect(() => {
     if (!pickup || !dropoff) {
@@ -58,21 +58,33 @@ export function RideBookingView() {
 
   useEffect(() => {
     async function load() {
+      if (!pickup || !dropoff) return;
+
       try {
         const categories = await getVehicleCategories("ride");
+        const directions = await getRideDirections(pickup, dropoff);
+        const fareResult = await estimateRideFares({
+          pickup_lat: directions.pickup_lat,
+          pickup_lng: directions.pickup_lng,
+          dropoff_lat: directions.dropoff_lat,
+          dropoff_lng: directions.dropoff_lng,
+        });
+
+        setMemberDiscountPercent(fareResult.discount_percent ?? 0);
+
         const apiOptions: BookableOption[] = [];
 
         for (const [index, category] of categories.entries()) {
-          let price = category.base_fare + category.per_km_rate * estimateDistanceKm();
-          try {
-            const estimate = await estimateFare({
-              vehicle_category_id: category.id,
-              distance_km: estimateDistanceKm(),
-              duration_min: estimateDurationMin(),
-            });
-            price = estimate.estimated_fare;
-          } catch {
-            // Use fallback price from category rates
+          const quote = fareResult.quotes[category.id];
+          let price = category.base_fare + category.per_km_rate * directions.distance_km;
+          let originalPrice: number | null = null;
+
+          if (quote) {
+            price = quote.estimated_fare;
+            originalPrice = quote.original_fare ?? null;
+          } else if ((fareResult.discount_percent ?? 0) > 0) {
+            originalPrice = price;
+            price = Math.round(price * (1 - (fareResult.discount_percent ?? 0) / 100));
           }
 
           const mappedId = categoryVehicleId(category);
@@ -83,6 +95,7 @@ export function RideBookingView() {
             name: category.name,
             eta: staticMeta?.eta ?? `${4 + index} mins`,
             price,
+            originalPrice,
             image: vehicleImageForCategory(category),
           });
         }
@@ -113,7 +126,7 @@ export function RideBookingView() {
     }
 
     void load();
-  }, []);
+  }, [pickup, dropoff, categoryParam, vehicleParam]);
 
   const rideOptions: BookableOption[] = useMemo(
     () =>
@@ -207,6 +220,11 @@ export function RideBookingView() {
             </span>
           </button>
         </div>
+        {memberDiscountPercent > 0 ? (
+          <p className="mt-3 rounded-xl bg-primary/10 px-3 py-2 text-sm font-semibold text-primary">
+            {Math.round(memberDiscountPercent)}% member discount applied
+          </p>
+        ) : null}
       </div>
 
       <div className="shrink-0 bg-card px-4 py-3">
@@ -261,9 +279,16 @@ export function RideBookingView() {
                   {option.name}
                   <span className="text-muted-foreground"> • {option.eta}</span>
                 </p>
-                <p className="shrink-0 text-base font-semibold text-foreground">
-                  {formatFare(option.price)}
-                </p>
+                <div className="shrink-0 text-right">
+                  {option.originalPrice != null && option.originalPrice > option.price ? (
+                    <p className="text-sm text-muted-foreground line-through">
+                      {formatFare(option.originalPrice)}
+                    </p>
+                  ) : null}
+                  <p className="text-base font-semibold text-foreground">
+                    {formatFare(option.price)}
+                  </p>
+                </div>
               </button>
             );
           })

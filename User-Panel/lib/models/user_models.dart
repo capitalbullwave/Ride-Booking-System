@@ -4,6 +4,8 @@ class UserProfile {
     required this.name,
     required this.phone,
     this.email,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
     this.rating = 0,
     this.totalRides = 0,
     this.initial = '?',
@@ -13,6 +15,8 @@ class UserProfile {
   final String name;
   final String phone;
   final String? email;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
   final double rating;
   final int totalRides;
   final String initial;
@@ -44,6 +48,8 @@ class UserProfile {
       name: name,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
+      emergencyContactName: json['emergency_contact_name'] as String?,
+      emergencyContactPhone: json['emergency_contact_phone'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       totalRides: (json['total_rides'] as num?)?.toInt() ?? 0,
       initial: json['initial'] as String? ??
@@ -56,6 +62,8 @@ class UserProfile {
         'name': name,
         'phone': phone,
         'email': email,
+        'emergency_contact_name': emergencyContactName,
+        'emergency_contact_phone': emergencyContactPhone,
         'rating': rating,
         'total_rides': totalRides,
         'initial': initial,
@@ -258,6 +266,7 @@ class AppNotification {
     required this.message,
     required this.time,
     required this.read,
+    this.data,
   });
 
   final String id;
@@ -266,14 +275,19 @@ class AppNotification {
   final String message;
   final String time;
   final bool read;
+  final Map<String, dynamic>? data;
+
+  bool get isRideAccepted =>
+      type == 'ride' && data?['event'] == 'ride_accepted';
 
   factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
         id: json['id'] as String? ?? '',
         type: json['type'] as String? ?? 'system',
         title: json['title'] as String? ?? '',
-        message: json['message'] as String? ?? '',
+        message: json['message'] as String? ?? json['body'] as String? ?? '',
         time: json['time'] as String? ?? '',
-        read: json['read'] as bool? ?? true,
+        read: json['read'] as bool? ?? json['is_read'] as bool? ?? true,
+        data: json['data'] as Map<String, dynamic>?,
       );
 }
 
@@ -311,6 +325,17 @@ class UserActiveRide {
     required this.dropoffAddress,
     required this.status,
     this.fareEstimate,
+    this.driverName,
+    this.driverPhone,
+    this.driverRating,
+    this.vehicleNumber,
+    this.startCode,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropoffLat,
+    this.dropoffLng,
+    this.driverLat,
+    this.driverLng,
   });
 
   final String id;
@@ -318,14 +343,92 @@ class UserActiveRide {
   final String dropoffAddress;
   final String status;
   final double? fareEstimate;
+  final String? driverName;
+  final String? driverPhone;
+  final double? driverRating;
+  final String? vehicleNumber;
+  final String? startCode;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
+  final double? driverLat;
+  final double? driverLng;
 
-  factory UserActiveRide.fromJson(Map<String, dynamic> json) => UserActiveRide(
-        id: json['id']?.toString() ?? '',
-        pickupAddress: json['pickup_address'] as String? ?? '',
-        dropoffAddress: json['dropoff_address'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        fareEstimate: (json['fare_estimate'] as num?)?.toDouble(),
-      );
+  factory UserActiveRide.fromJson(Map<String, dynamic> json) {
+    final driver = json['driver'] as Map<String, dynamic>?;
+    return UserActiveRide(
+      id: json['id']?.toString() ?? '',
+      pickupAddress: json['pickup_address'] as String? ?? '',
+      dropoffAddress: json['dropoff_address'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      fareEstimate: (json['fare_estimate'] as num?)?.toDouble(),
+      driverName: driver?['name'] as String?,
+      driverPhone: driver?['phone'] as String?,
+      driverRating: (driver?['rating'] as num?)?.toDouble(),
+      vehicleNumber: json['vehicle_number'] as String?,
+      startCode: json['start_code'] as String?,
+      pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
+      pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
+      dropoffLat: (json['dropoff_lat'] as num?)?.toDouble(),
+      dropoffLng: (json['dropoff_lng'] as num?)?.toDouble(),
+      driverLat: (json['driver_lat'] as num?)?.toDouble(),
+      driverLng: (json['driver_lng'] as num?)?.toDouble(),
+    );
+  }
+
+  UserActiveRide copyWithDriverLocation({double? lat, double? lng}) {
+    return UserActiveRide(
+      id: id,
+      pickupAddress: pickupAddress,
+      dropoffAddress: dropoffAddress,
+      status: status,
+      fareEstimate: fareEstimate,
+      driverName: driverName,
+      driverPhone: driverPhone,
+      driverRating: driverRating,
+      vehicleNumber: vehicleNumber,
+      startCode: startCode,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      dropoffLat: dropoffLat,
+      dropoffLng: dropoffLng,
+      driverLat: lat ?? driverLat,
+      driverLng: lng ?? driverLng,
+    );
+  }
+
+  UserActiveRide copyWith({String? status, String? startCode}) {
+    return UserActiveRide(
+      id: id,
+      pickupAddress: pickupAddress,
+      dropoffAddress: dropoffAddress,
+      status: status ?? this.status,
+      fareEstimate: fareEstimate,
+      driverName: driverName,
+      driverPhone: driverPhone,
+      driverRating: driverRating,
+      vehicleNumber: vehicleNumber,
+      startCode: startCode ?? this.startCode,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      dropoffLat: dropoffLat,
+      dropoffLng: dropoffLng,
+      driverLat: driverLat,
+      driverLng: driverLng,
+    );
+  }
+
+  bool get isInProgress {
+    final normalized = status.toUpperCase();
+    return normalized == 'OTP_VERIFIED' ||
+        normalized == 'STARTED' ||
+        normalized == 'IN_PROGRESS';
+  }
+
+  bool get isCompleted => status.toUpperCase() == 'COMPLETED';
+
+  bool get hasDriver => driverName != null && driverName!.isNotEmpty;
 
   bool get isSearching {
     final normalized = status.toUpperCase();

@@ -10,6 +10,9 @@ import 'package:wavego_driver/core/utils/date_formatter.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
+import 'package:wavego_driver/core/utils/ride_notification_utils.dart';
+import 'package:wavego_driver/models/notification_model.dart';
+import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
@@ -22,6 +25,7 @@ import 'package:wavego_driver/widgets/common/online_toggle.dart';
 import 'package:wavego_driver/widgets/common/shimmer_loading.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
 import 'package:wavego_driver/widgets/common/stat_card.dart';
+import 'package:wavego_driver/widgets/ride/ride_request_bottom_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -33,6 +37,17 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _navIndex = 0;
   Timer? _ridePollTimer;
+  Timer? _notificationPollTimer;
+  Timer? _activeRideCheckTimer;
+  final Set<String> _presentedRideIds = {};
+  bool _showingRideSheet = false;
+
+  bool get _isOnRideRequestRoute {
+    if (!mounted) return false;
+    final location = GoRouter.of(context).state.matchedLocation;
+    return location == RouteNames.rideRequest ||
+        location.startsWith('${RouteNames.rideRequest}/');
+  }
 
   @override
   void initState() {
@@ -54,6 +69,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (ref.read(dashboardViewModelProvider).isOnline) {
         _pollForRides();
         _startRidePolling();
+        _pollNotifications();
+        _startNotificationPolling();
+        _startActiveRideCheck();
       }
     });
   }
@@ -61,7 +79,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void dispose() {
     _stopRidePolling();
+    _stopNotificationPolling();
+    _activeRideCheckTimer?.cancel();
     super.dispose();
+  }
+
+  void _startActiveRideCheck() {
+    _activeRideCheckTimer?.cancel();
+    _activeRideCheckTimer =
+        Timer.periodic(const Duration(seconds: 4), (_) => _checkActiveRideRedirect());
+  }
+
+  Future<void> _checkActiveRideRedirect() async {
+    if (!mounted) return;
+    if (ref.read(rideViewModelProvider).activeRide != null) {
+      if (GoRouter.of(context).state.matchedLocation != RouteNames.activeTrip) {
+        context.go(RouteNames.activeTrip);
+      }
+      return;
+    }
+    final ride = await ref.read(rideViewModelProvider.notifier).restoreActiveRide();
+    if (ride != null && mounted) {
+      context.go(RouteNames.activeTrip);
+    }
   }
 
   Future<void> _loadNotificationBadge() async {
@@ -82,8 +122,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (next && mounted) {
         _pollForRides();
         _startRidePolling();
+        _pollNotifications();
+        _startNotificationPolling();
+        _startActiveRideCheck();
       } else {
         _stopRidePolling();
+        _stopNotificationPolling();
+        _activeRideCheckTimer?.cancel();
+      }
+    });
+
+    ref.listen(rideViewModelProvider.select((s) => s.activeRide), (prev, next) {
+      if (next != null && mounted) {
+        context.go(RouteNames.activeTrip);
       }
     });
 
@@ -100,7 +151,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
-        onDestinationSelected: (index) => setState(() => _navIndex = index),
+        onDestinationSelected: (index) {
+          setState(() => _navIndex = index);
+          if (index == 4) {
+            ref.read(dashboardViewModelProvider.notifier).loadDashboard();
+          }
+        },
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -145,7 +201,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _startRidePolling() {
     _ridePollTimer?.cancel();
     _ridePollTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) => _pollForRides());
+        Timer.periodic(const Duration(seconds: 3), (_) => _pollForRides());
   }
 
   void _stopRidePolling() {
@@ -153,29 +209,85 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     _ridePollTimer = null;
   }
 
-  Future<void> _pollForRides() async {
+  void _startNotificationPolling() {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer =
+        Timer.periodic(const Duration(seconds: 4), (_) => _pollNotifications());
+  }
+
+  void _stopNotificationPolling() {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer = null;
+  }
+
+  Future<void> _pollNotifications() async {
     if (!ref.read(dashboardViewModelProvider).isOnline) return;
     if (ref.read(rideViewModelProvider).activeRide != null) return;
 
-    final hadRequest = ref.read(rideViewModelProvider).incomingRequest != null;
-    await ref.read(rideViewModelProvider.notifier).pollForRideRequest();
-    final rideState = ref.read(rideViewModelProvider);
-    final request = rideState.incomingRequest;
-    if (request == null || !mounted || hadRequest) return;
+    try {
+      final items =
+          await ref.read(notificationRepositoryProvider).getNotifications();
+      final unread = items.where((n) => !n.read).length;
+      ref.read(notificationUnreadCountProvider.notifier).state = unread;
+
+      if (_showingRideSheet || _isOnRideRequestRoute) return;
+      if (ref.read(rideViewModelProvider).incomingRequest != null) return;
+
+      for (final n in items) {
+        if (!isActionableRideRequestNotification(n)) continue;
+        final id = rideIdFromNotification(n);
+        if (id == null || _presentedRideIds.contains(id)) continue;
+        if (ref.read(rideViewModelProvider.notifier).isDismissed(id)) continue;
+
+        final request = rideRequestFromNotification(n);
+        if (request == null) continue;
+        await _presentRideRequestOnce(request);
+        break;
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _presentRideRequestOnce(RideRequest request) async {
+    if (!mounted) return;
+    if (_presentedRideIds.contains(request.id)) return;
+    if (_showingRideSheet) return;
+    if (ref.read(rideViewModelProvider.notifier).isDismissed(request.id)) return;
+
+    _presentedRideIds.add(request.id);
+    ref.read(rideViewModelProvider.notifier).setIncomingRequest(request);
 
     if (ref.read(autoAcceptProvider)) {
-      final ride = await ref
-          .read(rideViewModelProvider.notifier)
-          .acceptRide(request.id);
-      if (ride != null && mounted) {
-        context.showSnackBar('Ride auto-accepted');
-        context.go(RouteNames.activeTrip);
+      try {
+        ref.read(rideViewModelProvider.notifier).setIncomingRequest(request);
+        ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(request);
+        if (mounted) context.go(RouteNames.activeTrip);
+        await ref.read(rideViewModelProvider.notifier).acceptRide(request.id);
+      } catch (e) {
+        if (mounted) context.showSnackBar(e.userMessage, isError: true);
       }
       return;
     }
 
-    context.showSnackBar('New ride request nearby!');
-    context.push(RouteNames.rideRequest);
+    _showingRideSheet = true;
+    await showRideRequestBottomSheet(
+      context: context,
+      ref: ref,
+      request: request,
+    );
+    _showingRideSheet = false;
+  }
+
+  Future<void> _pollForRides() async {
+    if (!ref.read(dashboardViewModelProvider).isOnline) return;
+    if (ref.read(rideViewModelProvider).activeRide != null) return;
+    if (_showingRideSheet || _isOnRideRequestRoute) return;
+
+    await ref.read(rideViewModelProvider.notifier).pollForRideRequest();
+    final request = ref.read(rideViewModelProvider).incomingRequest;
+    if (request == null || !mounted) return;
+    if (_presentedRideIds.contains(request.id)) return;
+
+    await _presentRideRequestOnce(request);
   }
 }
 
@@ -359,7 +471,7 @@ class _HomeTab extends ConsumerWidget {
                             Expanded(
                               child: StatCard(
                                 title: 'Rating',
-                                value: '${data.rating} ⭐',
+                                value: data.rating.toStringAsFixed(1),
                                 icon: Icons.star,
                                 color: AppColors.warning,
                               ),

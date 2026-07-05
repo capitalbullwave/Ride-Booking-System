@@ -4,6 +4,7 @@ import 'dart:io' show HttpClient;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/dio_client.dart';
+import 'package:wavego_user/models/fare_models.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/services/base_api_service.dart';
 
@@ -146,7 +147,7 @@ class PlacesService extends BaseApiService {
         {'lat': '$lat', 'lon': '$lng', 'format': 'json', 'addressdetails': '1'},
       );
       final request = await client.getUrl(uri);
-      request.headers.set('User-Agent', 'WaveGo-User/1.0 (support@ridebook.com)');
+      request.headers.set('User-Agent', 'Fast Bull-User/1.0 (support@ridebook.com)');
       final response = await request.close();
       if (response.statusCode != 200) return null;
 
@@ -237,6 +238,47 @@ class PlacesService extends BaseApiService {
 class RideBookingService extends BaseApiService {
   RideBookingService(super.dio);
 
+  Future<RideFareEstimateResult> estimateRide({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+  }) async {
+    if (useMock) {
+      return const RideFareEstimateResult(
+        discountPercent: 0,
+        quotes: {},
+      );
+    }
+
+    final data = await post<Map<String, dynamic>>(
+      ApiEndpoints.rideEstimate,
+      data: {
+        'pickup_lat': pickupLat,
+        'pickup_lng': pickupLng,
+        'dropoff_lat': dropoffLat,
+        'dropoff_lng': dropoffLng,
+      },
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+
+    final vehicleTypes = data['vehicle_types'] as List<dynamic>? ?? [];
+    final quotes = <String, VehicleFareQuote>{};
+    for (final item in vehicleTypes) {
+      if (item is Map<String, dynamic>) {
+        final quote = VehicleFareQuote.fromJson(item);
+        if (quote.vehicleTypeId.isNotEmpty) {
+          quotes[quote.vehicleTypeId] = quote;
+        }
+      }
+    }
+
+    return RideFareEstimateResult(
+      discountPercent: (data['discount_percent'] as num?)?.toDouble() ?? 0,
+      quotes: quotes,
+    );
+  }
+
   Future<Map<String, dynamic>> bookRide({
     required String pickupAddress,
     required String dropoffAddress,
@@ -247,6 +289,7 @@ class RideBookingService extends BaseApiService {
     String paymentMethod = 'CASH',
     String? vehicleCategoryId,
     double? rentalHours,
+    DateTime? scheduledAt,
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -271,6 +314,7 @@ class RideBookingService extends BaseApiService {
         'payment_method': paymentMethod,
         if (vehicleCategoryId != null) 'vehicle_category_id': vehicleCategoryId,
         if (rentalHours != null) 'rental_hours': rentalHours,
+        if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );
@@ -302,6 +346,25 @@ class RideBookingService extends BaseApiService {
       data: {
         'ride_id': rideId,
         'reason': reason,
+      },
+    );
+  }
+
+  Future<void> rateRide(
+    String rideId, {
+    required int rating,
+    String? comment,
+  }) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      return;
+    }
+
+    await post(
+      ApiEndpoints.rateRide(rideId),
+      data: {
+        'rating': rating,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
       },
     );
   }

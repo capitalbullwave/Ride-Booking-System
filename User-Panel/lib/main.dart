@@ -46,7 +46,7 @@ class WaveGoUserApp extends ConsumerWidget {
     final isDark = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'WaveGo',
+      title: 'Fast Bull',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

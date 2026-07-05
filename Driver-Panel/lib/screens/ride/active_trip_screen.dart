@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -7,10 +10,12 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/navigation_launcher.dart';
+import 'package:wavego_driver/models/payment_completion_data.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
+import 'package:wavego_driver/widgets/ride/trip_map_view.dart';
 
 class ActiveTripScreen extends ConsumerStatefulWidget {
   const ActiveTripScreen({super.key});
@@ -21,10 +26,19 @@ class ActiveTripScreen extends ConsumerStatefulWidget {
 
 class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   static const _statusFlow = [
-    ('heading_to_pickup', 'Heading To Pickup', 'Arrived'),
-    ('arrived', 'Arrived', 'Start Ride'),
+    ('heading_to_pickup', 'Heading To Pickup', 'Arrived at pickup'),
+    ('arrived', 'At Pickup — enter start code', 'Start ride'),
     ('started', 'Ride Started', 'Complete Ride'),
   ];
+
+  final _otpController = TextEditingController();
+  final _sheetController = DraggableScrollableController();
+  String? _otpError;
+  bool _otpSubmitting = false;
+  bool _statusUpdating = false;
+  bool _loading = true;
+  bool _cancelHandled = false;
+  Timer? _statusPollTimer;
 
   LatLng _navTarget(ActiveRide ride) {
     if (ride.status == 'started') {
@@ -75,7 +89,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     }
     final launched = await NavigationLauncher.sendSms(
       phone,
-      body: 'Hi ${ride.passengerName}, I am your WaveGo Captain.',
+      body: 'Hi ${ride.passengerName}, I am your Fast Bull Captain.',
     );
     if (!launched && mounted) {
       context.showSnackBar('Could not open messaging app', isError: true);
@@ -83,62 +97,132 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final ride = ref.watch(rideViewModelProvider).activeRide;
-    if (ride == null) {
-      return const Scaffold(body: Center(child: Text('No active ride')));
+  void initState() {
+    super.initState();
+    if (ref.read(rideViewModelProvider).activeRide != null) {
+      _loading = false;
+    }
+    Future.microtask(() async {
+      if (ref.read(rideViewModelProvider).activeRide == null) {
+        await ref.read(rideViewModelProvider.notifier).restoreActiveRide();
+      }
+      if (!mounted) return;
+      if (ref.read(rideViewModelProvider).activeRide == null) {
+        context.go(RouteNames.dashboard);
+        return;
+      }
+      setState(() => _loading = false);
+      _startStatusPolling();
+    });
+  }
+
+  void _startStatusPolling() {
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _pollRideStatus();
+    });
+  }
+
+  Future<void> _pollRideStatus() async {
+    if (_cancelHandled || !mounted) return;
+    final current = ref.read(rideViewModelProvider).activeRide;
+    if (current == null) return;
+    if (current.status != 'heading_to_pickup' && current.status != 'arrived') {
+      return;
     }
 
-    final pickup = LatLng(ride.pickupLat, ride.pickupLng);
-    final destination = LatLng(ride.destinationLat, ride.destinationLng);
+    final ride =
+        await ref.read(rideViewModelProvider.notifier).refreshActiveRideStatus();
+    if (!mounted || _cancelHandled) return;
+    if (ride == null) {
+      await _handleRideCancelled();
+    }
+  }
+
+  Future<void> _handleRideCancelled() async {
+    if (_cancelHandled || !mounted) return;
+    _cancelHandled = true;
+    _statusPollTimer?.cancel();
+    ref.read(rideViewModelProvider.notifier).clearRide();
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.cancel_outlined, color: AppColors.error, size: 48),
+        title: const Text('Ride cancelled'),
+        content: const Text(
+          'The passenger cancelled this ride. You can accept new requests from the home screen.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (mounted) context.go(RouteNames.dashboard);
+  }
+
+  void _expandSheetForOtp() {
+    if (!_sheetController.isAttached) return;
+    _sheetController.animateTo(
+      0.68,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _statusPollTimer?.cancel();
+    _sheetController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen(rideViewModelProvider.select((s) => s.activeRide?.status), (prev, next) {
+      if (next == 'arrived' && prev != 'arrived') {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _expandSheetForOtp());
+      }
+    });
+
+    if (_loading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final ride = ref.watch(rideViewModelProvider).activeRide;
+    if (ride == null) {
+      return const Scaffold(
+        body: Center(child: Text('No active ride')),
+      );
+    }
+
     final currentAction = _statusFlow.firstWhere(
       (s) => s.$1 == ride.status,
       orElse: () => _statusFlow.last,
     );
     final sheetColor = Theme.of(context).colorScheme.surface;
+    final primaryBusy = _statusUpdating || _otpSubmitting;
+    final isStartingRide = ref.watch(rideViewModelProvider).isAccepting;
 
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(target: pickup, zoom: 14),
-            onMapCreated: (_) {},
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            markers: {
-              Marker(
-                markerId: const MarkerId('pickup'),
-                position: pickup,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueGreen,
-                ),
-                infoWindow: const InfoWindow(title: 'Pickup'),
-              ),
-              Marker(
-                markerId: const MarkerId('destination'),
-                position: destination,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueRed,
-                ),
-                infoWindow: const InfoWindow(title: 'Destination'),
-              ),
-            },
-            polylines: {
-              Polyline(
-                polylineId: const PolylineId('route'),
-                points: [pickup, destination],
-                color: AppColors.primary,
-                width: 4,
-              ),
-            },
-          ),
+          TripMapView(ride: ride),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
                   IconButton.filled(
-                    onPressed: () => context.pop(),
+                    onPressed: () => context.go(RouteNames.dashboard),
                     icon: const Icon(Icons.arrow_back),
                   ),
                   const Spacer(),
@@ -154,9 +238,10 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
             ),
           ),
           DraggableScrollableSheet(
-            initialChildSize: 0.35,
-            minChildSize: 0.25,
-            maxChildSize: 0.6,
+            controller: _sheetController,
+            initialChildSize: ride.status == 'arrived' ? 0.68 : 0.38,
+            minChildSize: 0.28,
+            maxChildSize: 0.78,
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
@@ -194,10 +279,34 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                           .titleLarge
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          ride.status == 'started'
+                              ? Icons.location_on
+                              : Icons.person_pin_circle,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            ride.status == 'started'
+                                ? ride.destinationAddress
+                                : ride.pickupAddress,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       ride.passengerName,
-                      style: Theme.of(context).textTheme.bodyLarge,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -208,6 +317,88 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                         fontSize: 18,
                       ),
                     ),
+                    Text(
+                      ride.paymentMode,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                    if (ride.status == 'heading_to_pickup') ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'When you reach pickup, tap "Arrived at pickup". Then enter the passenger\'s 4-digit start code from their Fast Bull app.',
+                          style: TextStyle(fontSize: 12, height: 1.4),
+                        ),
+                      ),
+                    ],
+                    if (ride.status == 'arrived') ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.pin, color: AppColors.primary, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Ask the passenger for their Ride start code shown in the app.',
+                                style: TextStyle(fontSize: 12, height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Passenger start code',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _otpController,
+                        keyboardType: TextInputType.number,
+                        maxLength: 4,
+                        autofocus: true,
+                        textAlign: TextAlign.center,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                        style: const TextStyle(
+                          fontSize: 32,
+                          letterSpacing: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: '0 0 0 0',
+                          counterText: '',
+                          errorText: _otpError,
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) {
+                          if (_otpError != null) setState(() => _otpError = null);
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Wrong code will not start the ride.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -237,7 +428,10 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                     const SizedBox(height: 16),
                     AppButton(
                       label: currentAction.$3,
-                      onPressed: () => _handleStatusAction(ride),
+                      isLoading: primaryBusy || isStartingRide,
+                      onPressed: (primaryBusy || isStartingRide)
+                          ? null
+                          : () => _handleStatusAction(ride, currentAction.$1),
                     ),
                   ],
                 ),
@@ -249,56 +443,70 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     );
   }
 
-  Future<void> _handleStatusAction(ActiveRide ride) async {
+  Future<void> _handleStatusAction(ActiveRide ride, String statusKey) async {
     final vm = ref.read(rideViewModelProvider.notifier);
 
-    if (ride.status == 'heading_to_pickup') {
-      await vm.updateStatus(ride.id, 'arrived');
+    if (statusKey == 'heading_to_pickup') {
+      setState(() => _statusUpdating = true);
+      try {
+        await vm.updateStatus(ride.id, 'arrived');
+        if (mounted) {
+          vm.patchActiveRideStatus('arrived');
+          _expandSheetForOtp();
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showSnackBar(e.userMessage, isError: true);
+        }
+      } finally {
+        if (mounted) setState(() => _statusUpdating = false);
+      }
       return;
     }
 
-    if (ride.status == 'arrived') {
-      final otp = await _promptRideOtp();
-      if (otp == null || !mounted) return;
-      await vm.updateStatus(ride.id, 'started', otp: otp);
+    if (statusKey == 'arrived') {
+      final code = _otpController.text.trim();
+      if (code.length < 4) {
+        setState(() => _otpError = 'Enter the 4-digit code from passenger app');
+        return;
+      }
+      setState(() {
+        _otpSubmitting = true;
+        _otpError = null;
+      });
+      _statusPollTimer?.cancel();
+      try {
+        await ref.read(rideViewModelProvider.notifier).startRideWithOtp(ride.id, code);
+        if (mounted) {
+          _otpController.clear();
+          context.showSnackBar('Ride started');
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _otpError = e.userMessage);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _otpSubmitting = false);
+          _startStatusPolling();
+        }
+      }
       return;
     }
 
-    if (ride.status == 'started') {
+    if (statusKey == 'started') {
       final payment = await vm.completeRide(ride.id);
       if (payment != null && mounted) {
-        context.push(RouteNames.payment, extra: payment);
+        context.pushReplacement(
+          RouteNames.payment,
+          extra: PaymentCompletionData(
+            payment: payment,
+            rideId: ride.id,
+            passengerName: ride.passengerName,
+          ),
+        );
       }
     }
-  }
-
-  Future<String?> _promptRideOtp() async {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter Ride OTP'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          decoration: const InputDecoration(
-            hintText: 'Passenger OTP',
-            counterText: '',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Start Ride'),
-          ),
-        ],
-      ),
-    );
   }
 }
 

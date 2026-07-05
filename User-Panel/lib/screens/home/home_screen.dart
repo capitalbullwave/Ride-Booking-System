@@ -3,14 +3,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
+import 'package:wavego_user/core/constants/services.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/core/utils/extensions.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/profile_display_provider.dart';
 import 'package:wavego_user/providers/app_providers.dart';
+import 'package:wavego_user/providers/rental_booking_provider.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/services/places_service.dart';
@@ -19,6 +23,7 @@ import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
 import 'package:wavego_user/widgets/home/active_ride_card.dart';
 import 'package:wavego_user/widgets/home/location_card.dart';
 import 'package:wavego_user/widgets/home/service_tile.dart';
+import 'package:wavego_user/widgets/home/service_type_tabs.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -60,8 +65,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _rideRealtimeSub = realtime.messages.listen((msg) {
       final event = msg['event']?.toString() ?? '';
       if (event.isEmpty) return;
-      // Any ride update should refresh active ride snapshot.
-      if (mounted) ref.invalidate(activeRideProvider);
+      if (mounted) {
+        if (event == 'ride_cancelled') {
+          ref.read(tripBookingProvider.notifier).clearActiveRideId();
+          _subscribedRideId = null;
+        }
+        ref.invalidate(activeRideProvider);
+        if (event == 'ride_accepted') {
+          ref.invalidate(notificationsProvider);
+          final driverName = msg['driver_name']?.toString() ?? 'Captain';
+          final startCode = msg['start_code']?.toString() ?? '----';
+          context.showSnackBar('$driverName accepted! Start code: $startCode');
+          final rideId = msg['ride_id']?.toString();
+          if (rideId != null && rideId.isNotEmpty) {
+            ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
+          }
+        } else if (event == 'driver_location') {
+          ref.invalidate(activeRideProvider);
+        }
+      }
     });
   }
 
@@ -108,12 +130,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(tripBookingProvider.notifier).swapLocations();
   }
 
-  void _findRide(TripBookingState trip) {
+  void _handleBook(TripBookingState trip) {
     if (trip.pickup == null || trip.dropoff == null) {
       _openLocation(context, isPickup: trip.pickup == null);
       return;
     }
-    context.push(RouteNames.book);
+
+    switch (trip.mode) {
+      case HomeBookingMode.ride:
+      case HomeBookingMode.parcel:
+        context.push(RouteNames.book);
+        break;
+      case HomeBookingMode.rental:
+        final rentalNotifier = ref.read(rentalBookingProvider.notifier);
+        rentalNotifier.setPickup(trip.pickup!);
+        rentalNotifier.setDropoff(trip.dropoff!);
+        context.push(RouteNames.rental);
+        break;
+    }
+  }
+
+  void _onServiceModeChanged(HomeBookingMode mode) {
+    ref.read(tripBookingProvider.notifier).setMode(mode);
+  }
+
+  Widget _buildBookingTabs(HomeBookingMode mode) {
+    return ServiceTypeTabs(
+      selected: mode,
+      onChanged: _onServiceModeChanged,
+    );
+  }
+
+  String _actionLabelFor(TripBookingState trip) {
+    if (trip.scheduledAt != null) {
+      switch (trip.mode) {
+        case HomeBookingMode.ride:
+          return 'Schedule ride';
+        case HomeBookingMode.parcel:
+          return 'Schedule parcel';
+        case HomeBookingMode.rental:
+          return trip.mode.actionLabel;
+      }
+    }
+    return trip.mode.actionLabel;
+  }
+
+  LocationCard _buildLocationCard({
+    required TripBookingState trip,
+    required String pickup,
+    required String dropoff,
+    required bool isBookingLocked,
+  }) {
+    final mode = trip.mode;
+    return LocationCard(
+      pickup: pickup,
+      dropoff: dropoff,
+      onSwap: _swapLocations,
+      onPickupTap: () => _openLocation(context, isPickup: true),
+      onDropoffTap: () => _openLocation(context, isPickup: false),
+      onFindRide: () => _handleBook(trip),
+      isBookingLocked: isBookingLocked,
+      actionLabel: _actionLabelFor(trip),
+      dropPlaceholder: mode.dropPlaceholder,
+      dropFieldLabel: mode.dropFieldLabel,
+      header: _buildBookingTabs(mode),
+      showSchedule: mode != HomeBookingMode.rental,
+      scheduledAt: trip.scheduledAt,
+      onScheduleChanged: (dateTime) {
+        ref.read(tripBookingProvider.notifier).setScheduledAt(dateTime);
+      },
+    );
+  }
+
+  List<HomeServiceItem> _servicesForMode(
+    List<HomeServiceItem> services,
+    HomeBookingMode mode,
+  ) {
+    final filtered = homeServicesForMode(services, mode);
+    return filtered.isNotEmpty ? filtered : services;
   }
 
   @override
@@ -170,13 +264,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: activeRideAsync.when(
                         loading: () => const ActiveRideCardShimmer(),
-                        error: (e, st) => LocationCard(
+                        error: (e, st) => _buildLocationCard(
+                          trip: trip,
                           pickup: pickup,
                           dropoff: dropoff,
-                          onSwap: _swapLocations,
-                          onPickupTap: () => _openLocation(context, isPickup: true),
-                          onDropoffTap: () => _openLocation(context, isPickup: false),
-                          onFindRide: () => _findRide(trip),
                           isBookingLocked: false,
                         ),
                         data: (activeRide) {
@@ -187,12 +278,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               isCancelling: _cancellingRide == true,
                               onCancel: () async {
                                 setState(() => _cancellingRide = true);
-                                await cancelRideWithConfirmation(
+                                final cancelled = await cancelRideWithConfirmation(
                                   context: context,
                                   ref: ref,
                                   rideId: activeRide.id,
                                 );
-                                if (mounted) setState(() => _cancellingRide = false);
+                                if (mounted) {
+                                  setState(() => _cancellingRide = false);
+                                  if (cancelled) {
+                                    _subscribedRideId = null;
+                                  }
+                                }
                               },
                             );
                           }
@@ -200,13 +296,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             data: (ride) => ride != null,
                             orElse: () => false,
                           );
-                          return LocationCard(
+                          return _buildLocationCard(
+                            trip: trip,
                             pickup: pickup,
                             dropoff: dropoff,
-                            onSwap: _swapLocations,
-                            onPickupTap: () => _openLocation(context, isPickup: true),
-                            onDropoffTap: () => _openLocation(context, isPickup: false),
-                            onFindRide: () => _findRide(trip),
                             isBookingLocked: isLocked,
                           );
                         },
@@ -276,36 +369,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   vehicleCategoriesAsync.when(
-                    loading: () => Column(
-                      children: fallbackHomeServices()
-                          .map(
-                            (service) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: ServiceTile(
-                                service: service,
-                                onTap: () => context.push(service.route),
+                    loading: () {
+                      final services = _servicesForMode(
+                        fallbackHomeServices(),
+                        trip.mode,
+                      );
+                      return Column(
+                        children: services
+                            .map(
+                              (service) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ServiceTile(
+                                  service: service,
+                                  onTap: () => context.push(service.route),
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    error: (e, st) => Column(
-                      children: fallbackHomeServices()
-                          .map(
-                            (service) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: ServiceTile(
-                                service: service,
-                                onTap: () => context.push(service.route),
+                            )
+                            .toList(),
+                      );
+                    },
+                    error: (e, st) {
+                      final services = _servicesForMode(
+                        fallbackHomeServices(),
+                        trip.mode,
+                      );
+                      return Column(
+                        children: services
+                            .map(
+                              (service) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: ServiceTile(
+                                  service: service,
+                                  onTap: () => context.push(service.route),
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(),
-                    ),
+                            )
+                            .toList(),
+                      );
+                    },
                     data: (categories) {
-                      final services = categories.isNotEmpty
+                      final allServices = categories.isNotEmpty
                           ? categories.map(homeServiceFromCategory).toList()
                           : fallbackHomeServices();
+                      final services = _servicesForMode(allServices, trip.mode);
 
                       return Column(
                         children: services
@@ -321,70 +427,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             .toList(),
                       );
                     },
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Vehicle Rental',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rent bikes and cars by the hour',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.mutedForeground,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => context.push(RouteNames.rental),
-                      borderRadius: BorderRadius.circular(AppRadius.card),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(AppRadius.card),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.schedule, color: AppColors.primary),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Start Vehicle Rental',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Set hours, choose vehicle, pick locations',
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: AppColors.mutedForeground,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 12),
                 ]),
@@ -531,7 +573,7 @@ class _PromoBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title ?? 'Ride smarter with WaveGo',
+                  title ?? 'Ride smarter with Fast Bull',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

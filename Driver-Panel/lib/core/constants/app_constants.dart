@@ -15,6 +15,7 @@ class AppConstants {
   static const String notificationsEnabledKey = 'notifications_enabled';
   static const String autoAcceptKey = 'auto_accept_rides';
   static const String navigationAppKey = 'navigation_app';
+  static const String dismissedRideIdsKey = 'dismissed_ride_ids';
 
   static const List<String> vehicleTypes = [
     'Bike',

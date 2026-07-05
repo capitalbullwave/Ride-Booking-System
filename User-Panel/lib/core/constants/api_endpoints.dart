@@ -10,14 +10,24 @@ class ApiEndpoints {
 
   static const String userProfile = '/user/profile';
   static const String userProfileAddresses = '/user/profile/addresses';
+  static const String studentPass = '/user/student-pass';
+  static const String subscriptionPlans = '/user/subscription-plans';
+  static const String userSubscription = '/user/subscription';
+  static const String subscriptionCheckout = '/user/subscription/checkout';
+  static const String subscriptionVerifyPayment = '/user/subscription/verify-payment';
+  static const String walletCheckout = '/user/wallet/checkout';
+  static const String walletVerifyPayment = '/user/wallet/verify-payment';
 
   // User panel (legacy /user/* prefix on backend)
   static const String dashboard = '/user/dashboard';
   static const String wallet = '/user/wallet';
+  static const String walletTransactions = '/user/transactions';
   static const String notifications = '/user/notifications';
   static const String rides = '/user/rides';
   static const String bookRide = '/user/book-ride';
+  static const String rideEstimate = '/rides/estimate';
   static const String cancelRide = '/user/cancel-ride';
+  static String rateRide(String rideId) => '/user/ride/$rideId/rate';
 
   // Public / maps (no auth)
   static const String placesSearch = '/public/places/search';

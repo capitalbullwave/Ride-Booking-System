@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Wavego User</string>
+	<string>Fast Bull</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -85,9 +85,13 @@
 		</dict>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>WaveGo needs your location to set pickup points and show your ride on the map.</string>
+	<string>Fast Bull needs your location to set pickup points and show your ride on the map.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>WaveGo needs your location to track rides in progress.</string>
+	<string>Fast Bull needs your location to track rides in progress.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Fast Bull needs camera access to capture your Aadhar and student ID photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fast Bull needs photo library access to upload your Aadhar and student ID documents.</string>
 	<key>GMSApiKey</key>
 	<string>AIzaSyBTQ4ccqqhUUpjDsjkM_D4y0BPrJhHnLe0</string>
 </dict>

@@ -14,9 +14,9 @@ import { OTPInput } from "@/components/auth/OTPInput";
 import { parseContactPhone, sendLoginOtp, verifyOtp, verifySignupOtp } from "@/lib/auth-api";
 import {
   clearPendingOtpPhone,
-  clearPostLoginRedirect,
   getDevOtpHint,
-  getPostLoginRedirect,
+  needsProfileSetup,
+  resolvePostAuthDestination,
   setAuthSession,
   setDevOtpHint as persistDevOtpHint,
   setPendingOtpPhone,
@@ -93,6 +93,7 @@ export function OTPView() {
       phone: string,
       profile?: { name?: string; email?: string; accessToken?: string; refreshToken?: string }
     ) => {
+      const profileComplete = !needsProfileSetup(profile?.name);
       setAuthSession({
         phone,
         verified: true,
@@ -100,12 +101,16 @@ export function OTPView() {
         ...(profile?.email?.trim() ? { email: profile.email.trim() } : {}),
         ...(profile?.accessToken ? { accessToken: profile.accessToken } : {}),
         ...(profile?.refreshToken ? { refreshToken: profile.refreshToken } : {}),
+        profileComplete,
       });
       clearPendingOtpPhone();
 
-      const redirectTo = getPostLoginRedirect();
-      clearPostLoginRedirect();
-      router.push(redirectTo || ROUTES.home);
+      if (!profileComplete) {
+        router.push(ROUTES.createProfile);
+        return;
+      }
+
+      router.push(resolvePostAuthDestination());
     },
     [router]
   );

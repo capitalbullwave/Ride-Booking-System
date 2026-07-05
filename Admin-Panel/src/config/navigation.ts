@@ -11,6 +11,8 @@ import {
   Inbox,
   BarChart3,
   Settings,
+  GraduationCap,
+  Crown,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +39,7 @@ export const navigation: NavGroup[] = [
     title: "Management",
     items: [
       { title: "Users", href: "/users", icon: Users },
+      { title: "Student Passes", href: "/student-passes", icon: GraduationCap },
       { title: "Drivers", href: "/drivers", icon: Car, badge: "12" },
       { title: "Rides", href: "/rides", icon: MapPin, badge: "892" },
       { title: "Vehicles", href: "/vehicles", icon: Truck },
@@ -46,6 +49,7 @@ export const navigation: NavGroup[] = [
     title: "Business",
     items: [
       { title: "Finance", href: "/finance", icon: Wallet },
+      { title: "Subscriptions", href: "/subscriptions", icon: Crown },
       { title: "Coupons", href: "/coupons", icon: Ticket },
       { title: "Support", href: "/support", icon: HeadphonesIcon, badge: "3" },
       { title: "Alert Inbox", href: "/alerts", icon: Inbox, badge: "3" },

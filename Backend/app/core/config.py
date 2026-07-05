@@ -85,7 +85,7 @@ class Settings(BaseSettings):
 
     # Driver matching
     driver_search_radius_km: float = 5.0
-    driver_request_timeout_seconds: int = 30
+    driver_request_timeout_seconds: int = 180
 
     # Pricing
     platform_fee_percent: float = 10.0

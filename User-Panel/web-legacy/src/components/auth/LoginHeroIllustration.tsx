@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 
-/** WaveGo brand palette — matches globals.css tokens for inline SVG */
+/** Fast Bull brand palette — matches globals.css tokens for inline SVG */
 const BRAND = {
   primary: "#31526E",
   secondary: "#D8B39F",
@@ -27,7 +27,7 @@ export function LoginHeroIllustration() {
         xmlns="http://www.w3.org/2000/svg"
         className="h-full w-full object-contain drop-shadow-2xl"
         role="img"
-        aria-label="WaveGo transportation services"
+        aria-label="Fast Bull transportation services"
       >
         <defs>
           <linearGradient id="loginSky" x1="0" y1="0" x2="0" y2="1">

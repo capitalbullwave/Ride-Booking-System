@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
-import 'package:wavego_driver/core/utils/responsive.dart';
 
 enum AppButtonVariant { primary, secondary, outline, danger, ghost }
 
@@ -27,32 +26,58 @@ class AppButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final child = isLoading
-        ? SizedBox(
-            height: 22,
-            width: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              color: variant == AppButtonVariant.outline
-                  ? AppColors.primary
-                  : Colors.white,
-            ),
-          )
-        : Row(
+        ? Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: variant == AppButtonVariant.outline ||
+                          variant == AppButtonVariant.ghost
+                      ? AppColors.primary
+                      : Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          )
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               if (icon != null) ...[
-                Icon(icon, size: 20),
-                const SizedBox(width: 8),
+                Icon(icon, size: 18),
+                const SizedBox(width: 6),
               ],
-              Text(label),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           );
+
+    final minSize = Size(0, height);
 
     final button = switch (variant) {
       AppButtonVariant.primary => ElevatedButton(
           onPressed: isLoading ? null : onPressed,
-          style: ElevatedButton.styleFrom(minimumSize: Size(expand ? double.infinity : 0, height)),
+          style: ElevatedButton.styleFrom(
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
           child: child,
         ),
       AppButtonVariant.secondary => ElevatedButton(
@@ -60,20 +85,25 @@ class AppButton extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary,
             foregroundColor: AppColors.foreground,
-            minimumSize: Size(expand ? double.infinity : 0, height),
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
           ),
           child: child,
         ),
       AppButtonVariant.outline => OutlinedButton(
           onPressed: isLoading ? null : onPressed,
-          style: OutlinedButton.styleFrom(minimumSize: Size(expand ? double.infinity : 0, height)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+          ),
           child: child,
         ),
       AppButtonVariant.danger => ElevatedButton(
           onPressed: isLoading ? null : onPressed,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.error,
-            minimumSize: Size(expand ? double.infinity : 0, height),
+            minimumSize: minSize,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
           ),
           child: child,
         ),
@@ -84,7 +114,7 @@ class AppButton extends StatelessWidget {
     };
 
     return SizedBox(
-      width: expand ? Responsive.width(context) : null,
+      width: expand ? double.infinity : null,
       child: button,
     );
   }

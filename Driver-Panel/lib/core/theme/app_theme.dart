@@ -16,7 +16,7 @@ class AppTheme {
       primary: AppColors.primary,
       onPrimary: Colors.white,
       secondary: AppColors.secondary,
-      onSecondary: AppColors.foreground,
+      onSecondary: Colors.white,
       error: AppColors.error,
       onError: Colors.white,
       surface: isDark ? AppColors.darkSurface : AppColors.lightSurface,
@@ -78,7 +78,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? AppColors.darkSurface : Colors.white,
+        fillColor: isDark ? AppColors.darkSurface : AppColors.muted,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
@@ -101,7 +101,7 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-        indicatorColor: AppColors.secondary.withValues(alpha: 0.35),
+        indicatorColor: AppColors.muted,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return textTheme.labelSmall?.copyWith(
@@ -131,7 +131,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.foreground,
+        backgroundColor: AppColors.primary,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.button)),
       ),
@@ -141,7 +141,7 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.muted,
-        selectedColor: AppColors.secondary.withValues(alpha: 0.45),
+        selectedColor: AppColors.muted,
         labelStyle: textTheme.labelMedium,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
         side: BorderSide.none,

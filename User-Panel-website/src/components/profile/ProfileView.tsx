@@ -1,17 +1,80 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell, PageHeader } from "@/components/layout";
 import { profileMenuItems } from "@/constants/profile-menu";
 import { ROUTES } from "@/constants/routes";
 import { clearAuthSession, getAuthSession } from "@/lib/auth-session";
 import { logoutAccount } from "@/lib/profile-api";
+import { getStudentPass, getUserSubscription } from "@/lib/membership-api";
+import {
+  applyMembershipPlanToState,
+  MEMBERSHIP_UPDATED_EVENT,
+  readCachedMembershipPlan,
+} from "@/lib/membership-sync";
 import { useAuthUser } from "@/hooks/useAuthUser";
-import { ChevronRight, LogOut, Star } from "lucide-react";
+import { ChevronRight, Crown, LogOut, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function ProfileView() {
   const router = useRouter();
   const user = useAuthUser();
+  const [activePlanName, setActivePlanName] = useState("Free");
+  const [activePlanBenefit, setActivePlanBenefit] = useState("Priority rides, ride discounts & more");
+  const [isFreePlan, setIsFreePlan] = useState(true);
+  const [studentPassStatus, setStudentPassStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadMembership = async () => {
+      try {
+        const cached = readCachedMembershipPlan();
+        if (cached) {
+          applyMembershipPlanToState(cached, {
+            setActivePlanName,
+            setActivePlanBenefit,
+            setIsFreePlan,
+          });
+        }
+
+        const [passRes, subRes] = await Promise.all([getStudentPass(), getUserSubscription()]);
+        setStudentPassStatus(passRes.application?.status ?? null);
+        const plan = subRes.subscription?.plan as {
+          name?: string;
+          slug?: string;
+          benefits?: string[];
+        };
+        if (plan?.name) {
+          applyMembershipPlanToState(
+            {
+              name: plan.name,
+              slug: plan.slug ?? "free",
+              benefits: Array.isArray(plan.benefits) ? plan.benefits : [],
+            },
+            {
+              setActivePlanName,
+              setActivePlanBenefit,
+              setIsFreePlan,
+            }
+          );
+        }
+      } catch {
+        // Keep defaults when API is unavailable
+      }
+    };
+
+    void loadMembership();
+
+    const onMembershipUpdated = () => {
+      void loadMembership();
+    };
+    window.addEventListener(MEMBERSHIP_UPDATED_EVENT, onMembershipUpdated);
+    window.addEventListener("focus", onMembershipUpdated);
+    return () => {
+      window.removeEventListener(MEMBERSHIP_UPDATED_EVENT, onMembershipUpdated);
+      window.removeEventListener("focus", onMembershipUpdated);
+    };
+  }, []);
 
   return (
     <AppShell>
@@ -36,9 +99,31 @@ export function ProfileView() {
           <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/50" />
         </button>
 
+        <button
+          onClick={() => router.push(ROUTES.profileSubscription)}
+          className="mb-6 flex w-full items-center gap-4 rounded-[24px] bg-gradient-to-br from-secondary to-primary p-5 text-left text-white shadow-lg shadow-primary/20 transition-all hover:opacity-95"
+        >
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+            <Crown className="h-7 w-7" />
+          </div>
+          <div className="flex flex-1 flex-col">
+            <h3 className="font-heading text-lg font-bold">
+              {isFreePlan ? "Upgrade to Fast Bull Plus" : `${activePlanName} Member`}
+            </h3>
+            <p className="text-sm text-white/85">
+              {isFreePlan ? "Priority rides, ride discounts & more" : activePlanBenefit}
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 shrink-0 text-white/90" />
+        </button>
+
         <div className="flex flex-col gap-3">
           {profileMenuItems.map((item) => {
             const Icon = item.icon;
+            const statusBadge =
+              item.id === "student-pass" && studentPassStatus
+                ? studentPassStatus.charAt(0).toUpperCase() + studentPassStatus.slice(1)
+                : null;
             return (
               <button
                 key={item.id}
@@ -49,7 +134,21 @@ export function ProfileView() {
                   <div className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <span className="font-semibold text-foreground">{item.label}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">{item.label}</span>
+                    {statusBadge ? (
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase",
+                          studentPassStatus === "approved" && "bg-green-100 text-green-700",
+                          studentPassStatus === "pending" && "bg-amber-100 text-amber-700",
+                          studentPassStatus === "rejected" && "bg-red-100 text-red-700"
+                        )}
+                      >
+                        {statusBadge}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground/50 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
               </button>

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/core/utils/wallet_refresh.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
@@ -21,14 +22,25 @@ class WalletScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final walletAsync = ref.watch(walletProvider);
+    final walletAsync = ref.watch(resolvedWalletProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: walletAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () {
+          if (walletAsync.hasValue) {
+            return _walletBody(context, walletAsync.value!);
+          }
+          return const Center(child: CircularProgressIndicator());
+        },
         error: (e, _) => Center(child: Text('Error: $e')),
-        data: (wallet) => SafeArea(
+        data: (wallet) => _walletBody(context, wallet),
+      ),
+    );
+  }
+
+  Widget _walletBody(BuildContext context, WalletSummary wallet) {
+    return SafeArea(
           bottom: false,
           child: Stack(
             clipBehavior: Clip.none,
@@ -107,9 +119,7 @@ class WalletScreen extends ConsumerWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
   }
 }
 

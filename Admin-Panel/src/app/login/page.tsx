@@ -53,7 +53,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
 
     if (result.success) {
-      toast.success("Welcome back to WaveGo Admin");
+      toast.success("Welcome back to Fast Bull Admin");
       router.replace("/");
       router.refresh();
     } else {
@@ -69,8 +69,8 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen bg-background">
       <div className="relative hidden w-1/2 overflow-hidden lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute inset-0 bg-[linear-gradient(145deg,#31526E_0%,#4a6d8a_50%,#6086A8_100%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,#D8B39F55,transparent_45%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(145deg,#73398f_0%,#7346f4_50%,#c45cf7_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,#c45cf755,transparent_45%)]" />
         <div className="absolute -right-16 -top-16 h-72 w-72 rounded-full bg-secondary/30 blur-3xl" />
         <div className="absolute -bottom-24 -left-12 h-80 w-80 rounded-full bg-primary/40 blur-3xl" />
 

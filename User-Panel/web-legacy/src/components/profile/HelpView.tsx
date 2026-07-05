@@ -166,7 +166,7 @@ export function HelpView({ onBack }: HelpViewProps) {
             <h1 className="font-heading text-3xl font-bold leading-tight sm:text-4xl md:text-5xl">
               Support Resources
               <br />
-              for WaveGo Riders
+              for Fast Bull Riders
             </h1>
 
             <div className="mt-8 flex overflow-hidden rounded-[16px] bg-white/10 shadow-sm backdrop-blur-sm">

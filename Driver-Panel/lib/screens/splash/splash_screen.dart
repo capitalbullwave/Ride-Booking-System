@@ -127,7 +127,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Rides & mobility — drive with WaveGo',
+              'Rides & mobility — drive with Fast Bull',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.mutedForeground,
                   ),

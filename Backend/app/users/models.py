@@ -46,6 +46,7 @@ class User(UUIDMixin, TimestampMixin, SoftDeleteMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     google_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True)
+    rating_avg: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     token_version: Mapped[int] = mapped_column(default=1, nullable=False)
 
     rides: Mapped[List["Ride"]] = relationship("Ride", back_populates="user", foreign_keys="Ride.user_id")

@@ -1,3 +1,5 @@
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
+
 class PlaceSuggestion {
   const PlaceSuggestion({
     required this.id,
@@ -108,24 +110,33 @@ class TripBookingState {
     this.dropoff,
     this.route,
     this.activeRideId,
+    this.mode = HomeBookingMode.ride,
+    this.scheduledAt,
   });
 
   final SelectedPlace? pickup;
   final SelectedPlace? dropoff;
   final DirectionsResult? route;
   final String? activeRideId;
+  final HomeBookingMode mode;
+  final DateTime? scheduledAt;
 
   TripBookingState copyWith({
     SelectedPlace? pickup,
     SelectedPlace? dropoff,
     DirectionsResult? route,
     String? activeRideId,
+    HomeBookingMode? mode,
+    DateTime? scheduledAt,
     bool clearRoute = false,
+    bool clearScheduledAt = false,
   }) =>
       TripBookingState(
         pickup: pickup ?? this.pickup,
         dropoff: dropoff ?? this.dropoff,
         route: clearRoute ? null : (route ?? this.route),
         activeRideId: activeRideId ?? this.activeRideId,
+        mode: mode ?? this.mode,
+        scheduledAt: clearScheduledAt ? null : (scheduledAt ?? this.scheduledAt),
       );
 }

@@ -49,6 +49,26 @@ async def _validate_token_version(token: dict, db: AsyncSession) -> None:
             raise UnauthorizedException("Session expired. Please login again.")
 
 
+async def get_optional_current_user(
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(security)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Optional[User]:
+    if not credentials:
+        return None
+    try:
+        payload = decode_token(credentials.credentials)
+    except ValueError:
+        return None
+    if payload.get("type") != "access" or payload.get("role") != UserRole.USER.value:
+        return None
+    try:
+        await _validate_token_version(payload, db)
+    except UnauthorizedException:
+        return None
+    repo = UserRepository(db)
+    return await repo.get_by_id_active(uuid.UUID(payload["sub"]))
+
+
 async def get_current_user(
     token: Annotated[dict, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db)],

@@ -7,6 +7,7 @@ import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
@@ -45,8 +46,23 @@ class _RideRequestScreenState extends ConsumerState<RideRequestScreen> {
   Future<void> _accept() async {
     if (_request == null) return;
     _timer?.cancel();
-    final ride = await ref.read(rideViewModelProvider.notifier).acceptRide(_request!.id);
-    if (ride != null && mounted) context.go(RouteNames.activeTrip);
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      ref.read(rideViewModelProvider.notifier).setIncomingRequest(_request!);
+      ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(_request!);
+      router.go(RouteNames.activeTrip);
+      await ref.read(rideViewModelProvider.notifier).acceptRide(_request!.id);
+    } catch (e) {
+      ref.read(rideViewModelProvider.notifier).clearRide();
+      router.go(RouteNames.dashboard);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(e.userMessage),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _decline() async {

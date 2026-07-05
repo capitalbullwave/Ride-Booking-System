@@ -101,10 +101,14 @@ class AuthRepository {
   Future<UserProfile> updateProfile({
     String? fullName,
     String? email,
+    String? emergencyContactName,
+    String? emergencyContactPhone,
   }) async {
     final profile = await _profileService.updateProfile(
       fullName: fullName,
       email: email,
+      emergencyContactName: emergencyContactName,
+      emergencyContactPhone: emergencyContactPhone,
     );
     await _cacheProfile(profile);
     return profile;
@@ -156,6 +160,20 @@ class AuthRepository {
   Future<void> setOnboardingComplete() =>
       _localStorage.setBool(AppConstants.onboardingCompleteKey, true);
 
+  Future<bool> needsProfileSetup() async {
+    if (!await isLoggedIn()) return false;
+
+    var profile = await getProfile();
+    if (profile == null) {
+      try {
+        profile = await syncProfileFromApi();
+      } catch (_) {
+        return true;
+      }
+    }
+    return profile.isPlaceholderName;
+  }
+
   Future<void> logout() async {
     await _authService.logout();
     await _secureStorage.deleteAll();
@@ -176,6 +194,7 @@ class WalletRepository {
   WalletRepository(this._service);
   final WalletService _service;
   Future<WalletSummary> getWallet() => _service.getWallet();
+  Future<List<Map<String, dynamic>>> getTransactions() => _service.getTransactions();
 }
 
 class NotificationRepository {

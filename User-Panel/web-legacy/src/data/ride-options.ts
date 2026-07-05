@@ -68,7 +68,7 @@ export const RIDE_VEHICLE_OPTIONS: RideVehicleOption[] = [
 
 export const PAYMENT_METHODS = [
   { id: "cash", label: "Payment via cash" },
-  { id: "wallet", label: "Payment via WaveGo Wallet" },
+  { id: "wallet", label: "Payment via Fast Bull Wallet" },
 ] as const;
 
 export const RIDE_VEHICLE_IDS: RideVehicleId[] = RIDE_VEHICLE_OPTIONS.map((v) => v.id);

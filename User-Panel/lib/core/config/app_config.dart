@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'WaveGo';
+  static const String appName = 'Fast Bull';
   static const String appTagline = 'Rides, parcels & ambulance — one app';
   static const String appVersion = '1.0.0';
 

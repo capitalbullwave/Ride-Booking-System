@@ -3,20 +3,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
+import 'package:wavego_user/models/fare_models.dart';
 import 'package:wavego_user/models/place_models.dart';
+import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/services/membership_service.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/screens/booking/map_picker_screen.dart';
 import 'package:wavego_user/services/location_service.dart';
 import 'package:wavego_user/services/places_service.dart';
 import 'package:wavego_user/services/recent_places_service.dart';
+import 'package:wavego_user/services/ride_realtime_service.dart';
 import 'package:wavego_user/services/saved_places_service.dart';
 import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
+import 'package:wavego_user/widgets/home/ride_schedule_section.dart';
+import 'package:wavego_user/widgets/booking/live_tracking_map.dart';
+import 'package:wavego_user/widgets/booking/rate_ride_dialog.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
@@ -413,6 +421,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   int? _selectedVehicleIndex;
   List<BookableVehicle> _vehicles = fallbackBookableVehicles();
   bool _loadingVehicles = true;
+  Map<String, VehicleFareQuote> _fareQuotes = {};
+  bool _loadingFares = false;
+  double _memberDiscountPercent = 0;
 
   @override
   void initState() {
@@ -424,23 +435,39 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   }
 
   Future<void> _loadVehicles() async {
+    final mode = ref.read(tripBookingProvider).mode;
     try {
       final categories = await ref.read(vehicleCategoriesProvider.future);
       if (!mounted) return;
+      final filtered = filterCategoriesForMode(categories, mode);
       setState(() {
-        _vehicles = categories.isNotEmpty
-            ? categories
-                .asMap()
-                .entries
-                .map((entry) => bookableVehicleFromCategory(entry.value, entry.key))
-                .toList()
-            : fallbackBookableVehicles();
+        if (filtered.isNotEmpty) {
+          _vehicles = filtered
+              .asMap()
+              .entries
+              .map((entry) => bookableVehicleFromCategory(entry.value, entry.key))
+              .toList();
+        } else if (mode == HomeBookingMode.parcel) {
+          _vehicles = fallbackParcelVehicles();
+        } else {
+          _vehicles = filterBookableVehiclesForMode(
+            fallbackBookableVehicles(),
+            mode,
+          );
+        }
         _loadingVehicles = false;
       });
     } catch (_) {
       if (mounted) {
         setState(() {
-          _vehicles = fallbackBookableVehicles();
+          if (mode == HomeBookingMode.parcel) {
+            _vehicles = fallbackParcelVehicles();
+          } else {
+            _vehicles = filterBookableVehiclesForMode(
+              fallbackBookableVehicles(),
+              mode,
+            );
+          }
           _loadingVehicles = false;
         });
       }
@@ -477,6 +504,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
           _loadingRoute = false;
           _selectedVehicleIndex = null;
         });
+        await _loadFareEstimates();
       }
     } catch (e) {
       if (mounted) {
@@ -488,9 +516,137 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
     }
   }
 
+  Future<void> _loadFareEstimates() async {
+    final route = _route;
+    if (route == null) return;
+
+    setState(() => _loadingFares = true);
+
+    try {
+      final result = await ref.read(rideBookingServiceProvider).estimateRide(
+            pickupLat: route.pickup.lat,
+            pickupLng: route.pickup.lng,
+            dropoffLat: route.dropoff.lat,
+            dropoffLng: route.dropoff.lng,
+          );
+      if (!mounted) return;
+      setState(() {
+        _fareQuotes = result.quotes;
+        _memberDiscountPercent = result.discountPercent;
+        _loadingFares = false;
+      });
+    } catch (_) {
+      try {
+        final discount = await ref.read(rideDiscountPercentProvider.future);
+        if (!mounted) return;
+        setState(() {
+          _memberDiscountPercent = discount;
+          _fareQuotes = {};
+          _loadingFares = false;
+        });
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _loadingFares = false;
+          });
+        }
+      }
+    }
+  }
+
+  Widget _buildFareLabel(BookableVehicle vehicle, double distanceKm) {
+    final quote = _fareQuotes[vehicle.id];
+
+    if (quote != null) {
+      if (quote.hasDiscount) {
+        final original = quote.originalFare ??
+            (quote.estimatedFare + quote.memberDiscount);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '₹${original.round()}',
+              style: TextStyle(
+                decoration: TextDecoration.lineThrough,
+                fontSize: 13,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+            Text(
+              '₹${quote.estimatedFare.round()}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        );
+      }
+
+      return Text(
+        '₹${quote.estimatedFare.round()}',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          color: AppColors.primary,
+        ),
+      );
+    }
+
+    final rawFare = vehicle.baseFare + vehicle.perKmRate * distanceKm;
+    if (_memberDiscountPercent > 0) {
+      final discounted = rawFare * (1 - _memberDiscountPercent / 100);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '₹${rawFare.round()}',
+            style: TextStyle(
+              decoration: TextDecoration.lineThrough,
+              fontSize: 13,
+              color: AppColors.mutedForeground,
+            ),
+          ),
+          Text(
+            '₹${discounted.round()}',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Text(
+      vehicle.fareForDistanceKm(distanceKm),
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 18,
+        color: AppColors.primary,
+      ),
+    );
+  }
+
   Future<void> _confirmBooking() async {
-    final activeRide = await ref.read(activeRideProvider.future);
-    if (activeRide != null) {
+    UserActiveRide? activeRide;
+    try {
+      activeRide = await ref.read(activeRideProvider.future);
+    } catch (e) {
+      if (mounted) {
+        context.showSnackBar(
+          e.userMessage,
+          isError: true,
+        );
+      }
+      return;
+    }
+
+    if (activeRide != null &&
+        activeRide.status.toUpperCase() != 'SEARCHING_DRIVER' &&
+        activeRide.status.toUpperCase() != 'REQUESTED') {
       if (mounted) {
         context.showSnackBar(
           'You already have an active ride. Please finish or cancel it before booking a new one.',
@@ -510,6 +666,10 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       return;
     }
 
+    final selectedVehicle = _selectedVehicleIndex != null
+        ? _vehicles[_selectedVehicleIndex!]
+        : null;
+
     try {
       final result = await ref.read(rideBookingServiceProvider).bookRide(
             pickupAddress: pickup.label,
@@ -518,15 +678,25 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             pickupLng: route.pickup.lng,
             dropoffLat: route.dropoff.lat,
             dropoffLng: route.dropoff.lng,
+            vehicleCategoryId: selectedVehicle?.id,
+            scheduledAt: trip.scheduledAt,
           );
       final rideId = result['id']?.toString();
       if (rideId != null && rideId.isNotEmpty) {
         ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
       }
-      if (mounted) context.go(RouteNames.bookSearching);
+      ref.invalidate(activeRideProvider);
+      if (!mounted) return;
+      if (trip.scheduledAt != null && trip.scheduledAt!.isAfter(DateTime.now())) {
+        ref.read(tripBookingProvider.notifier).setScheduledAt(null);
+        context.showSnackBar('Ride scheduled successfully');
+        context.go(RouteNames.bookings);
+      } else {
+        context.go(RouteNames.bookSearching);
+      }
     } catch (e) {
       if (mounted) {
-        context.showSnackBar(e.toString(), isError: true);
+        context.showSnackBar(e.userMessage, isError: true);
       }
     }
   }
@@ -536,7 +706,11 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
     final trip = ref.watch(tripBookingProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Choose a ride')),
+      appBar: AppBar(
+        title: Text(
+          trip.mode == HomeBookingMode.parcel ? 'Send parcel' : 'Choose a ride',
+        ),
+      ),
       body: Column(
         children: [
           Padding(
@@ -557,6 +731,23 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: AppColors.mutedForeground),
                 ),
+                if (trip.scheduledAt != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        RideScheduleSection.formatSchedule(trip.scheduledAt!),
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 if (_route != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -565,6 +756,24 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
+                    ),
+                  ),
+                ],
+                if (_memberDiscountPercent > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${_memberDiscountPercent.round()}% member discount applied',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -602,7 +811,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                       ),
           ),
           Expanded(
-            child: _loadingVehicles
+            child: _loadingVehicles || _loadingFares
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     padding: const EdgeInsets.all(16),
@@ -611,9 +820,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                         final index = entry.key;
                         final vehicle = entry.value;
                         final isSelected = _selectedVehicleIndex == index;
-                        final fare = _route != null
-                            ? vehicle.fareForDistanceKm(_route!.distanceKm)
-                            : vehicle.fareForDistanceKm(5);
+                        final distanceKm = _route?.distanceKm ?? 5.0;
 
                         return Material(
                           color: Colors.transparent,
@@ -674,14 +881,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                                       ],
                                     ),
                                   ),
-                                  Text(
-                                    fare,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
+                                  _buildFareLabel(vehicle, distanceKm),
                                   if (isSelected) ...[
                                     const SizedBox(width: 8),
                                     const Icon(
@@ -723,6 +923,7 @@ class RideSearchingScreen extends ConsumerStatefulWidget {
 
 class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
   Timer? _pollTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   String? _rideId;
 
   bool _isDriverAssigned(String? status) {
@@ -740,17 +941,44 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
   @override
   void initState() {
     super.initState();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _checkRideStatus());
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) => _checkRideStatus());
     Future.microtask(() async {
       await _loadRideId();
+      _startRideRealtime();
       await _checkRideStatus();
     });
+  }
+
+  void _startRideRealtime() {
+    final realtime = ref.read(rideRealtimeProvider);
+    realtime.connect();
+    _realtimeSub?.cancel();
+    _realtimeSub = realtime.messages.listen((msg) {
+      final event = msg['event']?.toString() ?? '';
+      if (event != 'ride_accepted' || !mounted) return;
+      _onDriverAccepted(msg);
+    });
+    final rideId = _rideId ?? ref.read(tripBookingProvider).activeRideId;
+    if (rideId != null && rideId.isNotEmpty) {
+      realtime.subscribeRide(rideId);
+    }
+  }
+
+  void _onDriverAccepted(Map<String, dynamic> msg) {
+    _pollTimer?.cancel();
+    ref.invalidate(activeRideProvider);
+    ref.invalidate(notificationsProvider);
+    final driverName = msg['driver_name']?.toString() ?? 'Captain';
+    final startCode = msg['start_code']?.toString() ?? '----';
+    context.showSnackBar('$driverName accepted! Start code: $startCode');
+    context.pushReplacement(RouteNames.bookTracking);
   }
 
   Future<void> _loadRideId() async {
     final fromState = ref.read(tripBookingProvider).activeRideId;
     if (fromState != null && fromState.isNotEmpty) {
       if (mounted) setState(() => _rideId = fromState);
+      ref.read(rideRealtimeProvider).subscribeRide(fromState);
       return;
     }
     final active = await ref.read(rideBookingServiceProvider).getActiveRide();
@@ -758,6 +986,7 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
     if (id != null && id.isNotEmpty && mounted) {
       ref.read(tripBookingProvider.notifier).setActiveRideId(id);
       setState(() => _rideId = id);
+      ref.read(rideRealtimeProvider).subscribeRide(id);
     }
   }
 
@@ -766,8 +995,10 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
       final active = await ref.read(rideBookingServiceProvider).getActiveRide();
       final status = active?['status']?.toString();
       if (_isDriverAssigned(status) && mounted) {
-        _pollTimer?.cancel();
-        context.pushReplacement('/book/tracking');
+        _onDriverAccepted({
+          'driver_name': (active?['driver'] as Map?)?['name'] ?? 'Captain',
+          'start_code': active?['start_code'] ?? '----',
+        });
       }
     } catch (_) {}
   }
@@ -775,6 +1006,7 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _realtimeSub?.cancel();
     super.dispose();
   }
 
@@ -852,103 +1084,410 @@ class RideTrackingScreen extends ConsumerStatefulWidget {
 
 class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   String? _rideId;
+  Timer? _pollTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  UserActiveRide? _optimisticRide;
+  double? _liveDriverLat;
+  double? _liveDriverLng;
+  bool _ratingShown = false;
+  bool _rideCompleted = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(_loadRideId);
+    Future.microtask(() async {
+      await _loadRideId();
+      _startRideRealtime();
+    });
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      ref.invalidate(activeRideProvider);
+    });
+  }
+
+  void _startRideRealtime() {
+    final realtime = ref.read(rideRealtimeProvider);
+    realtime.connect();
+    _realtimeSub?.cancel();
+    _realtimeSub = realtime.messages.listen((msg) {
+      final event = msg['event']?.toString() ?? '';
+      if (!mounted) return;
+      if (event == 'ride_accepted') {
+        setState(() {
+          _optimisticRide = UserActiveRide(
+            id: msg['ride_id']?.toString() ?? _rideId ?? '',
+            pickupAddress: msg['pickup_address'] as String? ?? '',
+            dropoffAddress: msg['dropoff_address'] as String? ?? '',
+            status: msg['status'] as String? ?? 'DRIVER_ASSIGNED',
+            fareEstimate: (msg['estimated_fare'] as num?)?.toDouble(),
+            driverName: msg['driver_name'] as String?,
+            driverPhone: msg['driver_phone'] as String?,
+            vehicleNumber: msg['vehicle_number'] as String?,
+            startCode: msg['start_code']?.toString(),
+            pickupLat: (msg['pickup_lat'] as num?)?.toDouble(),
+            pickupLng: (msg['pickup_lng'] as num?)?.toDouble(),
+            dropoffLat: (msg['dropoff_lat'] as num?)?.toDouble(),
+            dropoffLng: (msg['dropoff_lng'] as num?)?.toDouble(),
+          );
+        });
+        ref.invalidate(activeRideProvider);
+        ref.invalidate(notificationsProvider);
+      } else if (event == 'driver_location') {
+        setState(() {
+          _liveDriverLat = (msg['lat'] as num?)?.toDouble();
+          _liveDriverLng = (msg['lng'] as num?)?.toDouble();
+        });
+      } else if (event == 'ride_started') {
+        setState(() {
+          final status = msg['status']?.toString() ?? 'STARTED';
+          if (_optimisticRide != null) {
+            _optimisticRide = _optimisticRide!.copyWith(status: status, startCode: '');
+          } else {
+            final current = ref.read(activeRideProvider).valueOrNull;
+            if (current != null) {
+              _optimisticRide = current.copyWith(status: status, startCode: '');
+            }
+          }
+        });
+        ref.invalidate(activeRideProvider);
+      } else if (event == 'ride_completed') {
+        _handleRideCompleted(msg);
+      }
+    });
+    final rideId = _rideId ?? ref.read(tripBookingProvider).activeRideId;
+    if (rideId != null && rideId.isNotEmpty) {
+      realtime.subscribeRide(rideId);
+    }
+  }
+
+  Future<void> _handleRideCompleted(Map<String, dynamic> msg) async {
+    if (_ratingShown || !mounted) return;
+    _ratingShown = true;
+    _pollTimer?.cancel();
+    setState(() => _rideCompleted = true);
+
+    final rideId = msg['ride_id']?.toString() ?? _rideId ?? '';
+    final driverName =
+        _optimisticRide?.driverName ?? ref.read(activeRideProvider).valueOrNull?.driverName;
+
+    if (!mounted) return;
+    final result = await showRateRideDialog(
+      context,
+      title: 'Rate your captain',
+      subtitle: driverName != null && driverName.isNotEmpty
+          ? 'How was your ride with $driverName?'
+          : 'How was your ride?',
+    );
+
+    if (result != null && rideId.isNotEmpty) {
+      try {
+        await ref.read(rideBookingServiceProvider).rateRide(
+              rideId,
+              rating: result['rating'] as int? ?? 5,
+              comment: result['comment'] as String?,
+            );
+        if (mounted) {
+          context.showSnackBar('Thanks for your feedback!');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showSnackBar(e.userMessage, isError: true);
+        }
+      }
+    }
+
+    ref.read(tripBookingProvider.notifier).clearActiveRideId();
+    ref.invalidate(activeRideProvider);
+    if (mounted) {
+      context.go(RouteNames.home);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadRideId() async {
     final fromState = ref.read(tripBookingProvider).activeRideId;
     if (fromState != null && fromState.isNotEmpty) {
       if (mounted) setState(() => _rideId = fromState);
+      ref.read(rideRealtimeProvider).subscribeRide(fromState);
       return;
     }
     final active = await ref.read(rideBookingServiceProvider).getActiveRide();
-    if (mounted) setState(() => _rideId = active?['id']?.toString());
+    if (mounted) {
+      setState(() => _rideId = active?['id']?.toString());
+      final id = active?['id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        ref.read(rideRealtimeProvider).subscribeRide(id);
+      }
+    }
+  }
+
+  UserActiveRide? _resolvedRide(UserActiveRide? apiRide) {
+    UserActiveRide? base;
+    if (apiRide != null && !apiRide.isSearching) {
+      base = apiRide;
+      if (_optimisticRide != null &&
+          base.isInProgress &&
+          (_optimisticRide!.startCode?.isNotEmpty ?? false)) {
+        base = base.copyWith(startCode: '');
+      }
+    } else if (_optimisticRide != null) {
+      base = _optimisticRide;
+    } else {
+      base = apiRide;
+    }
+    if (base == null) return null;
+    if (_liveDriverLat != null && _liveDriverLng != null) {
+      return base.copyWithDriverLocation(lat: _liveDriverLat, lng: _liveDriverLng);
+    }
+    return base;
+  }
+
+  Widget _buildMap(UserActiveRide? ride) {
+    if (ride != null && !ride.isSearching && ride.pickupLat != null) {
+      return LiveTrackingMap(
+        ride: ride,
+        driverLat: _liveDriverLat,
+        driverLng: _liveDriverLng,
+      );
+    }
+    final route = ref.watch(tripBookingProvider).route;
+    if (route != null) {
+      return RouteMapPreview(route: route, height: double.infinity);
+    }
+    return Container(
+      color: AppColors.muted,
+      child: const Center(
+        child: Icon(Icons.map, size: 64, color: AppColors.mutedForeground),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final route = ref.watch(tripBookingProvider).route;
     final rideId = _rideId ?? ref.watch(tripBookingProvider).activeRideId ?? '';
+    final activeRideAsync = ref.watch(activeRideProvider);
+    final resolvedForMap = activeRideAsync.maybeWhen(
+      data: (ride) => _resolvedRide(ride),
+      orElse: () => _optimisticRide,
+    );
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Live tracking'),
         actions: [
-          if (rideId.isNotEmpty)
-            CancelRideButton(
-              rideId: rideId,
-              navigateHome: true,
-              compact: true,
+          if (rideId.isNotEmpty && !_rideCompleted)
+            Builder(
+              builder: (context) {
+                final resolved = _resolvedRide(activeRideAsync.valueOrNull);
+                if (resolved != null && resolved.isInProgress) {
+                  return const SizedBox.shrink();
+                }
+                return CancelRideButton(
+                  rideId: rideId,
+                  navigateHome: true,
+                  compact: true,
+                );
+              },
             ),
         ],
       ),
       body: Column(
         children: [
-          Expanded(
-            child: route != null
-                ? RouteMapPreview(route: route, height: double.infinity)
-                : Container(
-                    color: AppColors.muted,
-                    child: const Center(
-                      child: Icon(Icons.map, size: 64, color: AppColors.mutedForeground),
-                    ),
-                  ),
+          Expanded(child: _buildMap(resolvedForMap)),
+          activeRideAsync.when(
+            loading: () => _TrackingBottomSheet.searching(rideId: rideId),
+            error: (_, __) => _TrackingBottomSheet.searching(rideId: rideId),
+            data: (ride) {
+              final resolved = _resolvedRide(ride);
+              if (resolved != null && resolved.isCompleted && !_ratingShown) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _handleRideCompleted({'ride_id': resolved.id});
+                });
+              }
+              if (resolved == null || resolved.isSearching) {
+                return _TrackingBottomSheet.searching(rideId: rideId);
+              }
+              return _TrackingBottomSheet.assigned(
+                ride: resolved,
+                rideId: rideId,
+                showCancel: !resolved.isInProgress && !_rideCompleted,
+              );
+            },
           ),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: Column(
+        ],
+      ),
+    );
+  }
+}
+
+class _TrackingBottomSheet extends StatelessWidget {
+  const _TrackingBottomSheet._({
+    required this.rideId,
+    this.ride,
+    required this.searching,
+    this.showCancel = true,
+  });
+
+  factory _TrackingBottomSheet.searching({required String rideId}) {
+    return _TrackingBottomSheet._(rideId: rideId, searching: true);
+  }
+
+  factory _TrackingBottomSheet.assigned({
+    required UserActiveRide ride,
+    required String rideId,
+    bool showCancel = true,
+  }) {
+    return _TrackingBottomSheet._(
+      rideId: rideId,
+      ride: ride,
+      searching: false,
+      showCancel: showCancel,
+    );
+  }
+
+  final String rideId;
+  final UserActiveRide? ride;
+  final bool searching;
+  final bool showCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (searching || ride == null) ...[
+            Row(
               children: [
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: AppColors.primary,
-                      child: const Text('A', style: TextStyle(color: Colors.white)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Finding captain...', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text(
-                            'We will notify you when assigned',
-                            style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (route != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${route.durationMin.round()} min',
-                          style: const TextStyle(
-                            color: AppColors.success,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
+                const CircleAvatar(
+                  backgroundColor: AppColors.primary,
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
                 ),
-                if (rideId.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  CancelRideButton(rideId: rideId, navigateHome: true),
-                ],
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Finding captain...', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'We will notify you when assigned',
+                        style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
+          ] else ...[
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.primary,
+                  child: Text(
+                    (ride!.driverName ?? 'D')[0].toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ride!.driverName ?? 'Captain assigned',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        ride!.statusLabel,
+                        style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13),
+                      ),
+                      if (ride!.vehicleNumber != null)
+                        Text(
+                          ride!.vehicleNumber!,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                      if (ride!.driverPhone != null && ride!.driverPhone!.isNotEmpty)
+                        Text(
+                          ride!.driverPhone!,
+                          style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground),
+                        ),
+                    ],
+                  ),
+                ),
+                if (ride!.fareEstimate != null)
+                  Text(
+                    '₹${ride!.fareEstimate!.round()}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: AppColors.primary,
+                    ),
+                  )
+                else if (ride!.driverRating != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: AppColors.warning, size: 16),
+                      Text(' ${ride!.driverRating!.toStringAsFixed(1)}'),
+                    ],
+                  ),
+              ],
+            ),
+            if (!ride!.isInProgress &&
+                ride!.startCode != null &&
+                ride!.startCode!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Ride start code',
+                      style: TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      ride!.startCode!,
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 10,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Share this code with your driver when they arrive at pickup',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.mutedForeground, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+          if (rideId.isNotEmpty && showCancel) ...[
+            const SizedBox(height: 16),
+            CancelRideButton(rideId: rideId, navigateHome: true),
+          ],
         ],
       ),
     );

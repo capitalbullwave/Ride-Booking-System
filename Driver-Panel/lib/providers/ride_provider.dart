@@ -1,45 +1,150 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wavego_driver/core/constants/app_constants.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/repositories/ride_repository.dart';
 
 class RideViewModel extends StateNotifier<RideState> {
-  RideViewModel(this._repository) : super(const RideState());
+  RideViewModel(this._repository, this._localStorage) : super(const RideState()) {
+    _loadDismissedRideIds();
+  }
 
   final RideRepository _repository;
+  final LocalStorageService _localStorage;
+  final Set<String> _dismissedRideIds = {};
 
-  Future<void> pollForRideRequest() async {
-    state = state.copyWith(requestState: const ViewStateLoading());
+  void _loadDismissedRideIds() {
+    _dismissedRideIds.addAll(
+      _localStorage.getStringList(AppConstants.dismissedRideIdsKey),
+    );
+  }
+
+  Future<void> _persistDismissed(String rideId) async {
+    _dismissedRideIds.add(rideId);
+    await _localStorage.setStringList(
+      AppConstants.dismissedRideIdsKey,
+      _dismissedRideIds.toList(),
+    );
+  }
+
+  Future<void> pollForRideRequest({bool silent = true}) async {
+    if (!silent) {
+      state = state.copyWith(requestState: const ViewStateLoading());
+    }
     try {
       final request = await _repository.getIncomingRideRequest();
+      if (request != null && _dismissedRideIds.contains(request.id)) {
+        if (state.incomingRequest?.id == request.id) {
+          state = state.copyWith(clearIncomingRequest: true);
+        }
+        return;
+      }
       if (request != null) {
+        if (state.incomingRequest?.id == request.id) return;
         state = state.copyWith(
           requestState: ViewStateSuccess(request),
           incomingRequest: request,
         );
-      } else {
+      } else if (state.incomingRequest != null) {
+        state = state.copyWith(
+          requestState: const ViewStateInitial(),
+          clearIncomingRequest: true,
+        );
+      } else if (!silent) {
         state = state.copyWith(requestState: const ViewStateInitial());
       }
     } catch (e) {
-      state = state.copyWith(requestState: ViewStateError(e.toString()));
+      if (!silent) {
+        state = state.copyWith(requestState: ViewStateError(e.toString()));
+      }
     }
   }
 
-  Future<ActiveRide?> acceptRide(String rideId) async {
-    state = state.copyWith(isAccepting: true);
+  void setIncomingRequest(RideRequest request) {
+    if (_dismissedRideIds.contains(request.id)) return;
+    state = state.copyWith(
+      requestState: ViewStateSuccess(request),
+      incomingRequest: request,
+    );
+  }
+
+  void primeActiveTripFromRequest(RideRequest request) {
+    state = state.copyWith(
+      incomingRequest: request,
+      isAccepting: true,
+      activeRide: ActiveRide(
+        id: request.id,
+        status: 'heading_to_pickup',
+        pickupAddress: request.pickupAddress,
+        destinationAddress: request.destinationAddress,
+        pickupLat: request.pickupLat,
+        pickupLng: request.pickupLng,
+        destinationLat: request.destinationLat,
+        destinationLng: request.destinationLng,
+        passengerName: request.passengerName,
+        passengerPhone: request.passengerPhone,
+        paymentMode: request.paymentMode,
+        estimatedFare: request.estimatedFare,
+        distance: request.distance,
+      ),
+    );
+  }
+
+  Future<ActiveRide> acceptRide(String rideId) async {
+    final incoming = state.incomingRequest;
+    if (incoming != null && incoming.id == rideId && state.activeRide == null) {
+      primeActiveTripFromRequest(incoming);
+    } else {
+      state = state.copyWith(isAccepting: true);
+    }
+
     try {
-      final ride = await _repository.acceptRide(rideId);
-      state = state.copyWith(activeRide: ride, isAccepting: false);
+      final accepted = await _repository.acceptRide(rideId);
+      final ride = _enrichFromIncoming(accepted, rideId);
+
+      _dismissedRideIds.remove(rideId);
+      state = state.copyWith(
+        activeRide: ride,
+        isAccepting: false,
+        clearIncomingRequest: true,
+      );
       return ride;
     } catch (e) {
-      state = state.copyWith(isAccepting: false);
-      return null;
+      state = state.copyWith(isAccepting: false, clearActiveRide: true);
+      rethrow;
     }
+  }
+
+  ActiveRide _enrichFromIncoming(ActiveRide ride, String rideId) {
+    final incoming = state.incomingRequest;
+    if (incoming == null || incoming.id != rideId) return ride;
+
+    return ride.copyWith(
+      pickupAddress:
+          ride.pickupAddress.isEmpty ? incoming.pickupAddress : ride.pickupAddress,
+      destinationAddress: ride.destinationAddress.isEmpty
+          ? incoming.destinationAddress
+          : ride.destinationAddress,
+      pickupLat: ride.pickupLat == 0 ? incoming.pickupLat : ride.pickupLat,
+      pickupLng: ride.pickupLng == 0 ? incoming.pickupLng : ride.pickupLng,
+      destinationLat:
+          ride.destinationLat == 0 ? incoming.destinationLat : ride.destinationLat,
+      destinationLng:
+          ride.destinationLng == 0 ? incoming.destinationLng : ride.destinationLng,
+      passengerName: ride.passengerName == 'Passenger'
+          ? incoming.passengerName
+          : ride.passengerName,
+      passengerPhone: ride.passengerPhone ?? incoming.passengerPhone,
+      estimatedFare:
+          ride.estimatedFare == 0 ? incoming.estimatedFare : ride.estimatedFare,
+    );
   }
 
   Future<void> declineRide(String rideId, {String? reason}) async {
     await _repository.declineRide(rideId, reason: reason);
-    state = state.copyWith(incomingRequest: null);
+    await _persistDismissed(rideId);
+    state = state.copyWith(clearIncomingRequest: true);
   }
 
   Future<ActiveRide?> restoreActiveRide() async {
@@ -55,20 +160,123 @@ class RideViewModel extends StateNotifier<RideState> {
   }
 
   Future<void> updateStatus(String rideId, String status, {String? otp}) async {
-    final ride = await _repository.updateRideStatus(
-      rideId,
-      status,
-      otp: otp,
-    );
-    state = state.copyWith(activeRide: ride);
+    final previous = state.activeRide;
+    try {
+      var ride = await _repository.updateRideStatus(
+        rideId,
+        status,
+        otp: otp,
+      );
+      if (previous != null) {
+        ride = ride.copyWith(
+          passengerName: ride.passengerName == 'Passenger'
+              ? previous.passengerName
+              : ride.passengerName,
+          passengerPhone: ride.passengerPhone ?? previous.passengerPhone,
+          pickupAddress:
+              ride.pickupAddress.isEmpty ? previous.pickupAddress : ride.pickupAddress,
+          destinationAddress: ride.destinationAddress.isEmpty
+              ? previous.destinationAddress
+              : ride.destinationAddress,
+          pickupLat: ride.pickupLat == 0 ? previous.pickupLat : ride.pickupLat,
+          pickupLng: ride.pickupLng == 0 ? previous.pickupLng : ride.pickupLng,
+          destinationLat:
+              ride.destinationLat == 0 ? previous.destinationLat : ride.destinationLat,
+          destinationLng:
+              ride.destinationLng == 0 ? previous.destinationLng : ride.destinationLng,
+          estimatedFare:
+              ride.estimatedFare == 0 ? previous.estimatedFare : ride.estimatedFare,
+        );
+      }
+      state = state.copyWith(activeRide: ride);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> startRideWithOtp(String rideId, String otp) async {
+    final previous = state.activeRide;
+    state = state.copyWith(isAccepting: true);
+    try {
+      var ride = await _repository.updateRideStatus(
+        rideId,
+        'started',
+        otp: otp.trim(),
+      );
+      if (previous != null) {
+        ride = ride.copyWith(
+          passengerName: ride.passengerName == 'Passenger'
+              ? previous.passengerName
+              : ride.passengerName,
+          passengerPhone: ride.passengerPhone ?? previous.passengerPhone,
+          pickupAddress:
+              ride.pickupAddress.isEmpty ? previous.pickupAddress : ride.pickupAddress,
+          destinationAddress: ride.destinationAddress.isEmpty
+              ? previous.destinationAddress
+              : ride.destinationAddress,
+          pickupLat: ride.pickupLat == 0 ? previous.pickupLat : ride.pickupLat,
+          pickupLng: ride.pickupLng == 0 ? previous.pickupLng : ride.pickupLng,
+          destinationLat:
+              ride.destinationLat == 0 ? previous.destinationLat : ride.destinationLat,
+          destinationLng:
+              ride.destinationLng == 0 ? previous.destinationLng : ride.destinationLng,
+          estimatedFare:
+              ride.estimatedFare == 0 ? previous.estimatedFare : ride.estimatedFare,
+        );
+      }
+      state = state.copyWith(activeRide: ride, isAccepting: false);
+    } catch (e) {
+      state = state.copyWith(isAccepting: false);
+      rethrow;
+    }
+  }
+
+  void patchActiveRideStatus(String status) {
+    final ride = state.activeRide;
+    if (ride == null) return;
+    state = state.copyWith(activeRide: ride.copyWith(status: status));
+  }
+
+  /// Returns null when ride is no longer active (e.g. cancelled). Keeps state on network errors.
+  Future<ActiveRide?> refreshActiveRideStatus() async {
+    try {
+      final ride = await _repository.getActiveRide();
+      if (ride == null || ride.status == 'cancelled') {
+        state = state.copyWith(clearActiveRide: true, clearIncomingRequest: true);
+        return null;
+      }
+      state = state.copyWith(activeRide: ride);
+      return ride;
+    } catch (_) {
+      return state.activeRide;
+    }
   }
 
   Future<PaymentBreakdown?> completeRide(String rideId) async {
     try {
-      return await _repository.completeRide(rideId);
+      final payment = await _repository.completeRide(rideId);
+      state = state.copyWith(clearActiveRide: true, clearIncomingRequest: true);
+      return payment;
     } catch (e) {
       return null;
     }
+  }
+
+  Future<PaymentBreakdown?> collectCashPayment(String rideId) =>
+      _repository.collectCashPayment(rideId);
+
+  Future<Map<String, dynamic>> createOnlinePaymentQr(String rideId) =>
+      _repository.createOnlinePaymentQr(rideId);
+
+  Future<bool> checkOnlinePaymentStatus(String rideId) =>
+      _repository.checkOnlinePaymentStatus(rideId);
+
+  Future<void> ratePassenger(
+    String rideId, {
+    required int rating,
+    String? comment,
+  }) async {
+    await _repository.ratePassenger(rideId, rating: rating, comment: comment);
   }
 
   Future<RideSummary?> getSummary(String rideId) async {
@@ -78,6 +286,15 @@ class RideViewModel extends StateNotifier<RideState> {
       return null;
     }
   }
+
+  void dismissRideRequest(String rideId) {
+    _persistDismissed(rideId);
+    if (state.incomingRequest?.id == rideId) {
+      state = state.copyWith(clearIncomingRequest: true);
+    }
+  }
+
+  bool isDismissed(String rideId) => _dismissedRideIds.contains(rideId);
 
   void clearRide() {
     state = const RideState();
@@ -102,11 +319,14 @@ class RideState {
     RideRequest? incomingRequest,
     ActiveRide? activeRide,
     bool? isAccepting,
+    bool clearIncomingRequest = false,
+    bool clearActiveRide = false,
   }) {
     return RideState(
       requestState: requestState ?? this.requestState,
-      incomingRequest: incomingRequest ?? this.incomingRequest,
-      activeRide: activeRide ?? this.activeRide,
+      incomingRequest:
+          clearIncomingRequest ? null : (incomingRequest ?? this.incomingRequest),
+      activeRide: clearActiveRide ? null : (activeRide ?? this.activeRide),
       isAccepting: isAccepting ?? this.isAccepting,
     );
   }
@@ -114,5 +334,8 @@ class RideState {
 
 final rideViewModelProvider =
     StateNotifierProvider<RideViewModel, RideState>((ref) {
-  return RideViewModel(ref.watch(rideRepositoryProvider));
+  return RideViewModel(
+    ref.watch(rideRepositoryProvider),
+    ref.watch(localStorageProvider),
+  );
 });

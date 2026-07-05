@@ -13,7 +13,8 @@ import { LoginSceneDecor } from "@/components/auth/LoginSceneDecor";
 import { LoginServicesPanel } from "@/components/auth/LoginServicesPanel";
 import { ROUTES } from "@/constants/routes";
 import {
-  getPostLoginRedirect,
+  needsProfileSetup,
+  resolvePostAuthDestination,
   setAuthSession,
   setPostLoginRedirect,
 } from "@/lib/auth-session";
@@ -74,6 +75,7 @@ export function LoginView() {
     const next = searchParams.get("next") ?? searchParams.get("redirect");
     if (next) setPostLoginRedirect(next);
 
+    const profileComplete = !needsProfileSetup(profile?.name);
     setAuthSession({
       phone,
       verified: true,
@@ -81,12 +83,15 @@ export function LoginView() {
       ...(profile?.email?.trim() ? { email: profile.email.trim() } : {}),
       ...(profile?.accessToken ? { accessToken: profile.accessToken } : {}),
       ...(profile?.refreshToken ? { refreshToken: profile.refreshToken } : {}),
+      profileComplete,
     });
 
     await new Promise((resolve) => setTimeout(resolve, 600));
     setIsExiting(true);
 
-    const destination = getPostLoginRedirect() ?? ROUTES.home;
+    const destination = profileComplete
+      ? resolvePostAuthDestination()
+      : ROUTES.createProfile;
     await new Promise((resolve) => setTimeout(resolve, reduceMotion ? 0 : 400));
     router.push(destination);
   };

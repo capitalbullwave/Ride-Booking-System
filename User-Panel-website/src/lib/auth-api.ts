@@ -195,10 +195,14 @@ export async function sendLoginOtp(
   const path =
     payload.mode === "signup"
       ? "/auth/register/otp/resend"
-      : "/auth/login/otp/send";
+      : "/auth/send-otp";
+  const body =
+    payload.mode === "signup"
+      ? { phone }
+      : { role: "user", phone, purpose: "login" as const };
   const result = await apiFetch<{ message: string; success: boolean; otp?: string }>(
     path,
-    { method: "POST", body: JSON.stringify({ phone }) },
+    { method: "POST", body: JSON.stringify(body) },
     payload.mode === "signup"
       ? "Unable to resend signup OTP."
       : "Unable to send OTP. Please try again."
@@ -213,10 +217,15 @@ export async function sendLoginOtp(
 export async function verifyOtp(payload: OtpVerifyRequest): Promise<AuthResponse> {
   const phone = normalizePhone(payload.dial_code, payload.phone);
   const tokens = await apiFetch<TokenResponse>(
-    "/auth/login/otp/verify",
+    "/auth/verify-otp",
     {
       method: "POST",
-      body: JSON.stringify({ phone, otp: payload.otp }),
+      body: JSON.stringify({
+        role: "user",
+        phone,
+        otp: payload.otp,
+        purpose: payload.mode === "signup" ? "register" : "login",
+      }),
     },
     "Unable to verify OTP. Please try again."
   );

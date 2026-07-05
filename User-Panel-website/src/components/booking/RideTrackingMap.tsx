@@ -53,7 +53,7 @@ export function RideTrackingMap({ vehicleImage, vehicleName }: RideTrackingMapPr
         {/* Full trip path (pickup → drop), faint */}
         <path
           d="M 328 224 C 340 180, 348 120, 352 72"
-          stroke="#31526E"
+          stroke="#73398f"
           strokeWidth="2"
           strokeDasharray="5 7"
           fill="none"
@@ -63,7 +63,7 @@ export function RideTrackingMap({ vehicleImage, vehicleName }: RideTrackingMapPr
         {/* Captain → pickup route */}
         <path
           d={ROUTE_PATH}
-          stroke="#31526E"
+          stroke="#73398f"
           strokeWidth="5"
           fill="none"
           strokeLinecap="round"

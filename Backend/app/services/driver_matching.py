@@ -241,16 +241,74 @@ class DriverMatchingService:
 
     async def get_pending_ride_ids(self, driver_id: UUID) -> List[UUID]:
         redis = await self._get_redis()
-        if not redis:
+        pending: List[UUID] = []
+        if redis:
+            try:
+                raw = await redis.smembers(f"{DRIVER_PENDING_PREFIX}{driver_id}")
+                if raw:
+                    pending = [UUID(ride_id) for ride_id in raw]
+            except Exception:
+                pass
+
+        if pending:
+            return pending
+
+        return await self._open_ride_request_ids_from_db(driver_id)
+
+    async def _open_ride_request_ids_from_db(self, driver_id: UUID) -> List[UUID]:
+        from app.core.constants import RideStatus
+        from app.models import Notification, Ride
+
+        result = await self.db.execute(
+            select(Notification)
+            .where(Notification.driver_id == driver_id)
+            .order_by(Notification.created_at.desc())
+            .limit(30)
+        )
+        ride_ids: List[UUID] = []
+        seen: set[UUID] = set()
+        for notification in result.scalars().all():
+            data = notification.data or {}
+            if data.get("event") != "ride_request":
+                continue
+            if data.get("outcome"):
+                continue
+            try:
+                ride_id = UUID(str(data["ride_id"]))
+            except (TypeError, ValueError):
+                continue
+            if ride_id in seen:
+                continue
+            seen.add(ride_id)
+            ride_ids.append(ride_id)
+
+        if not ride_ids:
             return []
 
+        status_result = await self.db.execute(
+            select(Ride.id).where(
+                Ride.id.in_(ride_ids),
+                Ride.status == RideStatus.SEARCHING_DRIVER.value,
+            )
+        )
+        open_ids = {row[0] for row in status_result.all()}
+        return [ride_id for ride_id in ride_ids if ride_id in open_ids]
+
+    async def remember_pending_ride(self, driver_id: UUID, ride_id: UUID) -> None:
+        redis = await self._get_redis()
+        if not redis:
+            return
         try:
-            pending = await redis.smembers(f"{DRIVER_PENDING_PREFIX}{driver_id}")
-            if pending:
-                return [UUID(ride_id) for ride_id in pending]
+            key = f"{DRIVER_PENDING_PREFIX}{driver_id}"
+            await redis.sadd(key, str(ride_id))
+            await redis.sadd(f"{RIDE_REQUESTS_PREFIX}{ride_id}", str(driver_id))
+            await redis.expire(key, settings.driver_request_timeout_seconds)
+            await redis.expire(
+                f"{RIDE_REQUESTS_PREFIX}{ride_id}",
+                settings.driver_request_timeout_seconds,
+            )
         except Exception:
             pass
-        return []
 
     async def clear_driver_pending(self, driver_id: UUID, ride_id: UUID) -> None:
         redis = await self._get_redis()
@@ -260,6 +318,21 @@ class DriverMatchingService:
         try:
             await redis.srem(f"{DRIVER_PENDING_PREFIX}{driver_id}", str(ride_id))
             await redis.srem(f"{RIDE_REQUESTS_PREFIX}{ride_id}", str(driver_id))
+        except Exception:
+            pass
+
+    async def clear_ride_requests(self, ride_id: UUID) -> None:
+        """Remove a ride from all driver pending sets when cancelled or completed."""
+        redis = await self._get_redis()
+        if not redis:
+            return
+
+        try:
+            key = f"{RIDE_REQUESTS_PREFIX}{ride_id}"
+            driver_ids = await redis.smembers(key)
+            for driver_id in driver_ids:
+                await redis.srem(f"{DRIVER_PENDING_PREFIX}{driver_id}", str(ride_id))
+            await redis.delete(key)
         except Exception:
             pass
 
@@ -292,6 +365,12 @@ class DriverMatchingService:
 
     async def dispatch_ride_to_online_drivers(self, ride: Ride, ws_manager=None) -> int:
         from app.notifications.service import NotificationService
+        from sqlalchemy.orm import selectinload
+
+        result = await self.db.execute(
+            select(Ride).options(selectinload(Ride.user)).where(Ride.id == ride.id)
+        )
+        ride = result.scalar_one()
 
         drivers = await self._online_drivers_for_ride(ride)
         if not drivers:
@@ -303,6 +382,15 @@ class DriverMatchingService:
         except Exception:
             pass
 
+        passenger_name = (
+            f"{ride.user.first_name} {ride.user.last_name}".strip()
+            if ride.user
+            else "Passenger"
+        )
+        fare = float(ride.estimated_fare or 0)
+        distance = float(ride.estimated_distance_km or 0)
+        duration = float(ride.estimated_duration_min or 0)
+
         notif_service = NotificationService(self.db)
         payload = {
             "event": "ride_request",
@@ -313,17 +401,26 @@ class DriverMatchingService:
             "pickup_lng": ride.pickup_lng,
             "dropoff_lat": ride.dropoff_lat,
             "dropoff_lng": ride.dropoff_lng,
-            "estimated_fare": ride.estimated_fare,
-            "estimated_distance_km": ride.estimated_distance_km,
-            "estimated_duration_min": ride.estimated_duration_min,
+            "estimated_fare": fare,
+            "estimated_distance_km": distance,
+            "estimated_duration_min": duration,
             "payment_method": ride.payment_method,
+            "passenger_name": passenger_name,
+            "passenger_phone": ride.user.phone if ride.user else None,
             "status": ride.status,
+            "actions": ["accept", "reject"],
         }
+        message = (
+            f"{passenger_name}\n"
+            f"From: {ride.pickup_address}\n"
+            f"To: {ride.dropoff_address}\n"
+            f"Fare: ₹{fare:.0f} · {distance:.1f} km · {duration:.0f} min"
+        )
 
         for driver in drivers:
             await notif_service.create_in_app(
                 title="New ride request",
-                message=f"Pickup: {ride.pickup_address}",
+                message=message,
                 notification_type="RIDE",
                 driver_id=driver.id,
                 data=payload,

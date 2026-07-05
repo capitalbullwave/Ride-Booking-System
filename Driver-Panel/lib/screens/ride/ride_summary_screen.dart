@@ -10,7 +10,9 @@ import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
 
 class RideSummaryScreen extends ConsumerStatefulWidget {
-  const RideSummaryScreen({super.key});
+  const RideSummaryScreen({super.key, this.rideId});
+
+  final String? rideId;
 
   @override
   ConsumerState<RideSummaryScreen> createState() => _RideSummaryScreenState();
@@ -28,12 +30,20 @@ class _RideSummaryScreenState extends ConsumerState<RideSummaryScreen> {
   }
 
   Future<void> _load() async {
-    final ride = ref.read(rideViewModelProvider).activeRide;
-    if (ride == null) {
-      setState(() { _loading = false; _error = 'No ride data'; });
+    final rideId =
+        widget.rideId ?? ref.read(rideViewModelProvider).activeRide?.id;
+    if (rideId == null || rideId.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'No ride data';
+      });
       return;
     }
-    final summary = await ref.read(rideViewModelProvider.notifier).getSummary(ride.id);
+
+    final summary =
+        await ref.read(rideViewModelProvider.notifier).getSummary(rideId);
+    if (!mounted) return;
+
     setState(() {
       _summary = summary;
       _loading = false;
