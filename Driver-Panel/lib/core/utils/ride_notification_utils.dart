@@ -23,7 +23,11 @@ String? rideIdFromNotification(AppNotification notification) {
 
 RideRequest? rideRequestFromNotification(AppNotification notification) {
   if (!isRideRequestNotification(notification)) return null;
-  final data = notification.data!;
+  return rideRequestFromRealtimePayload(notification.data!);
+}
+
+RideRequest? rideRequestFromRealtimePayload(Map<String, dynamic> data) {
+  if (data['event'] != 'ride_request' || data['ride_id'] == null) return null;
   return RideRequest(
     id: data['ride_id']?.toString() ?? '',
     pickupAddress: data['pickup_address'] as String? ?? '',

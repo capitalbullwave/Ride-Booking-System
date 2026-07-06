@@ -108,6 +108,12 @@ List<HomeServiceItem> fallbackHomeServices() => AppServices.homeServices;
 
 bool isParcelCategorySlug(String slug) => slug.toLowerCase().contains('parcel');
 
+String? bookedVehicleSlugForTrip(HomeBookingMode mode, String? bookedSlug) {
+  if (bookedSlug != null && bookedSlug.isNotEmpty) return bookedSlug;
+  if (mode == HomeBookingMode.parcel) return 'parcel';
+  return null;
+}
+
 bool isParcelCategory(VehicleCategory category) => isParcelCategorySlug(category.slug);
 
 List<VehicleCategory> filterCategoriesForMode(

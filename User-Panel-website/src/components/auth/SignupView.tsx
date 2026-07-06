@@ -12,7 +12,7 @@ import { CountryCodeSelector } from "@/components/auth/CountryCodeSelector";
 import { LoginSceneDecor } from "@/components/auth/LoginSceneDecor";
 import { LoginServicesPanel } from "@/components/auth/LoginServicesPanel";
 import { ROUTES } from "@/constants/routes";
-import { setDevOtpHint, setPendingOtpPhone } from "@/lib/auth-session";
+import { setPendingOtpPhone } from "@/lib/auth-session";
 import { sendSignupOtp } from "@/lib/auth-api";
 import {
   defaultCountry,
@@ -139,7 +139,6 @@ export function SignupView() {
       });
 
       setPendingOtpPhone(result.phone);
-      if (result.dev_otp) setDevOtpHint(result.dev_otp);
       router.push(`${ROUTES.otp}?phone=${encodeURIComponent(result.phone)}&mode=signup`);
     } catch (error) {
       const message =

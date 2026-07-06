@@ -329,6 +329,8 @@ class UserActiveRide {
     this.driverPhone,
     this.driverRating,
     this.vehicleNumber,
+    this.vehicleTypeSlug,
+    this.vehicleTypeName,
     this.startCode,
     this.pickupLat,
     this.pickupLng,
@@ -347,6 +349,8 @@ class UserActiveRide {
   final String? driverPhone;
   final double? driverRating;
   final String? vehicleNumber;
+  final String? vehicleTypeSlug;
+  final String? vehicleTypeName;
   final String? startCode;
   final double? pickupLat;
   final double? pickupLng;
@@ -357,6 +361,7 @@ class UserActiveRide {
 
   factory UserActiveRide.fromJson(Map<String, dynamic> json) {
     final driver = json['driver'] as Map<String, dynamic>?;
+    final vehicleType = json['vehicle_type'] as Map<String, dynamic>?;
     return UserActiveRide(
       id: json['id']?.toString() ?? '',
       pickupAddress: json['pickup_address'] as String? ?? '',
@@ -367,6 +372,10 @@ class UserActiveRide {
       driverPhone: driver?['phone'] as String?,
       driverRating: (driver?['rating'] as num?)?.toDouble(),
       vehicleNumber: json['vehicle_number'] as String?,
+      vehicleTypeSlug: vehicleType?['slug'] as String? ??
+          json['vehicle_type_slug'] as String?,
+      vehicleTypeName: vehicleType?['name'] as String? ??
+          json['vehicle_type_name'] as String?,
       startCode: json['start_code'] as String?,
       pickupLat: (json['pickup_lat'] as num?)?.toDouble(),
       pickupLng: (json['pickup_lng'] as num?)?.toDouble(),
@@ -388,6 +397,8 @@ class UserActiveRide {
       driverPhone: driverPhone,
       driverRating: driverRating,
       vehicleNumber: vehicleNumber,
+      vehicleTypeSlug: vehicleTypeSlug,
+      vehicleTypeName: vehicleTypeName,
       startCode: startCode,
       pickupLat: pickupLat,
       pickupLng: pickupLng,
@@ -409,6 +420,8 @@ class UserActiveRide {
       driverPhone: driverPhone,
       driverRating: driverRating,
       vehicleNumber: vehicleNumber,
+      vehicleTypeSlug: vehicleTypeSlug,
+      vehicleTypeName: vehicleTypeName,
       startCode: startCode ?? this.startCode,
       pickupLat: pickupLat,
       pickupLng: pickupLng,

@@ -1,11 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show HttpClient, Platform;
+import 'dart:io' show Platform;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
+  static final Dio _http = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 12),
+      headers: const {'Accept': 'application/json'},
+    ),
+  );
+
   static const defaultLat = 28.6139;
   static const defaultLng = 77.2090;
 
@@ -31,46 +40,66 @@ class LocationService {
   }
 
   Future<bool> ensurePermission() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw LocationServiceException(
-        'Location services are off. Turn on GPS in Settings.',
-        openSettings: true,
-      );
-    }
+    // Browser shows its own permission prompt when geolocation is requested.
+    if (kIsWeb) return true;
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      throw LocationServiceException(
-        'Location permission blocked. Enable it in Settings.',
-        openSettings: true,
-      );
-    }
-
-    if (permission == LocationPermission.denied) {
-      throw LocationServiceException('Location permission denied');
-    }
-
-    if (Platform.isIOS) {
-      final accuracyStatus = await Geolocator.getLocationAccuracy();
-      if (accuracyStatus == LocationAccuracyStatus.reduced) {
-        await Geolocator.requestTemporaryFullAccuracy(
-          purposeKey: 'RidePickup',
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw LocationServiceException(
+          'Location services are off. Turn on GPS in Settings.',
+          openSettings: true,
         );
       }
-    }
 
-    return true;
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw LocationServiceException(
+          'Location permission blocked. Enable it in Settings.',
+          openSettings: true,
+        );
+      }
+
+      if (permission == LocationPermission.denied) {
+        throw LocationServiceException('Location permission denied');
+      }
+
+      if (!kIsWeb && Platform.isIOS) {
+        final accuracyStatus = await Geolocator.getLocationAccuracy();
+        if (accuracyStatus == LocationAccuracyStatus.reduced) {
+          await Geolocator.requestTemporaryFullAccuracy(
+            purposeKey: 'RidePickup',
+          );
+        }
+      }
+
+      return true;
+    } on LocationServiceException {
+      rethrow;
+    } catch (_) {
+      throw LocationServiceException(
+        'Could not access location. Check app permissions and try again.',
+        openSettings: true,
+      );
+    }
   }
 
   Future<bool> isServiceEnabled() => Geolocator.isLocationServiceEnabled();
 
   LocationSettings _settings({Duration timeLimit = const Duration(seconds: 60)}) {
-    if (Platform.isIOS) {
+    if (kIsWeb) {
+      return WebSettings(
+        accuracy: LocationAccuracy.best,
+        timeLimit: timeLimit,
+        maximumAge: Duration.zero,
+      );
+    }
+    if (!kIsWeb && Platform.isIOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.best,
         activityType: ActivityType.other,
@@ -80,7 +109,7 @@ class LocationService {
         timeLimit: timeLimit,
       );
     }
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 0,
@@ -107,7 +136,7 @@ class LocationService {
     await ensurePermission();
 
     Position? lastKnown;
-    if (!forceFresh) {
+    if (!forceFresh && !kIsWeb) {
       lastKnown = await Geolocator.getLastKnownPosition();
       if (lastKnown != null) {
         final age = DateTime.now().difference(lastKnown.timestamp);
@@ -126,7 +155,7 @@ class LocationService {
       }
 
       // Simulator GPS is often San Francisco — try network before failing.
-      if (isIOSSimulator || kDebugMode) {
+      if (isIOSSimulator || kDebugMode || kIsWeb) {
         final network = await _fetchNetworkPosition();
         if (network != null) {
           return network;
@@ -143,32 +172,37 @@ class LocationService {
         openSettings: true,
       );
     } on PermissionDeniedException {
-      throw LocationServiceException('Location permission denied');
+      throw LocationServiceException(
+        kIsWeb
+            ? 'Location access denied. Allow location for this site in your browser.'
+            : 'Location permission denied',
+      );
+    } on PositionUpdateException {
+      return _recoverFromGpsFailure(lastKnown);
     } on TimeoutException {
-      final network = await _networkFallbackAfterGpsFailure();
-      if (network != null) return network;
-
-      if (lastKnown != null && isInIndia(lastKnown.latitude, lastKnown.longitude)) {
-        return lastKnown;
-      }
-      throw LocationServiceException(
-        'Could not get GPS fix. Move outdoors or wait a few seconds and try again.',
-      );
+      return _recoverFromGpsFailure(lastKnown);
     } catch (_) {
-      final network = await _networkFallbackAfterGpsFailure();
-      if (network != null) return network;
-
-      if (lastKnown != null && isInIndia(lastKnown.latitude, lastKnown.longitude)) {
-        return lastKnown;
-      }
-      throw LocationServiceException(
-        'Could not get your location. Check GPS and try again.',
-      );
+      return _recoverFromGpsFailure(lastKnown);
     }
   }
 
+  Future<Position> _recoverFromGpsFailure(Position? lastKnown) async {
+    final network = await _networkFallbackAfterGpsFailure();
+    if (network != null) return network;
+
+    if (lastKnown != null && isInIndia(lastKnown.latitude, lastKnown.longitude)) {
+      return lastKnown;
+    }
+
+    throw LocationServiceException(
+      kIsWeb
+          ? 'Could not detect your location. Allow location access in your browser and try again.'
+          : 'Could not get your location. Check GPS and try again.',
+    );
+  }
+
   Future<Position?> _networkFallbackAfterGpsFailure() async {
-    if (!isIOSSimulator && !kDebugMode) return null;
+    if (!isIOSSimulator && !kDebugMode && !kIsWeb) return null;
     return _fetchNetworkPosition();
   }
 
@@ -212,14 +246,12 @@ class LocationService {
 
   Future<Position?> _fetchFromIpInfo() async {
     try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 12);
-      final request = await client.getUrl(Uri.parse('https://ipinfo.io/json'));
-      final response = await request.close();
-      if (response.statusCode != 200) return null;
+      final response = await _http.get<dynamic>('https://ipinfo.io/json');
+      if (response.statusCode != 200 || response.data == null) return null;
 
-      final body = await response.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : jsonDecode(response.data as String) as Map<String, dynamic>;
       final loc = data['loc'] as String?;
       if (loc == null || !loc.contains(',')) return null;
 
@@ -234,14 +266,12 @@ class LocationService {
 
   Future<Position?> _fetchFromIpApiCo() async {
     try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 12);
-      final request = await client.getUrl(Uri.parse('https://ipapi.co/json/'));
-      final response = await request.close();
-      if (response.statusCode != 200) return null;
+      final response = await _http.get<dynamic>('https://ipapi.co/json/');
+      if (response.statusCode != 200 || response.data == null) return null;
 
-      final body = await response.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : jsonDecode(response.data as String) as Map<String, dynamic>;
       final lat = data['latitude'];
       final lng = data['longitude'];
       if (lat == null || lng == null) return null;
@@ -283,7 +313,10 @@ class LocationService {
     }
   }
 
-  Future<void> openLocationSettings() => Geolocator.openLocationSettings();
+  Future<void> openLocationSettings() async {
+    if (kIsWeb) return;
+    await Geolocator.openLocationSettings();
+  }
 }
 
 class LocationServiceException implements Exception {

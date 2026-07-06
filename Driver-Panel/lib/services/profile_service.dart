@@ -226,6 +226,38 @@ class ProfileService extends BaseApiService {
     );
   }
 
+  Future<void> saveVehicleType({required String vehicleTypeId}) async {
+    if (useMock) return;
+    await post(
+      ApiEndpoints.registrationVehicleType,
+      data: {'vehicle_type_id': vehicleTypeId},
+    );
+  }
+
+  Future<void> saveVehicleDocuments({
+    String? insuranceUrl,
+    String? pollutionUrl,
+    String? permitUrl,
+    String? fitnessUrl,
+    String? vehicleFrontUrl,
+    String? vehicleBackUrl,
+    String? vehicleSideUrl,
+  }) async {
+    if (useMock) return;
+    await post(
+      ApiEndpoints.registrationVehicleDocuments,
+      data: {
+        if (insuranceUrl != null) 'insurance_url': insuranceUrl,
+        if (pollutionUrl != null) 'pollution_url': pollutionUrl,
+        if (permitUrl != null) 'permit_url': permitUrl,
+        if (fitnessUrl != null) 'fitness_url': fitnessUrl,
+        if (vehicleFrontUrl != null) 'vehicle_front_url': vehicleFrontUrl,
+        if (vehicleBackUrl != null) 'vehicle_back_url': vehicleBackUrl,
+        if (vehicleSideUrl != null) 'vehicle_side_url': vehicleSideUrl,
+      },
+    );
+  }
+
   Future<void> saveKyc({
     required String idType,
     required String frontUrl,

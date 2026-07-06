@@ -68,7 +68,9 @@ class ImagePickUtils {
         source: action == _ImagePickAction.gallery
             ? ImageSource.gallery
             : ImageSource.camera,
-        imageQuality: 80,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
     } catch (error) {
       if (context.mounted) {

@@ -15,6 +15,8 @@ class RouteNames {
   static const String onboardingPhotoName = '/auth/onboarding/photo-name';
   static const String onboardingVehicleNumber = '/auth/onboarding/vehicle-number';
   static const String onboardingKyc = '/auth/onboarding/kyc';
+  static const String onboardingVehicleDocuments =
+      '/auth/onboarding/vehicle-documents';
   static const String registration = '/registration';
   static const String verificationPending = '/verification-pending';
   static const String dashboard = '/dashboard';

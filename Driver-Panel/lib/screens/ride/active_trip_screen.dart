@@ -15,6 +15,10 @@ import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
+import 'package:wavego_driver/providers/ride_chat_provider.dart';
+import 'package:wavego_driver/services/ride_realtime_service.dart';
+import 'package:wavego_driver/widgets/ride/ride_chat_notification.dart';
+import 'package:wavego_driver/widgets/ride/ride_chat_sheet.dart';
 import 'package:wavego_driver/widgets/ride/trip_map_view.dart';
 
 class ActiveTripScreen extends ConsumerStatefulWidget {
@@ -39,6 +43,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   bool _loading = true;
   bool _cancelHandled = false;
   Timer? _statusPollTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
   LatLng _navTarget(ActiveRide ride) {
     if (ride.status == 'started') {
@@ -80,20 +85,12 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   }
 
   Future<void> _messagePassenger(ActiveRide ride) async {
-    final phone = ride.passengerPhone;
-    if (phone == null || phone.isEmpty) {
-      if (mounted) {
-        context.showSnackBar('Passenger phone not available', isError: true);
-      }
-      return;
-    }
-    final launched = await NavigationLauncher.sendSms(
-      phone,
-      body: 'Hi ${ride.passengerName}, I am your Fast Bull Captain.',
+    await showRideChatSheet(
+      context: context,
+      ref: ref,
+      rideId: ride.id,
+      peerName: ride.passengerName,
     );
-    if (!launched && mounted) {
-      context.showSnackBar('Could not open messaging app', isError: true);
-    }
   }
 
   @override
@@ -113,6 +110,33 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
       }
       setState(() => _loading = false);
       _startStatusPolling();
+      final ride = ref.read(rideViewModelProvider).activeRide;
+      if (ride != null) _startRideRealtime(ride);
+    });
+  }
+
+  void _startRideRealtime(ActiveRide ride) {
+    final realtime = ref.read(rideRealtimeProvider);
+    unawaited(realtime.connect());
+    realtime.subscribeRide(ride.id);
+    _realtimeSub?.cancel();
+    _realtimeSub = realtime.messages.listen((msg) {
+      if (!mounted) return;
+      if (msg['event']?.toString() != 'chat_message') return;
+      if (msg['ride_id']?.toString() != ride.id) return;
+      if ((msg['sender_type']?.toString() ?? '') == 'driver') return;
+      if (ref.read(rideChatSheetOpenProvider)) return;
+
+      final text = msg['message']?.toString() ?? '';
+      if (text.isEmpty) return;
+
+      final currentRide = ref.read(rideViewModelProvider).activeRide ?? ride;
+      showRideChatNotification(
+        context,
+        senderName: msg['sender_name']?.toString() ?? currentRide.passengerName,
+        message: text,
+        onTap: () => _messagePassenger(currentRide),
+      );
     });
   }
 
@@ -178,6 +202,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   @override
   void dispose() {
     _statusPollTimer?.cancel();
+    _realtimeSub?.cancel();
     _sheetController.dispose();
     _otpController.dispose();
     super.dispose();
@@ -209,8 +234,14 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
       orElse: () => _statusFlow.last,
     );
     final sheetColor = Theme.of(context).colorScheme.surface;
-    final primaryBusy = _statusUpdating || _otpSubmitting;
+    final primaryBusy = ride.status == 'arrived'
+        ? _otpSubmitting
+        : ride.status == 'started'
+            ? _statusUpdating
+            : false;
     final isStartingRide = ref.watch(rideViewModelProvider).isAccepting;
+    final blockPrimaryAction = primaryBusy ||
+        (ride.status == 'heading_to_pickup' && isStartingRide);
 
     return Scaffold(
       body: Stack(
@@ -224,14 +255,6 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                   IconButton.filled(
                     onPressed: () => context.go(RouteNames.dashboard),
                     icon: const Icon(Icons.arrow_back),
-                  ),
-                  const Spacer(),
-                  IconButton.filled(
-                    onPressed: () => context.push(RouteNames.sos),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                    ),
-                    icon: const Icon(Icons.emergency),
                   ),
                 ],
               ),
@@ -417,19 +440,13 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                           label: 'Chat',
                           onTap: () => _messagePassenger(ride),
                         ),
-                        _ActionBtn(
-                          icon: Icons.emergency,
-                          label: 'SOS',
-                          color: AppColors.error,
-                          onTap: () => context.push(RouteNames.sos),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
                     AppButton(
                       label: currentAction.$3,
-                      isLoading: primaryBusy || isStartingRide,
-                      onPressed: (primaryBusy || isStartingRide)
+                      isLoading: blockPrimaryAction,
+                      onPressed: blockPrimaryAction
                           ? null
                           : () => _handleStatusAction(ride, currentAction.$1),
                     ),
@@ -447,19 +464,16 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     final vm = ref.read(rideViewModelProvider.notifier);
 
     if (statusKey == 'heading_to_pickup') {
-      setState(() => _statusUpdating = true);
+      // Show OTP entry immediately; sync "arrived" with the server in the background.
+      vm.patchActiveRideStatus('arrived');
+      WidgetsBinding.instance.addPostFrameCallback((_) => _expandSheetForOtp());
+
       try {
         await vm.updateStatus(ride.id, 'arrived');
-        if (mounted) {
-          vm.patchActiveRideStatus('arrived');
-          _expandSheetForOtp();
-        }
       } catch (e) {
-        if (mounted) {
-          context.showSnackBar(e.userMessage, isError: true);
-        }
-      } finally {
-        if (mounted) setState(() => _statusUpdating = false);
+        if (!mounted) return;
+        vm.patchActiveRideStatus('heading_to_pickup');
+        context.showSnackBar(e.userMessage, isError: true);
       }
       return;
     }
@@ -495,16 +509,21 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     }
 
     if (statusKey == 'started') {
-      final payment = await vm.completeRide(ride.id);
-      if (payment != null && mounted) {
-        context.pushReplacement(
-          RouteNames.payment,
-          extra: PaymentCompletionData(
-            payment: payment,
-            rideId: ride.id,
-            passengerName: ride.passengerName,
-          ),
-        );
+      setState(() => _statusUpdating = true);
+      try {
+        final payment = await vm.completeRide(ride.id);
+        if (payment != null && mounted) {
+          context.pushReplacement(
+            RouteNames.payment,
+            extra: PaymentCompletionData(
+              payment: payment,
+              rideId: ride.id,
+              passengerName: ride.passengerName,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _statusUpdating = false);
       }
     }
   }

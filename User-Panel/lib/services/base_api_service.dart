@@ -22,8 +22,20 @@ class BaseApiService {
     String path, {
     dynamic data,
     T Function(dynamic data)? parser,
+    Duration? sendTimeout,
+    Duration? receiveTimeout,
   }) async {
-    return _request(() => _dio.post(path, data: data), parser);
+    return _request(
+      () => _dio.post(
+        path,
+        data: data,
+        options: Options(
+          sendTimeout: sendTimeout,
+          receiveTimeout: receiveTimeout,
+        ),
+      ),
+      parser,
+    );
   }
 
   Future<T> put<T>(

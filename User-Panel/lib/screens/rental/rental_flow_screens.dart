@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_user/core/constants/home_booking_mode.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
@@ -15,6 +16,33 @@ import 'package:wavego_user/providers/rental_booking_provider.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/services/places_service.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
+
+Future<void> syncTripBookingFromRental(
+  WidgetRef ref, {
+  required SelectedPlace pickup,
+  required SelectedPlace dropoff,
+  required VehicleCategory category,
+}) async {
+  final tripNotifier = ref.read(tripBookingProvider.notifier);
+  tripNotifier.setMode(HomeBookingMode.rental);
+  tripNotifier.setPickup(pickup);
+  tripNotifier.setDropoff(dropoff);
+  tripNotifier.setBookedVehicleSlug(category.slug);
+
+  if (!pickup.hasCoordinates || !dropoff.hasCoordinates) return;
+
+  try {
+    final route = await ref.read(placesServiceProvider).getDirectionsByCoordinates(
+          pickupLat: pickup.latitude!,
+          pickupLng: pickup.longitude!,
+          dropoffLat: dropoff.latitude!,
+          dropoffLng: dropoff.longitude!,
+          pickupAddress: pickup.label,
+          dropoffAddress: dropoff.label,
+        );
+    tripNotifier.setRoute(route);
+  } catch (_) {}
+}
 
 class RentalHoursScreen extends ConsumerStatefulWidget {
   const RentalHoursScreen({super.key});
@@ -204,6 +232,10 @@ class RentalVehiclesScreen extends ConsumerWidget {
                       imageUrl: imageUrl,
                       onTap: () {
                         ref.read(rentalBookingProvider.notifier).setCategory(category);
+                        ref.read(tripBookingProvider.notifier).setMode(HomeBookingMode.rental);
+                        ref
+                            .read(tripBookingProvider.notifier)
+                            .setBookedVehicleSlug(category.slug);
                         context.push(RouteNames.rentalPickup);
                       },
                     );
@@ -253,6 +285,7 @@ class RentalPickupScreen extends ConsumerWidget {
     );
     if (result == null) return;
     ref.read(rentalBookingProvider.notifier).setPickup(result);
+    ref.read(tripBookingProvider.notifier).setPickup(result);
     if (context.mounted) context.push(RouteNames.rentalDropoff);
   }
 
@@ -307,6 +340,7 @@ class RentalDropoffScreen extends ConsumerWidget {
     );
     if (result == null) return;
     ref.read(rentalBookingProvider.notifier).setDropoff(result);
+    ref.read(tripBookingProvider.notifier).setDropoff(result);
     if (context.mounted) context.push(RouteNames.rentalConfirm);
   }
 
@@ -390,6 +424,12 @@ class _RentalConfirmScreenState extends ConsumerState<RentalConfirmScreen> {
 
     setState(() => _isBooking = true);
     try {
+      await syncTripBookingFromRental(
+        ref,
+        pickup: pickup,
+        dropoff: dropoff,
+        category: category,
+      );
       final result = await ref.read(rideBookingServiceProvider).bookRide(
             pickupAddress: pickup.label,
             dropoffAddress: dropoff.label,

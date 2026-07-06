@@ -4,9 +4,11 @@ import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/data/captain_vehicle_options.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
+import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 
 class CaptainVehicleSelectionScreen extends ConsumerStatefulWidget {
@@ -20,28 +22,60 @@ class CaptainVehicleSelectionScreen extends ConsumerStatefulWidget {
 class _CaptainVehicleSelectionScreenState
     extends ConsumerState<CaptainVehicleSelectionScreen> {
   String? _selectedId;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final saved = ref.read(registrationViewModelProvider).vehicleType;
-    _selectedId = CaptainVehicleOptions.byRegistrationType(saved)?.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSaved());
   }
 
-  void _confirmVehicle() {
+  Future<void> _loadSaved() async {
+    await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
+    if (!mounted) return;
+    final saved = ref.read(registrationViewModelProvider).vehicleType;
+    setState(() {
+      _selectedId = CaptainVehicleOptions.byRegistrationType(saved)?.id;
+    });
+  }
+
+  Future<void> _confirmVehicle() async {
     final selectedId = _selectedId;
     if (selectedId == null) return;
 
     final option =
         CaptainVehicleOptions.all.firstWhere((o) => o.id == selectedId);
 
-    ref.read(registrationViewModelProvider.notifier).updateRegistration(
-          (r) => r.copyWith(vehicleType: option.registrationType),
-        );
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go(RouteNames.documentCentre);
+    setState(() => _saving = true);
+    try {
+      final vehicleTypeId =
+          await ref.read(profileRepositoryProvider).resolveVehicleTypeId(
+                option.registrationType,
+              );
+      if (vehicleTypeId == null) {
+        throw Exception('Vehicle type not found');
+      }
+
+      await ref.read(profileRepositoryProvider).saveVehicleType(
+            vehicleTypeId: vehicleTypeId,
+          );
+
+      ref.read(registrationViewModelProvider.notifier).updateRegistration(
+            (r) => r.copyWith(vehicleType: option.registrationType),
+          );
+
+      if (!mounted) return;
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go(RouteNames.documentCentre);
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showSnackBar(e.userMessage, isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -112,7 +146,8 @@ class _CaptainVehicleSelectionScreenState
                 label: 'Confirm Vehicle',
                 variant: AppButtonVariant.secondary,
                 height: 56,
-                onPressed: hasSelection ? _confirmVehicle : null,
+                isLoading: _saving,
+                onPressed: hasSelection && !_saving ? _confirmVehicle : null,
               ),
             ),
           ],

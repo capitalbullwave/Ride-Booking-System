@@ -54,7 +54,7 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
     _plateController.text = data.vehicleNumber ?? '';
     setState(() {
       _rcFront = data.rcUrl ?? docUrl('VEHICLE_RC');
-      _rcBack = docUrl('VEHICLE_RC_BACK');
+      _rcBack = data.rcBackUrl ?? docUrl('VEHICLE_RC_BACK');
       _vehicleTypeName = data.vehicleType ?? raw['vehicle_type_name'] as String?;
       _loading = false;
     });
@@ -94,6 +94,10 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
       context.showSnackBar('Enter vehicle number', isError: true);
       return;
     }
+    if (!hasUploadedMedia(_rcFront) || !hasUploadedMedia(_rcBack)) {
+      context.showSnackBar('Upload RC front and back photos', isError: true);
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -114,6 +118,7 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
             (r) => r.copyWith(
               vehicleNumber: plate,
               rcUrl: _rcFront,
+              rcBackUrl: _rcBack,
               vehicleBrand: r.vehicleBrand ?? 'Standard',
               vehicleModel: r.vehicleModel ?? 'Standard',
               vehicleColor: r.vehicleColor ?? 'Unknown',

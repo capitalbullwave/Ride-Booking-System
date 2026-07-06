@@ -31,6 +31,9 @@ export interface DriverRide {
   dropLocation: string;
   distance: number;
   fare: number;
+  driverCommissionPercentage?: number;
+  driverEarning?: number;
+  companyEarning?: number;
   status: string;
   date: string;
   duration?: number;
@@ -179,6 +182,14 @@ export async function fetchDriverRides(driverId: string): Promise<DriverRide[]> 
     ...ride,
     fare: Number(ride.fare),
     distance: Number(ride.distance),
+    driverCommissionPercentage:
+      ride.driverCommissionPercentage != null
+        ? Number(ride.driverCommissionPercentage)
+        : undefined,
+    driverEarning:
+      ride.driverEarning != null ? Number(ride.driverEarning) : undefined,
+    companyEarning:
+      ride.companyEarning != null ? Number(ride.companyEarning) : undefined,
   }));
 }
 

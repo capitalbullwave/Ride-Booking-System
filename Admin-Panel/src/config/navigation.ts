@@ -61,6 +61,7 @@ export const navigation: NavGroup[] = [
     items: [
       { title: "Reports", href: "/reports", icon: BarChart3 },
       { title: "App Settings", href: "/settings", icon: Settings },
+      { title: "Driver Commission", href: "/settings/driver-commission", icon: Settings },
     ],
   },
 ];

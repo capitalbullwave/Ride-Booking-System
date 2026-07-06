@@ -43,11 +43,16 @@ class TripBookingNotifier extends StateNotifier<TripBookingState> {
     state = state.copyWith(activeRideId: rideId);
   }
 
+  void setBookedVehicleSlug(String? slug) {
+    state = state.copyWith(bookedVehicleSlug: slug);
+  }
+
   void clearActiveRideId() {
     state = TripBookingState(
       pickup: state.pickup,
       dropoff: state.dropoff,
       route: state.route,
+      bookedVehicleSlug: state.bookedVehicleSlug,
       mode: state.mode,
       scheduledAt: state.scheduledAt,
     );

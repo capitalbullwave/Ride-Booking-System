@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
+import 'package:wavego_driver/models/payment_completion_data.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/repositories/ride_repository.dart';
 
@@ -253,13 +254,29 @@ class RideViewModel extends StateNotifier<RideState> {
   }
 
   Future<PaymentBreakdown?> completeRide(String rideId) async {
+    final active = state.activeRide;
     try {
       final payment = await _repository.completeRide(rideId);
-      state = state.copyWith(clearActiveRide: true, clearIncomingRequest: true);
+      state = state.copyWith(
+        clearActiveRide: true,
+        clearIncomingRequest: true,
+        pendingPayment: active != null
+            ? PaymentCompletionData(
+                payment: payment,
+                rideId: rideId,
+                passengerName: active.passengerName,
+              )
+            : null,
+      );
       return payment;
     } catch (e) {
       return null;
     }
+  }
+
+  void clearPendingPayment() {
+    if (state.pendingPayment == null) return;
+    state = state.copyWith(clearPendingPayment: true);
   }
 
   Future<PaymentBreakdown?> collectCashPayment(String rideId) =>
@@ -307,20 +324,24 @@ class RideState {
     this.incomingRequest,
     this.activeRide,
     this.isAccepting = false,
+    this.pendingPayment,
   });
 
   final ViewState<RideRequest> requestState;
   final RideRequest? incomingRequest;
   final ActiveRide? activeRide;
   final bool isAccepting;
+  final PaymentCompletionData? pendingPayment;
 
   RideState copyWith({
     ViewState<RideRequest>? requestState,
     RideRequest? incomingRequest,
     ActiveRide? activeRide,
     bool? isAccepting,
+    PaymentCompletionData? pendingPayment,
     bool clearIncomingRequest = false,
     bool clearActiveRide = false,
+    bool clearPendingPayment = false,
   }) {
     return RideState(
       requestState: requestState ?? this.requestState,
@@ -328,6 +349,9 @@ class RideState {
           clearIncomingRequest ? null : (incomingRequest ?? this.incomingRequest),
       activeRide: clearActiveRide ? null : (activeRide ?? this.activeRide),
       isAccepting: isAccepting ?? this.isAccepting,
+      pendingPayment: clearPendingPayment
+          ? null
+          : (pendingPayment ?? this.pendingPayment),
     );
   }
 }

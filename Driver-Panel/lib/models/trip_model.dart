@@ -75,3 +75,21 @@ abstract class EarningsDataPoint with _$EarningsDataPoint {
   factory EarningsDataPoint.fromJson(Map<String, dynamic> json) =>
       _$EarningsDataPointFromJson(json);
 }
+
+class EarningsRideItem {
+  const EarningsRideItem({
+    required this.rideId,
+    required this.rideFare,
+    required this.driverCommissionPercentage,
+    required this.driverEarning,
+    this.rideDate,
+    required this.status,
+  });
+
+  final String rideId;
+  final double rideFare;
+  final double driverCommissionPercentage;
+  final double driverEarning;
+  final String? rideDate;
+  final String status;
+}

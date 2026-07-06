@@ -172,9 +172,8 @@ class BackendMappers {
         (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final commission = (json['commission'] as num?)?.toDouble() ?? fare * 0.2;
-    final totalEarnings =
-        (json['total_earnings'] as num?)?.toDouble() ?? (fare - commission);
+    final commission = (json['commission'] as num?)?.toDouble() ?? 0;
+    final totalEarnings = (json['total_earnings'] as num?)?.toDouble() ?? 0;
     return PaymentBreakdown(
       tripFare: fare,
       commission: commission,
@@ -194,7 +193,8 @@ class BackendMappers {
     final fare = (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final commission = fare * 0.2;
+    final driverEarning = (json['driver_earning'] as num?)?.toDouble() ?? 0;
+    final companyEarning = (json['company_earning'] as num?)?.toDouble() ?? 0;
     return RideSummary(
       id: json['id']?.toString() ?? '',
       pickupAddress: json['pickup_address'] as String? ?? '',
@@ -203,8 +203,8 @@ class BackendMappers {
       duration:
           ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
       fare: fare,
-      commission: commission,
-      netEarnings: fare - commission,
+      commission: companyEarning > 0 ? companyEarning : fare - driverEarning,
+      netEarnings: driverEarning,
       paymentMode: json['payment_method'] as String? ?? 'CASH',
       completedAt: json['completed_at']?.toString(),
     );
@@ -214,6 +214,7 @@ class BackendMappers {
     final fare = (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
+    final driverEarning = (json['driver_earning'] as num?)?.toDouble() ?? 0;
     return Trip(
       id: json['id']?.toString() ?? '',
       status: (json['status'] as String? ?? '').toLowerCase(),
@@ -223,7 +224,7 @@ class BackendMappers {
       duration:
           ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
       fare: fare,
-      netEarnings: fare * 0.8,
+      netEarnings: driverEarning,
       paymentMode: json['payment_method'] as String? ?? 'CASH',
       createdAt: json['created_at']?.toString() ?? '',
     );
@@ -233,7 +234,8 @@ class BackendMappers {
     final fare = (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final commission = fare * 0.2;
+    final driverEarning = (json['driver_earning'] as num?)?.toDouble() ?? 0;
+    final companyEarning = (json['company_earning'] as num?)?.toDouble() ?? 0;
     return TripDetail(
       id: json['id']?.toString() ?? '',
       status: (json['status'] as String? ?? '').toLowerCase(),
@@ -243,8 +245,8 @@ class BackendMappers {
       duration:
           ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
       fare: fare,
-      commission: commission,
-      netEarnings: fare - commission,
+      commission: companyEarning > 0 ? companyEarning : fare - driverEarning,
+      netEarnings: driverEarning,
       paymentMode: json['payment_method'] as String? ?? 'CASH',
       createdAt: json['created_at']?.toString() ?? '',
       completedAt: json['completed_at']?.toString(),
@@ -253,16 +255,40 @@ class BackendMappers {
 
   static EarningsSummary earningsFromJson(Map<String, dynamic> json) {
     return EarningsSummary(
-      todayEarnings: (json['net_earnings'] as num?)?.toDouble() ?? 0,
+      todayEarnings: (json['net_earnings'] as num?)?.toDouble() ??
+          (json['total_earnings'] as num?)?.toDouble() ??
+          0,
       weeklyEarnings: (json['total_earnings'] as num?)?.toDouble() ?? 0,
       monthlyEarnings: (json['total_earnings'] as num?)?.toDouble() ?? 0,
       totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
+      todayTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
     );
   }
 
+  static List<EarningsRideItem> earningsRidesFromJson(Map<String, dynamic> json) {
+    final rides = json['rides'] as List<dynamic>? ?? [];
+    return rides.map((raw) {
+      final item = raw as Map<String, dynamic>;
+      return EarningsRideItem(
+        rideId: item['ride_id']?.toString() ?? '',
+        rideFare: (item['ride_fare'] as num?)?.toDouble() ?? 0,
+        driverCommissionPercentage:
+            (item['driver_commission_percentage'] as num?)?.toDouble() ?? 0,
+        driverEarning: (item['driver_earning'] as num?)?.toDouble() ?? 0,
+        rideDate: item['ride_date']?.toString(),
+        status: item['status'] as String? ?? 'COMPLETED',
+      );
+    }).toList();
+  }
+
   static WalletInfo walletFromJson(Map<String, dynamic> json) {
+    final available = (json['available_balance'] as num?)?.toDouble() ??
+        (json['balance'] as num?)?.toDouble() ??
+        0;
     return WalletInfo(
-      currentBalance: (json['balance'] as num?)?.toDouble() ?? 0,
+      currentBalance: available,
+      pendingBalance: (json['pending_balance'] as num?)?.toDouble() ?? 0,
+      totalEarnings: (json['lifetime_earnings'] as num?)?.toDouble() ?? 0,
       bank: json['bank'] != null
           ? bankFromJson(json['bank'] as Map<String, dynamic>)
           : null,

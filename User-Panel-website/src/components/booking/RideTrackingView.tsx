@@ -73,17 +73,6 @@ export function RideTrackingView() {
     }
 
     void loadRide();
-    const interval = window.setInterval(() => {
-      void getRideTracking(id)
-        .then((tracking) => {
-          if (typeof tracking.eta_minutes === "number") {
-            setEtaMinutes(tracking.eta_minutes);
-          }
-        })
-        .catch(() => undefined);
-    }, 10000);
-
-    return () => window.clearInterval(interval);
   }, [rideId]);
 
   const handleCancelRide = async (reason: string) => {

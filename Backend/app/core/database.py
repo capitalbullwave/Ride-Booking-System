@@ -55,7 +55,7 @@ class AuditMixin:
 
 async_engine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    echo=False,
     pool_pre_ping=True,
     pool_size=20,
     max_overflow=10,
@@ -71,7 +71,7 @@ AsyncSessionLocal = async_sessionmaker(
 
 sync_engine = create_engine(
     settings.database_sync_url,
-    echo=settings.debug,
+    echo=False,
     pool_pre_ping=True,
 )
 

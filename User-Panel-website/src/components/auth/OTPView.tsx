@@ -14,14 +14,13 @@ import { OTPInput } from "@/components/auth/OTPInput";
 import { parseContactPhone, sendLoginOtp, verifyOtp, verifySignupOtp } from "@/lib/auth-api";
 import {
   clearPendingOtpPhone,
-  getDevOtpHint,
   needsProfileSetup,
   resolvePostAuthDestination,
   setAuthSession,
-  setDevOtpHint as persistDevOtpHint,
   setPendingOtpPhone,
   setPostLoginRedirect,
 } from "@/lib/auth-session";
+import { HARDCODED_OTP } from "@/constants/auth";
 import {
   defaultCountry,
   formatPhoneDisplay,
@@ -53,7 +52,6 @@ export function OTPView() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [resendSeconds, setResendSeconds] = useState(0);
-  const [devOtpHint, setDevOtpHint] = useState<string | null>(null);
   const otpVerifyLock = useRef(false);
 
   useEffect(() => {
@@ -75,8 +73,6 @@ export function OTPView() {
     setPendingOtpPhone(urlPhone);
     setOtpStep("verify");
     setResendSeconds(30);
-    const hint = getDevOtpHint();
-    if (hint) setDevOtpHint(hint);
   }, [urlPhone]);
 
   useEffect(() => {
@@ -170,7 +166,7 @@ export function OTPView() {
 
     try {
       const contact = getContact();
-      const result = await sendLoginOtp({
+      await sendLoginOtp({
         dial_code: country.dialCode,
         phone: mobileNumber,
         mode: "login",
@@ -178,10 +174,6 @@ export function OTPView() {
 
       setPendingOtpPhone(contact);
       setOtpContact(contact);
-      if (result.dev_otp) {
-        persistDevOtpHint(result.dev_otp);
-        setDevOtpHint(result.dev_otp);
-      }
       setOtpStep("verify");
       setResendSeconds(30);
       setOtp("");
@@ -200,15 +192,11 @@ export function OTPView() {
     setIsSendingOtp(true);
     try {
       const { dial_code, phone } = parseContactPhone(otpContact);
-      const result = await sendLoginOtp({
+      await sendLoginOtp({
         dial_code,
         phone,
         mode: isSignup ? "signup" : "login",
       });
-      if (result.dev_otp) {
-        persistDevOtpHint(result.dev_otp);
-        setDevOtpHint(result.dev_otp);
-      }
       setOtp("");
       setResendSeconds(30);
       otpVerifyLock.current = false;
@@ -338,11 +326,9 @@ export function OTPView() {
                   className="mt-6 space-y-4 border-t border-border/60 pt-6"
                 >
                   <Label className="text-sm font-semibold text-foreground">Verify OTP</Label>
-                  {devOtpHint && (
-                    <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                      SMS is not configured locally. Use OTP: <strong>{devOtpHint}</strong>
-                    </p>
-                  )}
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    Use OTP: <strong>{HARDCODED_OTP}</strong>
+                  </p>
                   <OTPInput
                     length={6}
                     value={otp}

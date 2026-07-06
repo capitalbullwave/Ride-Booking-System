@@ -10,6 +10,7 @@ import 'package:wavego_driver/screens/auth/onboarding/kyc_upload_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/license_number_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/license_upload_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/photo_name_screen.dart';
+import 'package:wavego_driver/screens/auth/onboarding/vehicle_documents_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/vehicle_number_screen.dart';
 import 'package:wavego_driver/screens/auth/driving_license_question_screen.dart';
 import 'package:wavego_driver/screens/auth/document_centre_screen.dart';
@@ -130,6 +131,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const KycUploadScreen(),
       ),
       GoRoute(
+        path: RouteNames.onboardingVehicleDocuments,
+        builder: (_, __) => const VehicleDocumentsScreen(),
+      ),
+      GoRoute(
         path: RouteNames.registration,
         builder: (_, __) => const RegistrationScreen(),
       ),
@@ -159,7 +164,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.payment,
         builder: (_, state) => PaymentScreen(
-          completion: state.extra! as PaymentCompletionData,
+          completion: state.extra as PaymentCompletionData?,
         ),
       ),
       GoRoute(

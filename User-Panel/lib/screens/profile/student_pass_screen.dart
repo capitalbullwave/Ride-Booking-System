@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:wavego_user/core/network/api_exception.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
@@ -77,10 +78,10 @@ class _StudentPassScreenState extends ConsumerState<StudentPassScreen> {
       context.pop();
     } catch (error) {
       if (mounted) {
-        context.showSnackBar(
-          error.toString().replaceFirst('Exception: ', ''),
-          isError: true,
-        );
+        final message = error is ApiException
+            ? error.message
+            : error.userMessage;
+        context.showSnackBar(message, isError: true);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

@@ -35,6 +35,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   WalletInfo? _wallet;
   EarningsSummary? _earnings;
   List<WalletTransaction> _transactions = [];
+  List<EarningsRideItem> _earningsRides = [];
   _TxnFilter _txnFilter = _TxnFilter.all;
   _EarningsPeriod _earningsPeriod = _EarningsPeriod.week;
   bool _loading = true;
@@ -65,13 +66,17 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
       final results = await Future.wait([
         walletRepo.getWallet(),
         walletRepo.getTransactions(),
-        tripRepo.getEarnings(),
+        tripRepo.getEarningsSummary(),
+        tripRepo.getEarningsBundle(period: 'weekly'),
       ]);
       if (!mounted) return;
+      final bundle =
+          results[3] as ({EarningsSummary summary, List<EarningsRideItem> rides});
       setState(() {
         _wallet = results[0] as WalletInfo;
         _transactions = results[1] as List<WalletTransaction>;
         _earnings = results[2] as EarningsSummary;
+        _earningsRides = bundle.rides;
         _loading = false;
       });
     } catch (_) {
@@ -192,6 +197,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
               children: [
                 _EarningsTab(
                   earnings: _earnings,
+                  rides: _earningsRides,
                   period: _earningsPeriod,
                   onPeriodChanged: (p) => setState(() => _earningsPeriod = p),
                   onRefresh: _load,
@@ -240,12 +246,14 @@ class _WalletLoadingSkeleton extends StatelessWidget {
 class _EarningsTab extends StatelessWidget {
   const _EarningsTab({
     required this.earnings,
+    required this.rides,
     required this.period,
     required this.onPeriodChanged,
     required this.onRefresh,
   });
 
   final EarningsSummary? earnings;
+  final List<EarningsRideItem> rides;
   final _EarningsPeriod period;
   final ValueChanged<_EarningsPeriod> onPeriodChanged;
   final Future<void> Function() onRefresh;
@@ -277,17 +285,7 @@ class _EarningsTab extends StatelessWidget {
     }
 
     final e = earnings!;
-    final chartData = e.chart.isNotEmpty
-        ? e.chart
-        : [
-            EarningsDataPoint(label: 'Mon', amount: e.weeklyEarnings * 0.12),
-            EarningsDataPoint(label: 'Tue', amount: e.weeklyEarnings * 0.18),
-            EarningsDataPoint(label: 'Wed', amount: e.weeklyEarnings * 0.15),
-            EarningsDataPoint(label: 'Thu', amount: e.weeklyEarnings * 0.2),
-            EarningsDataPoint(label: 'Fri', amount: e.weeklyEarnings * 0.22),
-            EarningsDataPoint(label: 'Sat', amount: e.weeklyEarnings * 0.08),
-            EarningsDataPoint(label: 'Sun', amount: e.weeklyEarnings * 0.05),
-          ];
+    final chartData = e.chart;
 
     return RefreshIndicator(
       onRefresh: onRefresh,
@@ -361,8 +359,10 @@ class _EarningsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          _EarningsChartCard(data: chartData),
-          const SizedBox(height: 16),
+          if (chartData.isNotEmpty) ...[
+            _EarningsChartCard(data: chartData),
+            const SizedBox(height: 16),
+          ],
           _EarningCard(
             label: 'Today',
             amount: e.todayEarnings,
@@ -384,6 +384,28 @@ class _EarningsTab extends StatelessWidget {
             icon: Icons.calendar_month_outlined,
           ),
           const SizedBox(height: 16),
+          Text(
+            'Completed rides',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 10),
+          if (rides.isEmpty)
+            Text(
+              'No completed rides in this period yet.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            )
+          else
+            ...rides.map(
+              (ride) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _EarningsRideTile(ride: ride),
+              ),
+            ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -402,6 +424,114 @@ class _EarningsTab extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EarningsRideTile extends StatelessWidget {
+  const _EarningsRideTile({required this.ride});
+
+  final EarningsRideItem ride;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurface,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Ride #${ride.rideId.substring(0, 8)}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Text(
+                ride.status,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _RideMetricRow(
+            label: 'Ride fare',
+            value: DateFormatter.currency(ride.rideFare),
+          ),
+          _RideMetricRow(
+            label: 'Commission',
+            value: '${ride.driverCommissionPercentage.toStringAsFixed(1)}%',
+          ),
+          _RideMetricRow(
+            label: 'You earned',
+            value: DateFormatter.currency(ride.driverEarning),
+            emphasized: true,
+          ),
+          if (ride.rideDate != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              () {
+                final parsed = DateTime.tryParse(ride.rideDate!);
+                return parsed != null
+                    ? DateFormatter.dateTime(parsed)
+                    : ride.rideDate!;
+              }(),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RideMetricRow extends StatelessWidget {
+  const _RideMetricRow({
+    required this.label,
+    required this.value,
+    this.emphasized = false,
+  });
+
+  final String label;
+  final String value;
+  final bool emphasized;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
+                  color: emphasized ? AppColors.primary : null,
+                ),
           ),
         ],
       ),

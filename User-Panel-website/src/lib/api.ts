@@ -38,6 +38,13 @@ function resolveUserPath(path: string): string {
 
   }
 
+  // Paths like "/user/student-pass" must not become "/api/v1/user/user/...".
+  if (path.startsWith("/user/")) {
+
+    return `${USER_API}${path.slice("/user".length)}`;
+
+  }
+
   return `${USER_API}${path.startsWith("/") ? path : `/${path}`}`;
 
 }

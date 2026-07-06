@@ -24,15 +24,21 @@ class DocumentCentreScreen extends ConsumerStatefulWidget {
 class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
   bool _submitted = false;
   Map<String, String> _serverStepStatus = {};
+  List<Map<String, dynamic>> _serverSteps = [];
   bool _submitting = false;
+  bool _hydrating = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _hydratePhone();
-      _syncProgress();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    await _hydratePhone();
+    await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
+    await _syncProgress();
+    if (mounted) setState(() => _hydrating = false);
   }
 
   Future<void> _syncProgress() async {
@@ -51,6 +57,7 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
       setState(() {
         _submitted = data['submitted'] == true;
         _serverStepStatus = statusMap;
+        _serverSteps = steps;
       });
     } catch (_) {}
   }
@@ -97,6 +104,8 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
         context.push(RouteNames.onboardingVehicleNumber);
       case 'kyc':
         context.push(RouteNames.onboardingKyc);
+      case 'vehicle_docs':
+        context.push(RouteNames.onboardingVehicleDocuments);
     }
   }
 
@@ -124,11 +133,18 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_hydrating) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final registration = ref.watch(registrationViewModelProvider);
     final progress = DocumentCentreProgress.fromRegistration(
       registration,
       submitted: _submitted,
       serverStepStatus: _serverStepStatus,
+      serverSteps: _serverSteps,
     );
     final padding = Responsive.pagePadding(context);
 

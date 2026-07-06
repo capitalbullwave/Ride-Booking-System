@@ -1,3 +1,4 @@
+import 'package:wavego_driver/data/vehicle_document_requirements.dart';
 import 'package:wavego_driver/models/registration_model.dart';
 
 enum DocumentStepStatus {
@@ -41,35 +42,55 @@ class DocumentCentreProgress {
     DriverRegistration r, {
     bool submitted = false,
     Map<String, String>? serverStepStatus,
+    List<Map<String, dynamic>>? serverSteps,
   }) {
     final vehicleType = (r.vehicleType ?? '').trim();
     final vehicleTypeDone = vehicleType.isNotEmpty;
 
-    final licenseDone = (r.licenseNumber ?? '').trim().isNotEmpty &&
-        (r.licenseFrontUrl ?? '').trim().isNotEmpty;
-
     final photoNameDone = r.fullName.trim().isNotEmpty &&
-        ((r.profilePhotoUrl ?? r.selfieUrl) ?? '').trim().isNotEmpty;
+        ((r.profilePhotoUrl ?? r.selfieUrl) ?? '').trim().isNotEmpty &&
+        (r.dateOfBirth ?? '').trim().isNotEmpty &&
+        (r.gender ?? '').trim().isNotEmpty;
 
-    final vehicleNumberDone = (r.vehicleNumber ?? '').trim().isNotEmpty;
+    final licenseDone = (r.licenseNumber ?? '').trim().isNotEmpty &&
+        (r.licenseFrontUrl ?? '').trim().isNotEmpty &&
+        (r.licenseBackUrl ?? '').trim().isNotEmpty;
 
-    final kycDone = (r.aadhaarFrontUrl ?? '').trim().isNotEmpty ||
-        (r.panUrl ?? '').trim().isNotEmpty;
+    final vehicleNumberDone = (r.vehicleNumber ?? '').trim().isNotEmpty &&
+        (r.rcUrl ?? '').trim().isNotEmpty &&
+        (r.rcBackUrl ?? '').trim().isNotEmpty;
+
+    final kycDone = (r.aadhaarFrontUrl ?? '').trim().isNotEmpty &&
+        (r.aadhaarBackUrl ?? '').trim().isNotEmpty &&
+        (r.aadhaarNumber ?? '').trim().isNotEmpty;
+
+    final vehicleDocsDone = VehicleDocumentRequirements.isSatisfied(r);
 
     final doneById = <String, bool>{
       'vehicle': vehicleTypeDone,
-      'license': licenseDone,
       'photo_name': photoNameDone,
+      'license': licenseDone,
       'vehicle_number': vehicleNumberDone,
       'kyc': kycDone,
+      'vehicle_docs': vehicleDocsDone,
     };
 
-    final orderedRequired = [
+    if (serverSteps != null) {
+      for (final step in serverSteps) {
+        final id = step['id'] as String?;
+        if (id != null && step['completed'] == true) {
+          doneById[id] = true;
+        }
+      }
+    }
+
+    const orderedRequired = [
       'vehicle',
-      'license',
       'photo_name',
+      'license',
       'vehicle_number',
       'kyc',
+      'vehicle_docs',
     ];
 
     String? activeId;
@@ -99,11 +120,18 @@ class DocumentCentreProgress {
 
     String? subtitleFor(String id, DocumentStepStatus status) {
       if (id == 'vehicle' && vehicleTypeDone) return 'Selected';
+      if (id == 'vehicle_docs' && vehicleTypeDone) {
+        return '$vehicleType documents';
+      }
       if (status == DocumentStepStatus.underVerification) {
         return 'Under verification...';
       }
       return null;
     }
+
+    final vehicleDocsTitle = vehicleTypeDone
+        ? 'Vehicle documents ($vehicleType)'
+        : 'Vehicle documents';
 
     final items = <DocumentCentreItem>[
       DocumentCentreItem(
@@ -114,13 +142,6 @@ class DocumentCentreProgress {
         routeName: 'vehicle',
       ),
       DocumentCentreItem(
-        id: 'license',
-        title: 'Driving License',
-        subtitle: subtitleFor('license', statusFor('license')),
-        status: statusFor('license'),
-        routeName: 'license',
-      ),
-      DocumentCentreItem(
         id: 'photo_name',
         title: 'Photo and name',
         subtitle: subtitleFor('photo_name', statusFor('photo_name')),
@@ -128,18 +149,32 @@ class DocumentCentreProgress {
         routeName: 'photo_name',
       ),
       DocumentCentreItem(
+        id: 'license',
+        title: 'Driving License',
+        subtitle: subtitleFor('license', statusFor('license')),
+        status: statusFor('license'),
+        routeName: 'license',
+      ),
+      DocumentCentreItem(
         id: 'vehicle_number',
-        title: 'Vehicle Number',
+        title: 'Vehicle Number & RC',
         subtitle: subtitleFor('vehicle_number', statusFor('vehicle_number')),
         status: statusFor('vehicle_number'),
         routeName: 'vehicle_number',
       ),
       DocumentCentreItem(
         id: 'kyc',
-        title: 'Aadhaar or PAN card',
+        title: 'Aadhaar Card',
         subtitle: subtitleFor('kyc', statusFor('kyc')),
         status: statusFor('kyc'),
         routeName: 'kyc',
+      ),
+      DocumentCentreItem(
+        id: 'vehicle_docs',
+        title: vehicleDocsTitle,
+        subtitle: subtitleFor('vehicle_docs', statusFor('vehicle_docs')),
+        status: statusFor('vehicle_docs'),
+        routeName: 'vehicle_docs',
       ),
       const DocumentCentreItem(
         id: 'permissions',

@@ -110,6 +110,7 @@ class TripBookingState {
     this.dropoff,
     this.route,
     this.activeRideId,
+    this.bookedVehicleSlug,
     this.mode = HomeBookingMode.ride,
     this.scheduledAt,
   });
@@ -118,6 +119,7 @@ class TripBookingState {
   final SelectedPlace? dropoff;
   final DirectionsResult? route;
   final String? activeRideId;
+  final String? bookedVehicleSlug;
   final HomeBookingMode mode;
   final DateTime? scheduledAt;
 
@@ -126,6 +128,7 @@ class TripBookingState {
     SelectedPlace? dropoff,
     DirectionsResult? route,
     String? activeRideId,
+    String? bookedVehicleSlug,
     HomeBookingMode? mode,
     DateTime? scheduledAt,
     bool clearRoute = false,
@@ -136,6 +139,7 @@ class TripBookingState {
         dropoff: dropoff ?? this.dropoff,
         route: clearRoute ? null : (route ?? this.route),
         activeRideId: activeRideId ?? this.activeRideId,
+        bookedVehicleSlug: bookedVehicleSlug ?? this.bookedVehicleSlug,
         mode: mode ?? this.mode,
         scheduledAt: clearScheduledAt ? null : (scheduledAt ?? this.scheduledAt),
       );

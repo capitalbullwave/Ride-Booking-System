@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,10 @@ import 'package:wavego_user/widgets/booking/live_tracking_map.dart';
 import 'package:wavego_user/widgets/booking/rate_ride_dialog.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
+import 'package:wavego_user/core/utils/navigation_launcher.dart';
+import 'package:wavego_user/providers/ride_chat_provider.dart';
+import 'package:wavego_user/widgets/ride/ride_chat_notification.dart';
+import 'package:wavego_user/widgets/ride/ride_chat_sheet.dart';
 
 class LocationScreen extends ConsumerStatefulWidget {
   const LocationScreen({super.key, required this.field});
@@ -112,7 +117,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
         _error = e.message;
       });
       context.showSnackBar(e.message, isError: true);
-      if (e.openSettings) {
+      if (e.openSettings && !kIsWeb) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Enable location in Settings'),
@@ -126,11 +131,12 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final message = e.userMessage;
       setState(() {
         _isLocating = false;
-        _error = e.userMessage;
+        _error = message;
       });
-      context.showSnackBar(_error!, isError: true);
+      context.showSnackBar(message, isError: true);
     }
   }
 
@@ -685,6 +691,11 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       if (rideId != null && rideId.isNotEmpty) {
         ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
       }
+      if (selectedVehicle != null) {
+        ref
+            .read(tripBookingProvider.notifier)
+            .setBookedVehicleSlug(selectedVehicle.slug);
+      }
       ref.invalidate(activeRideProvider);
       if (!mounted) return;
       if (trip.scheduledAt != null && trip.scheduledAt!.isAfter(DateTime.now())) {
@@ -704,6 +715,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   @override
   Widget build(BuildContext context) {
     final trip = ref.watch(tripBookingProvider);
+    final selectedSlug = _selectedVehicleIndex != null
+        ? _vehicles[_selectedVehicleIndex!].slug
+        : bookedVehicleSlugForTrip(trip.mode, trip.bookedVehicleSlug);
 
     return Scaffold(
       appBar: AppBar(
@@ -793,7 +807,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                     child: const Center(child: CircularProgressIndicator()),
                   )
                 : _route != null
-                    ? RouteMapPreview(route: _route!)
+                    ? RouteMapPreview(route: _route!, vehicleSlug: selectedSlug)
                     : Container(
                         height: 180,
                         padding: const EdgeInsets.all(16),
@@ -925,6 +939,8 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
   Timer? _pollTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   String? _rideId;
+  DirectionsResult? _mapRoute;
+  bool _loadingMapRoute = true;
 
   bool _isDriverAssigned(String? status) {
     if (status == null) return false;
@@ -946,6 +962,7 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
       await _loadRideId();
       _startRideRealtime();
       await _checkRideStatus();
+      await _loadMapRoute();
     });
   }
 
@@ -1003,6 +1020,118 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
     } catch (_) {}
   }
 
+  Future<void> _loadMapRoute() async {
+    final trip = ref.read(tripBookingProvider);
+    if (trip.route != null && trip.route!.path.length >= 2) {
+      if (mounted) {
+        setState(() {
+          _mapRoute = trip.route;
+          _loadingMapRoute = false;
+        });
+      }
+      return;
+    }
+
+    final activeRide = ref.read(activeRideProvider).valueOrNull;
+    final pickupLat = trip.pickup?.latitude ?? activeRide?.pickupLat;
+    final pickupLng = trip.pickup?.longitude ?? activeRide?.pickupLng;
+    final dropoffLat = trip.dropoff?.latitude ?? activeRide?.dropoffLat;
+    final dropoffLng = trip.dropoff?.longitude ?? activeRide?.dropoffLng;
+
+    if (pickupLat == null ||
+        pickupLng == null ||
+        dropoffLat == null ||
+        dropoffLng == null) {
+      if (mounted) setState(() => _loadingMapRoute = false);
+      return;
+    }
+
+    try {
+      final route = await ref.read(placesServiceProvider).getDirectionsByCoordinates(
+            pickupLat: pickupLat,
+            pickupLng: pickupLng,
+            dropoffLat: dropoffLat,
+            dropoffLng: dropoffLng,
+            pickupAddress: trip.pickup?.label ?? activeRide?.pickupAddress ?? '',
+            dropoffAddress: trip.dropoff?.label ?? activeRide?.dropoffAddress ?? '',
+          );
+      ref.read(tripBookingProvider.notifier).setRoute(route);
+      if (mounted) {
+        setState(() {
+          _mapRoute = route;
+          _loadingMapRoute = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMapRoute = false);
+    }
+  }
+
+  DirectionsResult? _resolveDirections(TripBookingState trip, UserActiveRide? activeRide) {
+    if (_mapRoute != null) return _mapRoute;
+    if (trip.route != null && trip.route!.path.length >= 2) return trip.route;
+    return null;
+  }
+
+  Widget _buildMap(DirectionsResult? route, {String? vehicleSlug}) {
+    if (route != null) {
+      return RouteMapPreview(
+        route: route,
+        height: double.infinity,
+        vehicleSlug: vehicleSlug,
+      );
+    }
+    return Container(
+      color: AppColors.muted,
+      child: const Center(
+        child: Icon(Icons.map_outlined, size: 64, color: AppColors.mutedForeground),
+      ),
+    );
+  }
+
+  Widget _buildLocationRow({
+    required Color dotColor,
+    required String label,
+    required String address,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.mutedForeground,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _pollTimer?.cancel();
@@ -1014,9 +1143,28 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
     context.go(RouteNames.home);
   }
 
+  String _searchingTitle(HomeBookingMode mode) {
+    switch (mode) {
+      case HomeBookingMode.parcel:
+        return 'Finding delivery partner';
+      case HomeBookingMode.rental:
+        return 'Finding rental captain';
+      case HomeBookingMode.ride:
+        return 'Finding captain';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rideId = _rideId ?? ref.watch(tripBookingProvider).activeRideId ?? '';
+    final trip = ref.watch(tripBookingProvider);
+    final activeRide = ref.watch(activeRideProvider).valueOrNull;
+    final route = _resolveDirections(trip, activeRide);
+    final vehicleSlug = bookedVehicleSlugForTrip(trip.mode, trip.bookedVehicleSlug);
+    final pickupAddress =
+        trip.pickup?.label ?? activeRide?.pickupAddress ?? 'Pickup location';
+    final dropoffAddress =
+        trip.dropoff?.label ?? activeRide?.dropoffAddress ?? 'Drop location';
 
     return PopScope(
       canPop: false,
@@ -1024,53 +1172,116 @@ class _RideSearchingScreenState extends ConsumerState<RideSearchingScreen> {
         if (!didPop) _goHomeFromSearching();
       },
       child: Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: _goHomeFromSearching,
-        ),
-        title: const Text('Finding captain'),
-        actions: [
-          if (rideId.isNotEmpty)
-            CancelRideButton(
-              rideId: rideId,
-              navigateHome: true,
-              compact: true,
-            ),
-        ],
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-            const SizedBox(
-              width: 64,
-              height: 64,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Notifying nearby captains...',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Live tracking will start once a captain accepts',
-              style: TextStyle(color: AppColors.mutedForeground),
-            ),
-            if (rideId.isNotEmpty) ...[
-              const SizedBox(height: 28),
-              CancelRideButton(rideId: rideId, navigateHome: true),
-            ],
-            ],
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: _goHomeFromSearching,
           ),
+          title: Text(_searchingTitle(trip.mode)),
+          actions: [
+            if (rideId.isNotEmpty)
+              CancelRideButton(
+                rideId: rideId,
+                navigateHome: true,
+                compact: true,
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildMap(route, vehicleSlug: vehicleSlug),
+                  if (_loadingMapRoute)
+                    const Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 16,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildLocationRow(
+                    dotColor: AppColors.success,
+                    label: 'Pickup',
+                    address: pickupAddress,
+                  ),
+                  const SizedBox(height: 14),
+                  _buildLocationRow(
+                    dotColor: AppColors.error,
+                    label: 'Drop',
+                    address: dropoffAddress,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Notifying nearby captains...',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            const Text(
+                              'Live tracking will start once a captain accepts',
+                              style: TextStyle(
+                                color: AppColors.mutedForeground,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (rideId.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    CancelRideButton(rideId: rideId, navigateHome: true),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-    ),
     );
   }
 }
@@ -1122,6 +1333,10 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
             driverName: msg['driver_name'] as String?,
             driverPhone: msg['driver_phone'] as String?,
             vehicleNumber: msg['vehicle_number'] as String?,
+            vehicleTypeSlug: (msg['vehicle_type'] as Map?)?['slug'] as String? ??
+                msg['vehicle_type_slug'] as String?,
+            vehicleTypeName: (msg['vehicle_type'] as Map?)?['name'] as String? ??
+                msg['vehicle_type_name'] as String?,
             startCode: msg['start_code']?.toString(),
             pickupLat: (msg['pickup_lat'] as num?)?.toDouble(),
             pickupLng: (msg['pickup_lng'] as num?)?.toDouble(),
@@ -1151,12 +1366,43 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
         ref.invalidate(activeRideProvider);
       } else if (event == 'ride_completed') {
         _handleRideCompleted(msg);
+      } else if (event == 'chat_message') {
+        _handleIncomingChat(msg);
       }
     });
     final rideId = _rideId ?? ref.read(tripBookingProvider).activeRideId;
     if (rideId != null && rideId.isNotEmpty) {
       realtime.subscribeRide(rideId);
     }
+  }
+
+  void _handleIncomingChat(Map<String, dynamic> msg) {
+    final rideId = msg['ride_id']?.toString() ?? _rideId ?? '';
+    if (rideId.isEmpty) return;
+    if ((msg['sender_type']?.toString() ?? '') == 'user') return;
+    if (ref.read(rideChatSheetOpenProvider)) return;
+
+    final ride = _resolvedRide(ref.read(activeRideProvider).valueOrNull);
+    final senderName = msg['sender_name']?.toString() ?? ride?.driverName ?? 'Captain';
+    final text = msg['message']?.toString() ?? '';
+    if (text.isEmpty || !mounted) return;
+
+    showRideChatNotification(
+      context,
+      senderName: senderName,
+      message: text,
+      onTap: () {
+        final resolved = _resolvedRide(ref.read(activeRideProvider).valueOrNull);
+        if (resolved == null) return;
+        showRideChatSheet(
+          context: context,
+          ref: ref,
+          rideId: resolved.id,
+          peerName: resolved.driverName ?? 'Captain',
+          mySenderType: 'user',
+        );
+      },
+    );
   }
 
   Future<void> _handleRideCompleted(Map<String, dynamic> msg) async {
@@ -1248,16 +1494,25 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   }
 
   Widget _buildMap(UserActiveRide? ride) {
+    final trip = ref.watch(tripBookingProvider);
+    final bookedVehicleSlug =
+        bookedVehicleSlugForTrip(trip.mode, trip.bookedVehicleSlug);
     if (ride != null && !ride.isSearching && ride.pickupLat != null) {
       return LiveTrackingMap(
         ride: ride,
         driverLat: _liveDriverLat,
         driverLng: _liveDriverLng,
+        fallbackVehicleSlug: bookedVehicleSlug,
+        tripRoute: trip.route,
       );
     }
-    final route = ref.watch(tripBookingProvider).route;
+    final route = trip.route;
     if (route != null) {
-      return RouteMapPreview(route: route, height: double.infinity);
+      return RouteMapPreview(
+        route: route,
+        height: double.infinity,
+        vehicleSlug: bookedVehicleSlug,
+      );
     }
     return Container(
       color: AppColors.muted,
@@ -1325,7 +1580,7 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   }
 }
 
-class _TrackingBottomSheet extends StatelessWidget {
+class _TrackingBottomSheet extends ConsumerWidget {
   const _TrackingBottomSheet._({
     required this.rideId,
     this.ride,
@@ -1355,8 +1610,31 @@ class _TrackingBottomSheet extends StatelessWidget {
   final bool searching;
   final bool showCancel;
 
+  Future<void> _callDriver(BuildContext context) async {
+    final phone = ride?.driverPhone;
+    if (phone == null || phone.isEmpty) {
+      context.showSnackBar('Driver phone not available', isError: true);
+      return;
+    }
+    final launched = await NavigationLauncher.callPhone(phone);
+    if (!launched && context.mounted) {
+      context.showSnackBar('Could not open phone dialer', isError: true);
+    }
+  }
+
+  void _openChat(BuildContext context, WidgetRef ref) {
+    if (rideId.isEmpty) return;
+    showRideChatSheet(
+      context: context,
+      ref: ref,
+      rideId: rideId,
+      peerName: ride?.driverName ?? 'Captain',
+      mySenderType: 'user',
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
@@ -1415,6 +1693,28 @@ class _TrackingBottomSheet extends StatelessWidget {
                         ride!.statusLabel,
                         style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13),
                       ),
+                      if (ride!.vehicleTypeName != null &&
+                          ride!.vehicleTypeName!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                vehicleIconForSlug(ride!.vehicleTypeSlug ?? 'cab'),
+                                size: 16,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                ride!.vehicleTypeName!,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (ride!.vehicleNumber != null)
                         Text(
                           ride!.vehicleNumber!,
@@ -1483,12 +1783,65 @@ class _TrackingBottomSheet extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                _RideContactAction(
+                  icon: Icons.phone,
+                  label: 'Call',
+                  onTap: () => _callDriver(context),
+                ),
+                _RideContactAction(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Chat',
+                  onTap: () => _openChat(context, ref),
+                ),
+              ],
+            ),
           ],
           if (rideId.isNotEmpty && showCancel) ...[
             const SizedBox(height: 16),
             CancelRideButton(rideId: rideId, navigateHome: true),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _RideContactAction extends StatelessWidget {
+  const _RideContactAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: [
+              Icon(icon, color: AppColors.primary),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

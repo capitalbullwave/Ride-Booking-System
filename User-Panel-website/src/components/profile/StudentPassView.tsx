@@ -43,6 +43,10 @@ export function StudentPassView() {
       setError("Enter a valid 12-digit Aadhar number");
       return;
     }
+    if (collegeName.trim().length < 2) {
+      setError("Enter your college name");
+      return;
+    }
     if (!aadharPhoto || !studentIdPhoto) {
       setError("Upload both Aadhar and student ID photos");
       return;

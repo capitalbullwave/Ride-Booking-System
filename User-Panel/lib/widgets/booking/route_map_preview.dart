@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
+import 'package:wavego_user/core/utils/map_marker_icons.dart';
 import 'package:wavego_user/models/place_models.dart';
 
 class RouteMapPreview extends StatefulWidget {
@@ -9,10 +10,12 @@ class RouteMapPreview extends StatefulWidget {
     super.key,
     required this.route,
     this.height = 180,
+    this.vehicleSlug,
   });
 
   final DirectionsResult route;
   final double height;
+  final String? vehicleSlug;
 
   @override
   State<RouteMapPreview> createState() => _RouteMapPreviewState();
@@ -20,6 +23,52 @@ class RouteMapPreview extends StatefulWidget {
 
 class _RouteMapPreviewState extends State<RouteMapPreview> {
   GoogleMapController? _controller;
+  BitmapDescriptor? _vehicleIcon;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVehicleIcon();
+  }
+
+  @override
+  void didUpdateWidget(covariant RouteMapPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.vehicleSlug != oldWidget.vehicleSlug) {
+      _loadVehicleIcon();
+    }
+  }
+
+  Future<void> _loadVehicleIcon() async {
+    final slug = widget.vehicleSlug;
+    if (slug == null || slug.isEmpty) {
+      if (mounted) setState(() => _vehicleIcon = null);
+      return;
+    }
+    final icon = await MapMarkerIcons.vehicleMarker(slug);
+    if (!mounted) return;
+    setState(() => _vehicleIcon = icon);
+  }
+
+  Set<Marker> _buildMarkers(LatLng pickup, LatLng dropoff) {
+    final markers = <Marker>{
+      Marker(
+        markerId: const MarkerId('pickup'),
+        position: pickup,
+        icon: _vehicleIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        anchor: _vehicleIcon != null ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),
+        infoWindow: InfoWindow(title: 'Pickup', snippet: widget.route.pickup.address),
+      ),
+      Marker(
+        markerId: const MarkerId('dropoff'),
+        position: dropoff,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+        infoWindow: InfoWindow(title: 'Drop', snippet: widget.route.dropoff.address),
+      ),
+    };
+    return markers;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,18 +94,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview> {
             _controller = controller;
             _fitBounds(points);
           },
-          markers: {
-            Marker(
-              markerId: const MarkerId('pickup'),
-              position: pickup,
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-            ),
-            Marker(
-              markerId: const MarkerId('dropoff'),
-              position: dropoff,
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
-            ),
-          },
+          markers: _buildMarkers(pickup, dropoff),
           polylines: {
             Polyline(
               polylineId: const PolylineId('route'),

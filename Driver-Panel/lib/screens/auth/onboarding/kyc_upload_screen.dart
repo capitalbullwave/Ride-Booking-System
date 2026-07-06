@@ -42,17 +42,16 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
 
   Future<void> _hydrate() async {
     final forcedType = onboardingDocType(context);
+    _idType = KycIdType.aadhaar;
     if (forcedType == 'pan') {
       _idType = KycIdType.pan;
-    } else if (forcedType == 'aadhaar') {
-      _idType = KycIdType.aadhaar;
     }
 
     await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
     if (!mounted) return;
 
     final data = ref.read(registrationViewModelProvider);
-    if (forcedType == null) {
+    if (forcedType == null && isProfileEditMode(context)) {
       if ((data.panNumber ?? '').isNotEmpty &&
           (data.aadhaarNumber ?? '').isEmpty &&
           hasUploadedMedia(data.panUrl)) {
@@ -177,7 +176,7 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (forcedType == null) ...[
+                  if (forcedType == null && editing) ...[
                     const Text(
                       'Select ID to upload',
                       style: TextStyle(fontWeight: FontWeight.w600),

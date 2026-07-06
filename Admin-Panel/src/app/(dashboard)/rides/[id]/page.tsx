@@ -2,7 +2,7 @@
 
 import { notFound } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, Navigation, Clock, IndianRupee } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Clock, IndianRupee, MessageSquare } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Ride, RideStatus } from "@/types";
 import { formatCurrency, formatDateTime, formatShortId, capitalize } from "@/lib/format";
-import { fetchRideById } from "@/lib/rides-api";
+import { fetchRideById, fetchRideMessages, RideChatMessage } from "@/lib/rides-api";
 import { toast } from "sonner";
 import { useAuth } from "@/components/providers/auth-provider";
 
@@ -30,6 +30,7 @@ export default function RideDetailPage({
   const { id } = use(params);
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [ride, setRide] = useState<Ride | null>(null);
+  const [messages, setMessages] = useState<RideChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notFoundState, setNotFoundState] = useState(false);
 
@@ -38,8 +39,12 @@ export default function RideDetailPage({
     setNotFoundState(false);
 
     try {
-      const data = await fetchRideById(id);
+      const [data, chat] = await Promise.all([
+        fetchRideById(id),
+        fetchRideMessages(id).catch(() => [] as RideChatMessage[]),
+      ]);
       setRide(data);
+      setMessages(chat);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to load ride";
       if (message.toLowerCase().includes("not found")) {
@@ -197,6 +202,47 @@ export default function RideDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Ride Conversation
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {messages.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No messages between passenger and driver for this ride.
+                </p>
+              ) : (
+                <div className="space-y-3 max-h-80 overflow-y-auto">
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`rounded-lg border p-3 ${
+                        msg.sender_type === "driver"
+                          ? "border-primary/20 bg-primary/5"
+                          : "border-muted bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-semibold capitalize">
+                          {msg.sender_name ?? msg.sender_type}
+                        </span>
+                        {msg.created_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatDateTime(msg.created_at)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -256,12 +302,37 @@ export default function RideDetailPage({
           )}
 
           <Card>
-            <CardHeader><CardTitle>Fare</CardTitle></CardHeader>
-            <CardContent>
-              <div className="flex justify-between font-bold">
-                <span>Total</span>
-                <span className="text-primary">{formatCurrency(ride.fare)}</span>
+            <CardHeader><CardTitle>Fare & Commission</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total Ride Fare</span>
+                <span className="text-sm font-semibold">{formatCurrency(ride.fare)}</span>
               </div>
+              {ride.status === "ride_completed" && ride.driverEarning != null ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Driver Commission
+                      {ride.driverCommissionPercentage != null
+                        ? ` (${ride.driverCommissionPercentage}%)`
+                        : ""}
+                    </span>
+                    <span className="text-sm font-semibold text-emerald-600">
+                      {formatCurrency(ride.driverEarning)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Company Revenue</span>
+                    <span className="text-sm font-semibold text-primary">
+                      {formatCurrency(ride.companyEarning ?? ride.fare - ride.driverEarning)}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Commission breakdown is available after the ride is completed.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

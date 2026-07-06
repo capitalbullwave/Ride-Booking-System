@@ -28,6 +28,7 @@ class ApiEndpoints {
   static const String rideEstimate = '/rides/estimate';
   static const String cancelRide = '/user/cancel-ride';
   static String rateRide(String rideId) => '/user/ride/$rideId/rate';
+  static String rideMessages(String rideId) => '/user/ride/$rideId/messages';
 
   // Public / maps (no auth)
   static const String placesSearch = '/public/places/search';

@@ -31,6 +31,7 @@ const routeLabels: Record<string, string> = {
   help: "Help Center",
   reports: "Reports & Analytics",
   settings: "App Settings",
+  "driver-commission": "Driver Commission",
   approval: "Vehicle Approval",
 };
 

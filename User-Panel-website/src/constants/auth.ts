@@ -1,3 +1,6 @@
+/** Fixed OTP for local development — not generated dynamically. */
+export const HARDCODED_OTP = "123456";
+
 export const PENDING_PROFILE_KEY = "wavego-pending-profile";
 export const PENDING_OTP_PHONE_KEY = "wavego-pending-otp-phone";
 export const DEV_OTP_HINT_KEY = "wavego-dev-otp-hint";

@@ -84,6 +84,62 @@ class TripService extends BaseApiService {
           BackendMappers.earningsFromJson(data as Map<String, dynamic>),
     );
   }
+
+  Future<({EarningsSummary summary, List<EarningsRideItem> rides})>
+      getEarningsBundle({String period = 'weekly'}) async {
+    if (useMock) {
+      final summary = await getEarnings(period: period);
+      return (summary: summary, rides: const <EarningsRideItem>[]);
+    }
+
+    return get(
+      ApiEndpoints.earnings,
+      queryParameters: {'period': period},
+      parser: (data) {
+        final map = data as Map<String, dynamic>;
+        return (
+          summary: BackendMappers.earningsFromJson(map),
+          rides: BackendMappers.earningsRidesFromJson(map),
+        );
+      },
+    );
+  }
+
+  Future<EarningsSummary> getEarningsSummary() async {
+    if (useMock) {
+      return getEarnings();
+    }
+
+    Future<Map<String, dynamic>> fetchRaw(String period) {
+      return get(
+        ApiEndpoints.earnings,
+        queryParameters: {'period': period},
+        parser: (data) => data as Map<String, dynamic>,
+      );
+    }
+
+    final results = await Future.wait([
+      fetchRaw('daily'),
+      fetchRaw('weekly'),
+      fetchRaw('monthly'),
+    ]);
+
+    double amount(Map<String, dynamic> json) =>
+        (json['net_earnings'] as num?)?.toDouble() ??
+        (json['total_earnings'] as num?)?.toDouble() ??
+        0;
+
+    int trips(Map<String, dynamic> json) =>
+        (json['total_rides'] as num?)?.toInt() ?? 0;
+
+    return EarningsSummary(
+      todayEarnings: amount(results[0]),
+      weeklyEarnings: amount(results[1]),
+      monthlyEarnings: amount(results[2]),
+      totalTrips: trips(results[1]),
+      todayTrips: trips(results[0]),
+    );
+  }
 }
 
 final tripServiceProvider = Provider<TripService>((ref) {

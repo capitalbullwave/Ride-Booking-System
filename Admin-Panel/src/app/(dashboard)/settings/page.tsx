@@ -15,10 +15,11 @@ import { appSettings as defaultAppSettings } from "@/data/mock-data";
 import {
   getStoredAppSettings,
   storeAppSettings,
-  validateAppSettings,
+  validateAppSettingsWithoutCommission,
 } from "@/lib/app-settings";
 import type { AppSettings } from "@/types";
 import { toast } from "sonner";
+import { VehicleCommissionForm } from "@/components/settings/vehicle-commission-form";
 
 function FieldHint({ children }: { children: React.ReactNode }) {
   return <p className="text-xs leading-relaxed text-muted-foreground">{children}</p>;
@@ -40,15 +41,12 @@ export default function SettingsPage() {
     [settings, savedSettings]
   );
 
-  const commissionTotal = settings.driverCommission + settings.platformFee;
-  const commissionValid = commissionTotal === 100;
-
   const updateSetting = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleSave = async () => {
-    const validation = validateAppSettings(settings);
+    const validation = validateAppSettingsWithoutCommission(settings);
     if (!validation.valid) {
       toast.error(validation.error ?? "Invalid settings");
       return;
@@ -260,59 +258,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="commission" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Commission Settings</CardTitle>
-              <CardDescription>Revenue sharing between drivers and the Fast Bull platform</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="driver-commission">Driver Commission (%)</Label>
-                  <FieldHint>
-                    Share of each ride fare paid to the driver. Example: 80% of a ₹100 ride = ₹80 to driver.
-                  </FieldHint>
-                  <Input
-                    id="driver-commission"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={settings.driverCommission}
-                    onChange={(e) => updateSetting("driverCommission", Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="platform-fee">Platform Fee (%)</Label>
-                  <FieldHint>
-                    Share kept by Fast Bull. Example: 20% of a ₹100 ride = ₹20 platform fee.
-                  </FieldHint>
-                  <Input
-                    id="platform-fee"
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={settings.platformFee}
-                    onChange={(e) => updateSetting("platformFee", Number(e.target.value))}
-                  />
-                </div>
-              </div>
-
-              <div
-                className={`rounded-[1rem] border px-4 py-3 text-sm ${
-                  commissionValid
-                    ? "border-primary/20 bg-primary/5 text-muted-foreground"
-                    : "border-destructive/30 bg-destructive/5 text-destructive"
-                }`}
-              >
-                <span className="font-medium">Total split: {commissionTotal}%</span>
-                {commissionValid ? (
-                  <span> — Driver {settings.driverCommission}% + Platform {settings.platformFee}% = 100%</span>
-                ) : (
-                  <span> — Driver commission and platform fee must add up to exactly 100%.</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <VehicleCommissionForm />
         </TabsContent>
       </Tabs>
     </div>

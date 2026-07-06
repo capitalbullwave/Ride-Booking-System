@@ -22,6 +22,9 @@ class ApiEndpoints {
   static const String registrationLicenseNumber = '/driver/registration/license-number';
   static const String registrationProfile = '/driver/registration/profile';
   static const String registrationVehicle = '/driver/registration/vehicle';
+  static const String registrationVehicleType = '/driver/registration/vehicle-type';
+  static const String registrationVehicleDocuments =
+      '/driver/registration/vehicle-documents';
   static const String registrationKyc = '/driver/registration/kyc';
   static const String registrationSubmit = '/driver/registration/submit';
   static const String goOnline = '/driver/go-online';
@@ -43,6 +46,7 @@ class ApiEndpoints {
   static String collectPaymentStatus(String rideId) =>
       '/driver/collect-payment/$rideId/status';
   static String ratePassenger(String rideId) => '/driver/ride/$rideId/rate';
+  static String rideMessages(String rideId) => '/driver/ride/$rideId/messages';
   static const String activeRide = '/driver/active-ride';
   static const String rideHistory = '/driver/ride-history';
 
@@ -67,4 +71,5 @@ class ApiEndpoints {
   static const String bankDetails = '/driver/bank';
   static const String withdraw = '/wallet/withdraw';
   static const String walletTransactions = '/driver/wallet/transactions';
+  static const String transactions = '/driver/transactions';
 }

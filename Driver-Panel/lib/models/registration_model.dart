@@ -39,6 +39,7 @@ abstract class DriverRegistration with _$DriverRegistration {
     String? transmission,
     // Step 5 - Documents
     @JsonKey(name: 'rc_url') String? rcUrl,
+    @JsonKey(name: 'rc_back_url') String? rcBackUrl,
     @JsonKey(name: 'insurance_url') String? insuranceUrl,
     @JsonKey(name: 'pollution_url') String? pollutionUrl,
     @JsonKey(name: 'permit_url') String? permitUrl,

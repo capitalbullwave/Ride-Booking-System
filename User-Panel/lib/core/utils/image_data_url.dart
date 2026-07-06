@@ -9,11 +9,19 @@ Future<String?> imageXFileToDataUrl(XFile? file) async {
   try {
     final Uint8List bytes = await file.readAsBytes();
     if (bytes.isEmpty) return null;
-    final mime = _mimeFromPath(file.path);
+    final mime = _mimeFromFile(file);
     return 'data:$mime;base64,${base64Encode(bytes)}';
   } catch (_) {
     return null;
   }
+}
+
+String _mimeFromFile(XFile file) {
+  final declared = file.mimeType?.trim().toLowerCase();
+  if (declared != null && declared.startsWith('image/')) {
+    return declared;
+  }
+  return _mimeFromPath(file.path);
 }
 
 String _mimeFromPath(String path) {

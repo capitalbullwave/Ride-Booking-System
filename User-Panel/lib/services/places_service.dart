@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:io' show HttpClient;
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/dio_client.dart';
@@ -10,6 +10,17 @@ import 'package:wavego_user/services/base_api_service.dart';
 
 class PlacesService extends BaseApiService {
   PlacesService(super.dio);
+
+  static final Dio _geoHttp = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 12),
+      receiveTimeout: const Duration(seconds: 12),
+      headers: const {
+        'Accept': 'application/json',
+        'User-Agent': 'Fast Bull-User/1.0 (support@ridebook.com)',
+      },
+    ),
+  );
 
   static const _mockSuggestions = [
     PlaceSuggestion(
@@ -97,6 +108,28 @@ class PlacesService extends BaseApiService {
     return DirectionsResult.fromJson(data);
   }
 
+  Future<DirectionsResult> getDirectionsByCoordinates({
+    required double pickupLat,
+    required double pickupLng,
+    required double dropoffLat,
+    required double dropoffLng,
+    String pickupAddress = '',
+    String dropoffAddress = '',
+  }) {
+    return getDirections(
+      pickup: SelectedPlace(
+        label: pickupAddress.isNotEmpty ? pickupAddress : '$pickupLat,$pickupLng',
+        latitude: pickupLat,
+        longitude: pickupLng,
+      ),
+      dropoff: SelectedPlace(
+        label: dropoffAddress.isNotEmpty ? dropoffAddress : '$dropoffLat,$dropoffLng',
+        latitude: dropoffLat,
+        longitude: dropoffLng,
+      ),
+    );
+  }
+
   Future<SelectedPlace> reverseGeocode(double lat, double lng) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -139,20 +172,20 @@ class PlacesService extends BaseApiService {
 
   Future<SelectedPlace?> _nominatimReverseGeocode(double lat, double lng) async {
     try {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 12);
-      final uri = Uri.https(
-        'nominatim.openstreetmap.org',
-        '/reverse',
-        {'lat': '$lat', 'lon': '$lng', 'format': 'json', 'addressdetails': '1'},
+      final response = await _geoHttp.get<dynamic>(
+        'https://nominatim.openstreetmap.org/reverse',
+        queryParameters: {
+          'lat': '$lat',
+          'lon': '$lng',
+          'format': 'json',
+          'addressdetails': '1',
+        },
       );
-      final request = await client.getUrl(uri);
-      request.headers.set('User-Agent', 'Fast Bull-User/1.0 (support@ridebook.com)');
-      final response = await request.close();
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200 || response.data == null) return null;
 
-      final body = await response.transform(utf8.decoder).join();
-      final data = jsonDecode(body) as Map<String, dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : jsonDecode(response.data as String) as Map<String, dynamic>;
       final display = data['display_name'] as String?;
       if (display == null || display.trim().isEmpty) return null;
 

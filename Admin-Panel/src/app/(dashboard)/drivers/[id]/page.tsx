@@ -426,7 +426,7 @@ export default function DriverDetailPage({
           </div>
           <div>
             <p className="text-2xl font-bold">{formatCurrency(driver.earnings)}</p>
-            <p className="text-xs text-muted-foreground">Earnings</p>
+            <p className="text-xs text-muted-foreground">Commission Earned</p>
           </div>
           <div>
             <p className="text-2xl font-bold">{formatCurrency(driver.walletBalance)}</p>
@@ -593,6 +593,8 @@ export default function DriverDetailPage({
                       <TableHead>User</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Fare</TableHead>
+                      <TableHead>Driver Commission</TableHead>
+                      <TableHead>Company Share</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Date</TableHead>
                     </TableRow>
@@ -606,6 +608,25 @@ export default function DriverDetailPage({
                           {ride.pickupLocation} → {ride.dropLocation}
                         </TableCell>
                         <TableCell>{formatCurrency(ride.fare)}</TableCell>
+                        <TableCell>
+                          {ride.driverEarning != null ? (
+                            <span>
+                              {formatCurrency(ride.driverEarning)}
+                              {ride.driverCommissionPercentage != null && (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  ({ride.driverCommissionPercentage}%)
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {ride.companyEarning != null
+                            ? formatCurrency(ride.companyEarning)
+                            : "—"}
+                        </TableCell>
                         <TableCell><StatusBadge status={ride.status} /></TableCell>
                         <TableCell>{formatDateTime(ride.date)}</TableCell>
                       </TableRow>

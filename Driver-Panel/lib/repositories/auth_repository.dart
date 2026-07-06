@@ -150,6 +150,26 @@ class ProfileRepository {
         rcFrontUrl: rcFrontUrl,
         rcBackUrl: rcBackUrl,
       );
+  Future<void> saveVehicleType({required String vehicleTypeId}) =>
+      _service.saveVehicleType(vehicleTypeId: vehicleTypeId);
+  Future<void> saveVehicleDocuments({
+    String? insuranceUrl,
+    String? pollutionUrl,
+    String? permitUrl,
+    String? fitnessUrl,
+    String? vehicleFrontUrl,
+    String? vehicleBackUrl,
+    String? vehicleSideUrl,
+  }) =>
+      _service.saveVehicleDocuments(
+        insuranceUrl: insuranceUrl,
+        pollutionUrl: pollutionUrl,
+        permitUrl: permitUrl,
+        fitnessUrl: fitnessUrl,
+        vehicleFrontUrl: vehicleFrontUrl,
+        vehicleBackUrl: vehicleBackUrl,
+        vehicleSideUrl: vehicleSideUrl,
+      );
   Future<void> saveKyc({
     required String idType,
     required String frontUrl,

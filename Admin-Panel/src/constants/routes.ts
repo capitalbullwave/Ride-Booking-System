@@ -24,6 +24,7 @@ export const ROUTES = {
   help: "/help",
   reports: "/reports",
   settings: "/settings",
+  settingsDriverCommission: "/settings/driver-commission",
 } as const;
 
 export const APP_NAME = "Fast Bull";

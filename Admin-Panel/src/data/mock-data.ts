@@ -24,6 +24,11 @@ export const dashboardStats: DashboardStats = {
   cancelledRides: 89450,
   todayRevenue: 2847500,
   monthlyRevenue: 68450000,
+  totalRevenue: 420000000,
+  driverEarningsToday: 854250,
+  companyEarningsToday: 1993250,
+  totalCommissionPaid: 126000000,
+  driverCommissionPercentage: 30,
 };
 
 export const rideBookingChartData: ChartDataPoint[] = [

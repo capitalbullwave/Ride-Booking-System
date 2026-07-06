@@ -11,12 +11,12 @@ import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/core/utils/ride_notification_utils.dart';
-import 'package:wavego_driver/models/notification_model.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/repositories/notification_repository.dart';
+import 'package:wavego_driver/services/ride_realtime_service.dart';
 import 'package:wavego_driver/screens/notifications/notifications_screen.dart';
 import 'package:wavego_driver/screens/profile/profile_screen.dart';
 import 'package:wavego_driver/screens/trip/trip_history_screen.dart';
@@ -36,9 +36,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _navIndex = 0;
-  Timer? _ridePollTimer;
-  Timer? _notificationPollTimer;
-  Timer? _activeRideCheckTimer;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   final Set<String> _presentedRideIds = {};
   bool _showingRideSheet = false;
 
@@ -67,27 +65,54 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (!mounted) return;
 
       if (ref.read(dashboardViewModelProvider).isOnline) {
-        _pollForRides();
-        _startRidePolling();
-        _pollNotifications();
-        _startNotificationPolling();
-        _startActiveRideCheck();
+        await _refreshOnlineData();
+        _startRealtimeRideListener();
       }
     });
   }
 
   @override
   void dispose() {
-    _stopRidePolling();
-    _stopNotificationPolling();
-    _activeRideCheckTimer?.cancel();
+    _stopRealtimeRideListener();
     super.dispose();
   }
 
-  void _startActiveRideCheck() {
-    _activeRideCheckTimer?.cancel();
-    _activeRideCheckTimer =
-        Timer.periodic(const Duration(seconds: 4), (_) => _checkActiveRideRedirect());
+  Future<void> _refreshOnlineData() async {
+    if (!ref.read(dashboardViewModelProvider).isOnline) return;
+    await _pollForRides();
+    await _pollNotifications();
+    await _checkActiveRideRedirect();
+  }
+
+  void _startRealtimeRideListener() {
+    _stopRealtimeRideListener();
+    final realtime = ref.read(rideRealtimeProvider);
+    unawaited(_connectRealtime(realtime));
+  }
+
+  Future<void> _connectRealtime(RideRealtimeService realtime) async {
+    await realtime.connect();
+    if (!mounted) return;
+    _realtimeSub = realtime.messages.listen((message) {
+      if (!mounted) return;
+      if (message['event'] != 'ride_request') return;
+      if (!ref.read(dashboardViewModelProvider).isOnline) return;
+      if (ref.read(rideViewModelProvider).activeRide != null) return;
+      if (_showingRideSheet || _isOnRideRequestRoute) return;
+
+      final request = rideRequestFromRealtimePayload(message);
+      if (request == null) return;
+      if (_presentedRideIds.contains(request.id)) return;
+      if (ref.read(rideViewModelProvider.notifier).isDismissed(request.id)) {
+        return;
+      }
+      unawaited(_presentRideRequestOnce(request));
+    });
+  }
+
+  void _stopRealtimeRideListener() {
+    _realtimeSub?.cancel();
+    _realtimeSub = null;
   }
 
   Future<void> _checkActiveRideRedirect() async {
@@ -120,15 +145,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     ref.listen(dashboardStateProvider(dashboardState.isOnline), (prev, next) {
       if (next && mounted) {
-        _pollForRides();
-        _startRidePolling();
-        _pollNotifications();
-        _startNotificationPolling();
-        _startActiveRideCheck();
+        unawaited(_refreshOnlineData());
+        _startRealtimeRideListener();
       } else {
-        _stopRidePolling();
-        _stopNotificationPolling();
-        _activeRideCheckTimer?.cancel();
+        _stopRealtimeRideListener();
       }
     });
 
@@ -142,7 +162,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       body: IndexedStack(
         index: _navIndex,
         children: [
-          _HomeTab(state: dashboardState),
+          _HomeTab(
+            state: dashboardState,
+            onRefresh: () async {
+              await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
+              await _refreshOnlineData();
+            },
+          ),
           const TripHistoryScreen(embedded: true),
           const WalletScreen(embedded: true),
           const NotificationsScreen(embedded: true),
@@ -196,28 +222,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       ),
     );
-  }
-
-  void _startRidePolling() {
-    _ridePollTimer?.cancel();
-    _ridePollTimer =
-        Timer.periodic(const Duration(seconds: 3), (_) => _pollForRides());
-  }
-
-  void _stopRidePolling() {
-    _ridePollTimer?.cancel();
-    _ridePollTimer = null;
-  }
-
-  void _startNotificationPolling() {
-    _notificationPollTimer?.cancel();
-    _notificationPollTimer =
-        Timer.periodic(const Duration(seconds: 4), (_) => _pollNotifications());
-  }
-
-  void _stopNotificationPolling() {
-    _notificationPollTimer?.cancel();
-    _notificationPollTimer = null;
   }
 
   Future<void> _pollNotifications() async {
@@ -294,8 +298,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 final dashboardStateProvider = Provider.family<bool, bool>((ref, isOnline) => isOnline);
 
 class _HomeTab extends ConsumerWidget {
-  const _HomeTab({required this.state});
+  const _HomeTab({
+    required this.state,
+    required this.onRefresh,
+  });
+
   final DashboardState state;
+  final Future<void> Function() onRefresh;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -303,7 +312,7 @@ class _HomeTab extends ConsumerWidget {
 
     return SafeArea(
       child: RefreshIndicator(
-        onRefresh: () => ref.read(dashboardViewModelProvider.notifier).loadDashboard(),
+        onRefresh: onRefresh,
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
@@ -428,7 +437,7 @@ class _HomeTab extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: StatCard(
-                                title: "Today's Earnings",
+                                title: "Today's Commission",
                                 value: DateFormatter.currency(data.todayEarnings),
                                 icon: Icons.currency_rupee,
                                 color: AppColors.secondary,

@@ -93,6 +93,9 @@ export interface Ride {
   dropLocation: string;
   distance: number;
   fare: number;
+  driverCommissionPercentage?: number;
+  driverEarning?: number;
+  companyEarning?: number;
   status: RideStatus;
   date: string;
   duration?: number;
@@ -206,6 +209,11 @@ export interface DashboardStats {
   cancelledRides: number;
   todayRevenue: number;
   monthlyRevenue: number;
+  totalRevenue: number;
+  driverEarningsToday: number;
+  companyEarningsToday: number;
+  totalCommissionPaid: number;
+  driverCommissionPercentage: number;
 }
 
 export interface ChartDataPoint {

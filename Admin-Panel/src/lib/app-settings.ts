@@ -50,3 +50,29 @@ export function validateAppSettings(settings: AppSettings): { valid: boolean; er
 
   return { valid: true };
 }
+
+/** Commission is managed via /settings/driver-commission API — skip local split validation. */
+export function validateAppSettingsWithoutCommission(settings: AppSettings): {
+  valid: boolean;
+  error?: string;
+} {
+  if (!settings.appName.trim()) {
+    return { valid: false, error: "App name is required" };
+  }
+  if (!settings.contactEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contactEmail)) {
+    return { valid: false, error: "Enter a valid contact email" };
+  }
+  if (!settings.contactPhone.trim()) {
+    return { valid: false, error: "Contact phone is required" };
+  }
+
+  if (settings.firebaseConfig.trim()) {
+    try {
+      JSON.parse(settings.firebaseConfig);
+    } catch {
+      return { valid: false, error: "Firebase configuration must be valid JSON" };
+    }
+  }
+
+  return { valid: true };
+}

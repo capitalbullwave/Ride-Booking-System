@@ -62,8 +62,8 @@ class AuthService:
 
     def _otp_response(self, message: str, otp: str | None = None) -> dict:
         response: dict = {"message": message, "success": True}
-        # Expose OTP in development when Twilio SMS is not configured.
-        if settings.is_development and otp and not get_twilio_otp_service().is_configured:
+        # Expose hardcoded OTP in development for local testing.
+        if settings.is_development and otp:
             response["otp"] = otp
         return response
 
@@ -84,21 +84,24 @@ class AuthService:
     def _twilio_otp(self):
         return get_twilio_otp_service()
 
+    _DEV_HARDCODED_OTP = "123456"
+
     async def _issue_phone_otp(self, phone: str) -> str | None:
-        """Send OTP via Twilio Verify, or return a local OTP for dev fallback."""
+        """Send OTP via Twilio Verify when configured; otherwise local/dev fallback."""
         if self._twilio_otp().is_configured:
             self._twilio_otp().send_otp(phone)
             return None
 
-        otp = generate_otp()
         if settings.is_development:
             logger.warning(
-                "dev_otp_generated",
+                "dev_otp_hardcoded",
                 phone=phone,
-                otp=otp,
-                hint="Twilio is not configured — OTP is not sent via SMS. "
-                "Use the code shown in the app or API response.",
+                otp=self._DEV_HARDCODED_OTP,
+                hint="Twilio not configured — using hardcoded OTP 123456.",
             )
+            return self._DEV_HARDCODED_OTP
+
+        otp = generate_otp()
         return otp
 
     def _validate_phone_otp(
@@ -111,6 +114,7 @@ class AuthService:
         if self._twilio_otp().is_configured:
             self._twilio_otp().verify_otp(phone, submitted_otp)
             return
+
         if not stored_otp or stored_otp != submitted_otp:
             raise ValidationException("Invalid OTP")
         if stored_expires_at and stored_expires_at < datetime.now(timezone.utc):

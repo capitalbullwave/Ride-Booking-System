@@ -43,6 +43,8 @@ class StudentPassService extends BaseApiService {
         'aadhar_photo': aadharPhoto,
         'student_id_photo': studentIdPhoto,
       },
+      sendTimeout: const Duration(minutes: 2),
+      receiveTimeout: const Duration(seconds: 60),
       parser: (raw) => raw as Map<String, dynamic>,
     );
     return StudentPassApplication.fromJson(

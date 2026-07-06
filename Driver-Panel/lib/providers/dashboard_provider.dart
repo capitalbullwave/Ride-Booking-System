@@ -92,7 +92,7 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
       (position) {
         final now = DateTime.now();
         if (lastPosted != null &&
-            now.difference(lastPosted!) < const Duration(seconds: 5)) {
+            now.difference(lastPosted!) < const Duration(seconds: 30)) {
           return;
         }
         lastPosted = now;

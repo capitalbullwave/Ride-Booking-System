@@ -1,3 +1,4 @@
+import { HARDCODED_OTP } from "@/constants/auth";
 import { apiFetch, authFetch } from "@/lib/api";
 import { normalizePhone } from "@/lib/phone";
 
@@ -165,7 +166,7 @@ export async function sendSignupOtp(
   return {
     message: result.message,
     phone: `${payload.dial_code} ${payload.phone}`,
-    ...(result.otp ? { dev_otp: result.otp } : {}),
+    dev_otp: HARDCODED_OTP,
   };
 }
 
@@ -210,7 +211,7 @@ export async function sendLoginOtp(
   return {
     message: result.message,
     phone: `${payload.dial_code} ${payload.phone}`,
-    ...(result.otp ? { dev_otp: result.otp } : {}),
+    dev_otp: HARDCODED_OTP,
   };
 }
 

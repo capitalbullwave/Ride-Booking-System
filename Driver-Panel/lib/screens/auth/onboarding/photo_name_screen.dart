@@ -29,11 +29,20 @@ class _PhotoNameScreenState extends ConsumerState<PhotoNameScreen> {
   @override
   void initState() {
     super.initState();
+    _nameController = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hydrate());
+  }
+
+  Future<void> _hydrate() async {
+    await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
+    if (!mounted) return;
     final data = ref.read(registrationViewModelProvider);
-    _nameController = TextEditingController(text: data.fullName);
-    _photoPath = data.profilePhotoUrl ?? data.selfieUrl;
-    _dob = data.dateOfBirth;
-    _gender = data.gender;
+    _nameController.text = data.fullName;
+    setState(() {
+      _photoPath = data.profilePhotoUrl ?? data.selfieUrl;
+      _dob = data.dateOfBirth;
+      _gender = data.gender;
+    });
   }
 
   @override

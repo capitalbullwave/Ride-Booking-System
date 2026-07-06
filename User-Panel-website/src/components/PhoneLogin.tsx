@@ -16,7 +16,6 @@ import {
   needsProfileSetup,
   resolvePostAuthDestination,
   setAuthSession,
-  setDevOtpHint,
   setPostLoginRedirect,
 } from "@/lib/auth-session";
 import { sendLoginOtp, verifyOtp } from "@/lib/auth-api";
@@ -111,13 +110,12 @@ export function PhoneLogin() {
         confirmationRef.current = confirmation;
         setE164Phone(e164);
       } else {
-        const result = await sendLoginOtp({
+        await sendLoginOtp({
           dial_code: country.dialCode,
           phone,
           mode: "login",
         });
         setE164Phone(toE164Phone(country, phone));
-        if (result.dev_otp) setDevOtpHint(result.dev_otp);
       }
       setStep("verify");
       setResendSeconds(30);
