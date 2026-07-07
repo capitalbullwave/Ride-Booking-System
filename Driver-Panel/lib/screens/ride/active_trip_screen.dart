@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
+import 'package:wavego_driver/core/utils/geo_distance.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/navigation_launcher.dart';
 import 'package:wavego_driver/models/payment_completion_data.dart';
@@ -15,6 +16,7 @@ import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
+import 'package:wavego_driver/widgets/common/slide_confirm_button.dart';
 import 'package:wavego_driver/providers/ride_chat_provider.dart';
 import 'package:wavego_driver/services/ride_realtime_service.dart';
 import 'package:wavego_driver/widgets/ride/ride_chat_notification.dart';
@@ -42,6 +44,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   bool _statusUpdating = false;
   bool _loading = true;
   bool _cancelHandled = false;
+  int? _tripEtaMinutes;
+  String? _tripDistanceLabel;
   Timer? _statusPollTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
 
@@ -246,7 +250,18 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          TripMapView(ride: ride),
+          TripMapView(
+            ride: ride,
+            onTripMetrics: ({speedKmh, etaMinutes, distanceMeters}) {
+              if (!mounted) return;
+              setState(() {
+                _tripEtaMinutes = etaMinutes;
+                _tripDistanceLabel = distanceMeters != null
+                    ? formatDistanceAway(distanceMeters)
+                    : null;
+              });
+            },
+          ),
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -262,9 +277,13 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
           ),
           DraggableScrollableSheet(
             controller: _sheetController,
-            initialChildSize: ride.status == 'arrived' ? 0.68 : 0.38,
-            minChildSize: 0.28,
-            maxChildSize: 0.78,
+            initialChildSize: ride.status == 'arrived'
+                ? 0.68
+                : ride.status == 'started'
+                    ? 0.34
+                    : 0.38,
+            minChildSize: ride.status == 'started' ? 0.26 : 0.28,
+            maxChildSize: ride.status == 'started' ? 0.42 : 0.78,
             builder: (context, scrollController) {
               return Container(
                 decoration: BoxDecoration(
@@ -295,6 +314,24 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    if (ride.status == 'started') ...[
+                      _StartedTripSheet(
+                        ride: ride,
+                        etaMinutes: _tripEtaMinutes,
+                        distanceLabel: _tripDistanceLabel,
+                        onNavigate: () => _openNavigation(ride),
+                        onCall: () => _callPassenger(ride),
+                        onChat: () => _messagePassenger(ride),
+                      ),
+                      const SizedBox(height: 16),
+                      SlideConfirmButton(
+                        label: 'Complete ride',
+                        enabled: !blockPrimaryAction,
+                        isLoading: primaryBusy,
+                        onConfirmed: () =>
+                            _handleStatusAction(ride, currentAction.$1),
+                      ),
+                    ] else ...[
                     Text(
                       currentAction.$2,
                       style: Theme.of(context)
@@ -307,18 +344,14 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          ride.status == 'started'
-                              ? Icons.location_on
-                              : Icons.person_pin_circle,
+                          Icons.person_pin_circle,
                           size: 18,
                           color: AppColors.primary,
                         ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            ride.status == 'started'
-                                ? ride.destinationAddress
-                                : ride.pickupAddress,
+                            ride.pickupAddress,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
@@ -355,7 +388,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
-                          'When you reach pickup, tap "Arrived at pickup". Then enter the passenger\'s 4-digit start code from their Fast Bull app.',
+                          'When you reach pickup, slide to confirm arrival. Then enter the passenger\'s 4-digit start code from their Fast Bull app.',
                           style: TextStyle(fontSize: 12, height: 1.4),
                         ),
                       ),
@@ -443,13 +476,23 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    AppButton(
-                      label: currentAction.$3,
-                      isLoading: blockPrimaryAction,
-                      onPressed: blockPrimaryAction
-                          ? null
-                          : () => _handleStatusAction(ride, currentAction.$1),
-                    ),
+                    if (ride.status == 'heading_to_pickup')
+                      SlideConfirmButton(
+                        label: 'Arrived',
+                        enabled: !blockPrimaryAction,
+                        isLoading: primaryBusy,
+                        onConfirmed: () =>
+                            _handleStatusAction(ride, currentAction.$1),
+                      )
+                    else
+                      AppButton(
+                        label: currentAction.$3,
+                        isLoading: blockPrimaryAction,
+                        onPressed: blockPrimaryAction
+                            ? null
+                            : () => _handleStatusAction(ride, currentAction.$1),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -526,6 +569,122 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
         if (mounted) setState(() => _statusUpdating = false);
       }
     }
+  }
+}
+
+class _StartedTripSheet extends StatelessWidget {
+  const _StartedTripSheet({
+    required this.ride,
+    required this.etaMinutes,
+    required this.distanceLabel,
+    required this.onNavigate,
+    required this.onCall,
+    required this.onChat,
+  });
+
+  final ActiveRide ride;
+  final int? etaMinutes;
+  final String? distanceLabel;
+  final VoidCallback onNavigate;
+  final VoidCallback onCall;
+  final VoidCallback onChat;
+
+  @override
+  Widget build(BuildContext context) {
+    final eta = etaMinutes ?? 5;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            'Ride started',
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        RichText(
+          text: TextSpan(
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF111827),
+                ),
+            children: [
+              const TextSpan(text: 'Destination in '),
+              TextSpan(
+                text: '$eta min',
+                style: const TextStyle(color: AppColors.primary),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          distanceLabel ?? 'Calculating route...',
+          style: const TextStyle(
+            color: Color(0xFF6B7280),
+            fontWeight: FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.location_on, size: 16, color: AppColors.success),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                ride.destinationAddress,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          ride.passengerName,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            _ActionBtn(
+              icon: Icons.navigation,
+              label: 'Navigate',
+              onTap: onNavigate,
+            ),
+            _ActionBtn(
+              icon: Icons.phone,
+              label: 'Call',
+              onTap: onCall,
+            ),
+            _ActionBtn(
+              icon: Icons.chat,
+              label: 'Chat',
+              onTap: onChat,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 

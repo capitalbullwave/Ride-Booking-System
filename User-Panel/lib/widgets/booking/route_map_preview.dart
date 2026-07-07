@@ -23,51 +23,24 @@ class RouteMapPreview extends StatefulWidget {
 
 class _RouteMapPreviewState extends State<RouteMapPreview> {
   GoogleMapController? _controller;
-  BitmapDescriptor? _vehicleIcon;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadVehicleIcon();
-  }
-
-  @override
-  void didUpdateWidget(covariant RouteMapPreview oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.vehicleSlug != oldWidget.vehicleSlug) {
-      _loadVehicleIcon();
-    }
-  }
-
-  Future<void> _loadVehicleIcon() async {
-    final slug = widget.vehicleSlug;
-    if (slug == null || slug.isEmpty) {
-      if (mounted) setState(() => _vehicleIcon = null);
-      return;
-    }
-    final icon = await MapMarkerIcons.vehicleMarker(slug);
-    if (!mounted) return;
-    setState(() => _vehicleIcon = icon);
-  }
 
   Set<Marker> _buildMarkers(LatLng pickup, LatLng dropoff) {
-    final markers = <Marker>{
+    return {
       Marker(
         markerId: const MarkerId('pickup'),
         position: pickup,
-        icon: _vehicleIcon ??
-            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        anchor: _vehicleIcon != null ? const Offset(0.5, 0.5) : const Offset(0.5, 1.0),
+        icon: MapMarkerIcons.pickupMarker,
+        anchor: const Offset(0.5, 1.0),
         infoWindow: InfoWindow(title: 'Pickup', snippet: widget.route.pickup.address),
       ),
       Marker(
         markerId: const MarkerId('dropoff'),
         position: dropoff,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+        icon: MapMarkerIcons.dropoffMarker,
+        anchor: const Offset(0.5, 1.0),
         infoWindow: InfoWindow(title: 'Drop', snippet: widget.route.dropoff.address),
       ),
     };
-    return markers;
   }
 
   @override

@@ -23,9 +23,9 @@ Future<RazorpayCheckoutResult> openRazorpayCheckout(
 
   void onSuccess(PaymentSuccessResponse response) {
     cleanup();
-    final orderId = response.orderId ?? checkout.orderId;
-    final paymentId = response.paymentId;
-    final signature = response.signature;
+    final orderId = (response.orderId ?? checkout.orderId).trim();
+    final paymentId = response.paymentId?.trim() ?? '';
+    final signature = response.signature?.trim() ?? '';
     if (orderId.isEmpty || paymentId.isEmpty || signature.isEmpty) {
       if (!completer.isCompleted) {
         completer.completeError('Payment response incomplete');

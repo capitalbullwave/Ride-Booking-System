@@ -144,7 +144,8 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
         Marker(
           markerId: const MarkerId('pickup'),
           position: LatLng(widget.ride.pickupLat!, widget.ride.pickupLng!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: MapMarkerIcons.pickupMarker,
+          anchor: const Offset(0.5, 1.0),
           infoWindow: InfoWindow(title: 'Pickup', snippet: widget.ride.pickupAddress),
         ),
       );
@@ -154,7 +155,8 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
         Marker(
           markerId: const MarkerId('dropoff'),
           position: LatLng(widget.ride.dropoffLat!, widget.ride.dropoffLng!),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose),
+          icon: MapMarkerIcons.dropoffMarker,
+          anchor: const Offset(0.5, 1.0),
           infoWindow: InfoWindow(title: 'Drop', snippet: widget.ride.dropoffAddress),
         ),
       );

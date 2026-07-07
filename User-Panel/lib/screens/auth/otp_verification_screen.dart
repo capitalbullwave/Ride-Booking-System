@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:wavego_user/core/auth/auth_refresh_notifier.dart';
 import 'package:wavego_user/core/config/app_config.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/responsive.dart';
 import 'package:wavego_user/core/utils/view_state.dart';
 import 'package:wavego_user/core/utils/profile_refresh.dart';
-import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
@@ -28,6 +28,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   int _secondsRemaining = AppConfig.otpResendSeconds;
   String? _errorMessage;
   bool _isLoading = false;
+  bool _isVerifying = false;
 
   @override
   void initState() {
@@ -52,34 +53,57 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   }
 
   Future<void> _verifyOtp(String otp) async {
-    if (!mounted) return;
+    if (!mounted || _isVerifying) return;
+
+    final code = otp.trim();
+    if (code.length < AppConfig.otpLength) {
+      setState(() => _errorMessage = 'Enter the full OTP sent to your phone');
+      return;
+    }
+
+    _isVerifying = true;
     setState(() {
       _errorMessage = null;
       _isLoading = true;
     });
 
-    await ref.read(authViewModelProvider.notifier).verifyOtp(otp);
+    try {
+      final response =
+          await ref.read(authViewModelProvider.notifier).verifyOtp(code);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final loginState = ref.read(authViewModelProvider).loginState;
-    if (loginState is ViewStateError) {
-      setState(() {
-        _errorMessage = loginState.message;
-        _isLoading = false;
-      });
-      return;
-    }
+      if (response == null) {
+        final loginState = ref.read(authViewModelProvider).loginState;
+        if (loginState is ViewStateError) {
+          setState(() => _errorMessage = loginState.message);
+        } else {
+          setState(() => _errorMessage = 'Unable to verify OTP. Please try again.');
+        }
+        return;
+      }
 
-    if (loginState is ViewStateSuccess && mounted) {
       refreshUserProfile(ref);
+      ref.read(authRefreshNotifierProvider).notifyAuthChanged();
 
-      final response = (loginState as ViewStateSuccess<LoginResponse?>).data;
-      final needsSetup = response?.user?.isPlaceholderName ?? true;
+      final needsSetup = response.user?.isPlaceholderName ?? true;
+      final destination =
+          needsSetup ? RouteNames.createProfile : RouteNames.home;
 
-      context.go(needsSetup ? RouteNames.createProfile : RouteNames.home);
-    } else {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        context.go(destination);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.toString().replaceFirst('Exception: ', '');
+        });
+      }
+    } finally {
+      _isVerifying = false;
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

@@ -78,7 +78,7 @@ class LocationCard extends StatelessWidget {
                   child: Column(
                     children: [
                       _LocationRow(
-                        dotColor: AppColors.success,
+                        dotColor: AppColors.error,
                         label: 'Pickup',
                         labelColor: AppColors.success,
                         value: pickup.isEmpty ? 'Current Location' : pickup,
@@ -87,7 +87,7 @@ class LocationCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       _LocationRow(
-                        dotColor: AppColors.error,
+                        dotColor: AppColors.success,
                         label: dropFieldLabel,
                         labelColor: AppColors.error,
                         value: dropoff.isEmpty ? dropPlaceholder : dropoff,

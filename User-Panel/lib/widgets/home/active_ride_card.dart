@@ -104,13 +104,13 @@ class ActiveRideCard extends StatelessWidget {
             child: Column(
               children: [
                 _RideLocationRow(
-                  dotColor: AppColors.success,
+                  dotColor: AppColors.error,
                   label: 'Pickup',
                   value: ride.pickupAddress,
                 ),
                 const SizedBox(height: 12),
                 _RideLocationRow(
-                  dotColor: AppColors.error,
+                  dotColor: AppColors.success,
                   label: 'Drop',
                   value: ride.dropoffAddress,
                 ),

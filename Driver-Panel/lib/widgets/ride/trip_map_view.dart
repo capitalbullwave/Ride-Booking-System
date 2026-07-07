@@ -6,14 +6,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
+import 'package:wavego_driver/core/utils/geo_distance.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/app_providers.dart';
+import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/services/directions_service.dart';
+import 'package:wavego_driver/widgets/ride/trip_speed_eta_overlay.dart';
+
+typedef TripMetricsCallback = void Function({
+  double? speedKmh,
+  int? etaMinutes,
+  double? distanceMeters,
+});
 
 class TripMapView extends ConsumerStatefulWidget {
-  const TripMapView({super.key, required this.ride});
+  const TripMapView({
+    super.key,
+    required this.ride,
+    this.onTripMetrics,
+  });
 
   final ActiveRide ride;
+  final TripMetricsCallback? onTripMetrics;
 
   @override
   ConsumerState<TripMapView> createState() => _TripMapViewState();
@@ -27,7 +41,18 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   bool _loadingRoutes = true;
   double? _driverLat;
   double? _driverLng;
+  double? _speedKmh;
+  int? _etaMinutes;
+  double? _distanceMeters;
   StreamSubscription<Position>? _positionSub;
+
+  void _emitMetrics() {
+    widget.onTripMetrics?.call(
+      speedKmh: _speedKmh,
+      etaMinutes: _etaMinutes,
+      distanceMeters: _distanceMeters,
+    );
+  }
 
   bool get _hasValidPickup =>
       DirectionsService.hasCoordinates(widget.ride.pickupLat, widget.ride.pickupLng);
@@ -56,12 +81,18 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
         if (!mounted) return;
         final lat = position.latitude;
         final lng = position.longitude;
-        if (_driverLat == lat && _driverLng == lng) return;
+        final speed = position.speed >= 0 ? position.speed * 3.6 : null;
+        final moved = _driverLat != lat || _driverLng != lng;
+        final speedChanged = _speedKmh != speed;
+        if (!moved && !speedChanged) return;
         setState(() {
           _driverLat = lat;
           _driverLng = lng;
+          _speedKmh = speed;
         });
-        _loadActiveLeg();
+        _updateEtaFallback();
+        _emitMetrics();
+        if (moved) _loadActiveLeg();
       },
       onError: (_) {},
     );
@@ -87,7 +118,10 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
       setState(() {
         _driverLat = position.latitude;
         _driverLng = position.longitude;
+        _speedKmh = position.speed >= 0 ? position.speed * 3.6 : null;
       });
+      _updateEtaFallback();
+      _emitMetrics();
     } catch (_) {}
   }
 
@@ -123,6 +157,27 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
     _fitBounds();
   }
 
+  void _updateEtaFallback() {
+    final dLat = _driverLat;
+    final dLng = _driverLng;
+    if (dLat == null || dLng == null) return;
+
+    final targetLat =
+        _isRideStarted ? widget.ride.destinationLat : widget.ride.pickupLat;
+    final targetLng =
+        _isRideStarted ? widget.ride.destinationLng : widget.ride.pickupLng;
+    if (!DirectionsService.hasCoordinates(targetLat, targetLng)) return;
+
+    final meters = distanceBetweenMeters(
+      lat1: dLat,
+      lng1: dLng,
+      lat2: targetLat,
+      lng2: targetLng,
+    );
+    _distanceMeters = meters;
+    _etaMinutes = estimateEtaMinutes(meters);
+  }
+
   Future<void> _loadActiveLeg() async {
     final dLat = _driverLat;
     final dLng = _driverLng;
@@ -145,11 +200,22 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
             dropoffLng: targetLng,
           );
       if (!mounted) return;
-      setState(() => _activeLegPoints = leg.points);
+      setState(() {
+        _activeLegPoints = leg.points;
+        if (leg.durationMin > 0) {
+          _etaMinutes = leg.durationMin.ceil();
+        }
+        if (leg.distanceKm > 0) {
+          _distanceMeters = leg.distanceKm * 1000;
+        }
+      });
+      _emitMetrics();
       _fitBounds();
     } catch (_) {
       if (!mounted) return;
       setState(() => _activeLegPoints = [LatLng(dLat, dLng), LatLng(targetLat, targetLng)]);
+      _updateEtaFallback();
+      _emitMetrics();
       _fitBounds();
     }
   }
@@ -282,6 +348,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
       );
     }
 
+    final vehicleType =
+        ref.watch(dashboardViewModelProvider).profile?.vehicle?.vehicleType;
+
     return Stack(
       children: [
         GoogleMap(
@@ -311,6 +380,16 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
+            ),
+          ),
+        if (_isRideStarted)
+          Positioned(
+            right: 12,
+            top: MediaQuery.paddingOf(context).top + 72,
+            child: TripSpeedEtaOverlay(
+              speedKmh: _speedKmh,
+              etaMinutes: _etaMinutes,
+              vehicleType: vehicleType,
             ),
           ),
       ],

@@ -30,6 +30,7 @@ def _serialize_vehicle_type(vt: VehicleType) -> dict:
         "waiting_charge_per_min": vt.waiting_charge_per_min,
         "icon_url": vt.icon,
         "service_group": vt.service_group or "ride",
+        "capacity": vt.capacity,
     }
 
 

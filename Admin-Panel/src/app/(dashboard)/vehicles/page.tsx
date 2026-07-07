@@ -67,6 +67,7 @@ type VehicleFormData = {
   perHourRate: string;
   waitingCharge: string;
   cancellationCharge: string;
+  capacity: string;
   isActive: boolean;
   image: string | null;
   existingImageUrl: string | null;
@@ -83,6 +84,7 @@ const emptyForm: VehicleFormData = {
   perHourRate: "0",
   waitingCharge: "2",
   cancellationCharge: "20",
+  capacity: "4",
   isActive: true,
   image: null,
   existingImageUrl: null,
@@ -114,6 +116,7 @@ function categoryToForm(category: VehicleCategory): VehicleFormData {
     perHourRate: String(category.perHourRate ?? 0),
     waitingCharge: String(category.waitingCharge),
     cancellationCharge: String(category.cancellationCharge ?? 20),
+    capacity: String(category.capacity ?? 4),
     isActive: category.isActive,
     image: null,
     existingImageUrl: category.imageUrl ?? null,
@@ -178,6 +181,20 @@ function VehicleFormFields({
             )}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Passenger Capacity</Label>
+        <Input
+          type="number"
+          min="1"
+          max="20"
+          value={form.capacity}
+          onChange={(e) => onChange({ capacity: e.target.value })}
+          placeholder="e.g. 4"
+        />
+        <p className="text-xs text-muted-foreground">
+          Shown on user panel when choosing a ride (person icon + number)
+        </p>
       </div>
       <div className="space-y-2">
         <Label>Vehicle Image (optional)</Label>
@@ -386,6 +403,7 @@ export default function VehiclesPage() {
         perHourRate: activeTab === "rental" ? Number(addForm.perHourRate) || 50 : 0,
         waitingCharge: Number(addForm.waitingCharge) || 2,
         cancellationCharge: Number(addForm.cancellationCharge) || 20,
+        capacity: Number(addForm.capacity) || 4,
         isActive: true,
         image: addForm.image ?? undefined,
         serviceGroup: activeTab,
@@ -438,6 +456,7 @@ export default function VehiclesPage() {
             : 0,
         waitingCharge: Number(editForm.waitingCharge) || 0,
         cancellationCharge: Number(editForm.cancellationCharge) || 20,
+        capacity: Number(editForm.capacity) || 4,
         isActive: editForm.isActive,
       };
       if (editForm.image) {
@@ -661,10 +680,14 @@ export default function VehiclesPage() {
                       </div>
                     </div>
                   ) : (
-                  <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-6">
                     <div className="rounded-lg bg-muted/40 px-3 py-2">
                       <p className="text-muted-foreground">Base Fare</p>
                       <p className="font-semibold">₹{category.baseFare}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/40 px-3 py-2">
+                      <p className="text-muted-foreground">Capacity</p>
+                      <p className="font-semibold">{category.capacity ?? 4} seats</p>
                     </div>
                     <div className="rounded-lg bg-muted/40 px-3 py-2">
                       <p className="text-muted-foreground">KM Included</p>

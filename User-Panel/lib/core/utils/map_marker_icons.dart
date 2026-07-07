@@ -10,6 +10,14 @@ class MapMarkerIcons {
 
   static final _cache = <String, BitmapDescriptor>{};
 
+  /// Ride start / pickup — red pin (Ola-style).
+  static final BitmapDescriptor pickupMarker =
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+
+  /// Destination / drop — green pin (Ola-style).
+  static final BitmapDescriptor dropoffMarker =
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+
   static Future<BitmapDescriptor> vehicleMarker(String? slug) async {
     final key = (slug ?? 'cab').toLowerCase();
     final cached = _cache[key];

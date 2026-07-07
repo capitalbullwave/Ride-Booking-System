@@ -7,6 +7,7 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/account_verification_status.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
+import 'package:wavego_driver/core/utils/media_url_resolver.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
@@ -95,7 +96,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 radius: 48,
                                 backgroundColor: AppColors.background,
                                 backgroundImage: profile?.avatar != null
-                                    ? CachedNetworkImageProvider(profile!.avatar!)
+                                    ? CachedNetworkImageProvider(
+                                        resolveMediaUrl(profile!.avatar!),
+                                      )
                                     : null,
                                 child: profile?.avatar == null
                                     ? Text(

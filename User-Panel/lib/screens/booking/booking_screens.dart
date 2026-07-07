@@ -10,6 +10,7 @@ import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
+import 'package:wavego_user/models/coupon_models.dart';
 import 'package:wavego_user/models/fare_models.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/models/user_models.dart';
@@ -22,12 +23,15 @@ import 'package:wavego_user/services/places_service.dart';
 import 'package:wavego_user/services/recent_places_service.dart';
 import 'package:wavego_user/services/ride_realtime_service.dart';
 import 'package:wavego_user/services/saved_places_service.dart';
+import 'package:wavego_user/widgets/booking/booking_checkout_bar.dart';
+import 'package:wavego_user/widgets/booking/booking_offers_sheet.dart';
 import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
+import 'package:wavego_user/widgets/booking/ride_accepted_panel.dart';
+import 'package:wavego_user/widgets/booking/ride_in_progress_panel.dart';
 import 'package:wavego_user/widgets/home/ride_schedule_section.dart';
 import 'package:wavego_user/widgets/booking/live_tracking_map.dart';
 import 'package:wavego_user/widgets/booking/rate_ride_dialog.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
-import 'package:wavego_user/widgets/common/app_button.dart';
 import 'package:wavego_user/core/utils/navigation_launcher.dart';
 import 'package:wavego_user/providers/ride_chat_provider.dart';
 import 'package:wavego_user/widgets/ride/ride_chat_notification.dart';
@@ -430,6 +434,10 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   Map<String, VehicleFareQuote> _fareQuotes = {};
   bool _loadingFares = false;
   double _memberDiscountPercent = 0;
+  String _paymentMethod = 'CASH';
+  AppliedCoupon? _appliedCoupon;
+  List<RideCoupon> _coupons = const [];
+  bool _booking = false;
 
   @override
   void initState() {
@@ -437,7 +445,106 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadRoute();
       _loadVehicles();
+      _loadCoupons();
     });
+  }
+
+  Future<void> _loadCoupons() async {
+    try {
+      final coupons = await ref.read(rideBookingServiceProvider).listCoupons();
+      if (!mounted) return;
+      setState(() => _coupons = coupons);
+    } catch (_) {}
+  }
+
+  double _orderAmountForSelectedVehicle() {
+    if (_selectedVehicleIndex == null) return 0;
+    final vehicle = _vehicles[_selectedVehicleIndex!];
+    final distanceKm = _route?.distanceKm ?? 5.0;
+    final quote = _fareQuotes[vehicle.id];
+    if (quote != null) return quote.estimatedFare;
+    final raw = vehicle.baseFare + vehicle.perKmRate * distanceKm;
+    if (_memberDiscountPercent > 0) {
+      return raw * (1 - _memberDiscountPercent / 100);
+    }
+    return raw;
+  }
+
+  Future<void> _openOffersSheet() async {
+    final amount = _orderAmountForSelectedVehicle();
+    if (amount <= 0) {
+      context.showSnackBar('Select a vehicle first', isError: true);
+      return;
+    }
+
+    await _loadCoupons();
+
+    final applied = await showBookingOffersSheet(
+      context: context,
+      coupons: _coupons,
+      orderAmount: amount,
+      current: _appliedCoupon,
+      onValidate: (code) => ref.read(rideBookingServiceProvider).validateCoupon(
+            code: code,
+            orderAmount: amount,
+          ),
+    );
+
+    if (!mounted) return;
+    setState(() => _appliedCoupon = applied);
+  }
+
+  Future<void> _openPaymentSheet() async {
+    const methods = [
+      ('CASH', 'Cash'),
+      ('UPI', 'UPI'),
+      ('WALLET', 'Wallet'),
+    ];
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            const Text('Payment method', style: TextStyle(fontWeight: FontWeight.bold)),
+            ...methods.map(
+              (item) => ListTile(
+                title: Text(item.$2),
+                trailing: _paymentMethod == item.$1
+                    ? const Icon(Icons.check_circle, color: AppColors.primary)
+                    : null,
+                onTap: () => Navigator.pop(context, item.$1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selected != null && mounted) {
+      setState(() => _paymentMethod = selected);
+    }
+  }
+
+  String get _paymentLabel {
+    switch (_paymentMethod) {
+      case 'UPI':
+        return 'UPI';
+      case 'WALLET':
+        return 'Wallet';
+      default:
+        return 'Cash';
+    }
+  }
+
+  String get _bookButtonLabel {
+    if (_selectedVehicleIndex == null) return 'Select a ride';
+    return 'Book ${_vehicles[_selectedVehicleIndex!].name}';
   }
 
   Future<void> _loadVehicles() async {
@@ -676,6 +783,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
         ? _vehicles[_selectedVehicleIndex!]
         : null;
 
+    setState(() => _booking = true);
     try {
       final result = await ref.read(rideBookingServiceProvider).bookRide(
             pickupAddress: pickup.label,
@@ -685,6 +793,8 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             dropoffLat: route.dropoff.lat,
             dropoffLng: route.dropoff.lng,
             vehicleCategoryId: selectedVehicle?.id,
+            paymentMethod: _paymentMethod,
+            promoCode: _appliedCoupon?.coupon.code,
             scheduledAt: trip.scheduledAt,
           );
       final rideId = result['id']?.toString();
@@ -709,6 +819,8 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       if (mounted) {
         context.showSnackBar(e.userMessage, isError: true);
       }
+    } finally {
+      if (mounted) setState(() => _booking = false);
     }
   }
 
@@ -881,12 +993,31 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          vehicle.name,
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                vehicle.name,
+                                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            const Icon(Icons.person_outline, size: 14, color: AppColors.mutedForeground),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '${vehicle.capacity}',
+                                              style: TextStyle(
+                                                color: AppColors.mutedForeground,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
                                         ),
+                                        const SizedBox(height: 2),
                                         Text(
-                                          vehicle.etaLabel(index),
+                                          vehicle.tripSubtitle(distanceKm, index),
                                           style: TextStyle(
                                             color: AppColors.mutedForeground,
                                             fontSize: 13,
@@ -914,12 +1045,16 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                   ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: AppButton(
-              label: 'Confirm booking',
-              onPressed: _route != null && _selectedVehicleIndex != null
-                  ? _confirmBooking
-                  : null,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: BookingCheckoutBar(
+              paymentLabel: _paymentLabel,
+              bookLabel: _bookButtonLabel,
+              appliedCoupon: _appliedCoupon,
+              isLoading: _booking,
+              enabled: _route != null && _selectedVehicleIndex != null,
+              onPaymentTap: _openPaymentSheet,
+              onOffersTap: _openOffersSheet,
+              onBookTap: _confirmBooking,
             ),
           ),
         ],
@@ -1530,51 +1665,103 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
       data: (ride) => _resolvedRide(ride),
       orElse: () => _optimisticRide,
     );
+    final driverAssigned =
+        resolvedForMap != null && !resolvedForMap.isSearching;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live tracking'),
-        actions: [
-          if (rideId.isNotEmpty && !_rideCompleted)
-            Builder(
-              builder: (context) {
-                final resolved = _resolvedRide(activeRideAsync.valueOrNull);
-                if (resolved != null && resolved.isInProgress) {
-                  return const SizedBox.shrink();
+      extendBody: true,
+      backgroundColor: Colors.white,
+      appBar: driverAssigned
+          ? null
+          : AppBar(
+              title: const Text('Live tracking'),
+            ),
+      body: Stack(
+        children: [
+          Positioned.fill(child: _buildMap(resolvedForMap)),
+          if (driverAssigned)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              left: 12,
+              right: 12,
+              child: Row(
+                children: [
+                  _TrackingMapButton(
+                    icon: Icons.arrow_back,
+                    onTap: () => Navigator.of(context).maybePop(),
+                  ),
+                  const Spacer(),
+                  if (rideId.isNotEmpty && !_rideCompleted)
+                    Builder(
+                      builder: (context) {
+                        final resolved = _resolvedRide(activeRideAsync.valueOrNull);
+                        if (resolved != null && resolved.isInProgress) {
+                          return const SizedBox.shrink();
+                        }
+                        return CancelRideButton(
+                          rideId: rideId,
+                          navigateHome: true,
+                          compact: true,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: activeRideAsync.when(
+              loading: () => _TrackingBottomSheet.searching(rideId: rideId),
+              error: (_, __) => _TrackingBottomSheet.searching(rideId: rideId),
+              data: (ride) {
+                final resolved = _resolvedRide(ride);
+                if (resolved != null && resolved.isCompleted && !_ratingShown) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _handleRideCompleted({'ride_id': resolved.id});
+                  });
                 }
-                return CancelRideButton(
+                if (resolved == null || resolved.isSearching) {
+                  return _TrackingBottomSheet.searching(rideId: rideId);
+                }
+                return _TrackingBottomSheet.assigned(
+                  ride: resolved,
                   rideId: rideId,
-                  navigateHome: true,
-                  compact: true,
                 );
               },
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(child: _buildMap(resolvedForMap)),
-          activeRideAsync.when(
-            loading: () => _TrackingBottomSheet.searching(rideId: rideId),
-            error: (_, __) => _TrackingBottomSheet.searching(rideId: rideId),
-            data: (ride) {
-              final resolved = _resolvedRide(ride);
-              if (resolved != null && resolved.isCompleted && !_ratingShown) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _handleRideCompleted({'ride_id': resolved.id});
-                });
-              }
-              if (resolved == null || resolved.isSearching) {
-                return _TrackingBottomSheet.searching(rideId: rideId);
-              }
-              return _TrackingBottomSheet.assigned(
-                ride: resolved,
-                rideId: rideId,
-                showCancel: !resolved.isInProgress && !_rideCompleted,
-              );
-            },
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TrackingMapButton extends StatelessWidget {
+  const _TrackingMapButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: Colors.black26,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(icon, size: 22, color: AppColors.foreground),
+        ),
       ),
     );
   }
@@ -1585,7 +1772,6 @@ class _TrackingBottomSheet extends ConsumerWidget {
     required this.rideId,
     this.ride,
     required this.searching,
-    this.showCancel = true,
   });
 
   factory _TrackingBottomSheet.searching({required String rideId}) {
@@ -1595,20 +1781,17 @@ class _TrackingBottomSheet extends ConsumerWidget {
   factory _TrackingBottomSheet.assigned({
     required UserActiveRide ride,
     required String rideId,
-    bool showCancel = true,
   }) {
     return _TrackingBottomSheet._(
       rideId: rideId,
       ride: ride,
       searching: false,
-      showCancel: showCancel,
     );
   }
 
   final String rideId;
   final UserActiveRide? ride;
   final bool searching;
-  final bool showCancel;
 
   Future<void> _callDriver(BuildContext context) async {
     final phone = ride?.driverPhone;
@@ -1635,212 +1818,102 @@ class _TrackingBottomSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (searching || ride == null) ...[
-            Row(
-              children: [
-                const CircleAvatar(
-                  backgroundColor: AppColors.primary,
-                  child: SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Finding captain...', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text(
-                        'We will notify you when assigned',
-                        style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final sheetHeight = searching
+        ? screenHeight * 0.22
+        : (ride?.isInProgress == true ? screenHeight * 0.38 : screenHeight * 0.45);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return SizedBox(
+      height: sheetHeight,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
             ),
-          ] else ...[
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    (ride!.driverName ?? 'D')[0].toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ride!.driverName ?? 'Captain assigned',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        ride!.statusLabel,
-                        style: const TextStyle(color: AppColors.mutedForeground, fontSize: 13),
-                      ),
-                      if (ride!.vehicleTypeName != null &&
-                          ride!.vehicleTypeName!.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
+          ],
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(14, 10, 14, 8 + bottomInset),
+                child: searching || ride == null
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Icon(
-                                vehicleIconForSlug(ride!.vehicleTypeSlug ?? 'cab'),
-                                size: 16,
-                                color: AppColors.primary,
+                              const CircleAvatar(
+                                radius: 18,
+                                backgroundColor: AppColors.primary,
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                ride!.vehicleTypeName!,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Finding captain...',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    Text(
+                                      'We will notify you when assigned',
+                                      style: TextStyle(
+                                        color: AppColors.mutedForeground,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      if (ride!.vehicleNumber != null)
-                        Text(
-                          ride!.vehicleNumber!,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                        ),
-                      if (ride!.driverPhone != null && ride!.driverPhone!.isNotEmpty)
-                        Text(
-                          ride!.driverPhone!,
-                          style: const TextStyle(fontSize: 13, color: AppColors.mutedForeground),
-                        ),
-                    ],
-                  ),
-                ),
-                if (ride!.fareEstimate != null)
-                  Text(
-                    '₹${ride!.fareEstimate!.round()}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: AppColors.primary,
-                    ),
-                  )
-                else if (ride!.driverRating != null)
-                  Row(
-                    children: [
-                      const Icon(Icons.star, color: AppColors.warning, size: 16),
-                      Text(' ${ride!.driverRating!.toStringAsFixed(1)}'),
-                    ],
-                  ),
-              ],
-            ),
-            if (!ride!.isInProgress &&
-                ride!.startCode != null &&
-                ride!.startCode!.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Ride start code',
-                      style: TextStyle(color: AppColors.mutedForeground, fontSize: 12),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      ride!.startCode!,
-                      style: const TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 10,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Share this code with your driver when they arrive at pickup',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.mutedForeground, fontSize: 11),
-                    ),
-                  ],
-                ),
+                          if (rideId.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            CancelRideButton(rideId: rideId, navigateHome: true),
+                          ],
+                        ],
+                      )
+                    : ride!.isInProgress
+                        ? RideInProgressPanel(
+                            ride: ride!,
+                            onMessage: () => _openChat(context, ref),
+                            onCall: () => _callDriver(context),
+                          )
+                        : RideAcceptedPanel(
+                            ride: ride!,
+                            onMessage: () => _openChat(context, ref),
+                            onCall: () => _callDriver(context),
+                          ),
               ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _RideContactAction(
-                  icon: Icons.phone,
-                  label: 'Call',
-                  onTap: () => _callDriver(context),
-                ),
-                _RideContactAction(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Chat',
-                  onTap: () => _openChat(context, ref),
-                ),
-              ],
             ),
           ],
-          if (rideId.isNotEmpty && showCancel) ...[
-            const SizedBox(height: 16),
-            CancelRideButton(rideId: rideId, navigateHome: true),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RideContactAction extends StatelessWidget {
-  const _RideContactAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            children: [
-              Icon(icon, color: AppColors.primary),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ],
-          ),
         ),
       ),
     );

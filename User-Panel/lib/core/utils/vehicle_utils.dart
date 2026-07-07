@@ -15,6 +15,7 @@ class BookableVehicle {
     required this.imageAsset,
     this.description,
     this.imageUrl,
+    this.capacity = 4,
   });
 
   final String id;
@@ -26,12 +27,18 @@ class BookableVehicle {
   final String imageAsset;
   final String? description;
   final String? imageUrl;
+  final int capacity;
 
   String fareForDistanceKm(double distanceKm) {
     return '₹${(baseFare + perKmRate * distanceKm).round()}';
   }
 
-  String etaLabel(int index) => '${4 + index} min';
+  String etaLabel(int index) => '${3 + index} min';
+
+  String tripSubtitle(double distanceKm, int index) {
+    final dist = distanceKm.toStringAsFixed(1);
+    return '$dist km • ${etaLabel(index)} away';
+  }
 }
 
 String vehicleImageAssetForSlug(String slug) {
@@ -68,6 +75,7 @@ BookableVehicle bookableVehicleFromCategory(VehicleCategory category, int index)
     imageAsset: vehicleImageAssetForSlug(category.slug),
     description: category.description,
     imageUrl: uploadedImage,
+    capacity: category.capacity,
   );
 }
 
@@ -180,6 +188,7 @@ List<BookableVehicle> fallbackBookableVehicles() => const [
         perKmRate: 8,
         icon: Icons.two_wheeler,
         imageAsset: 'assets/images/services/bike.png',
+        capacity: 1,
       ),
       BookableVehicle(
         id: 'auto',
@@ -189,6 +198,7 @@ List<BookableVehicle> fallbackBookableVehicles() => const [
         perKmRate: 12,
         icon: Icons.electric_rickshaw,
         imageAsset: 'assets/images/services/auto.png',
+        capacity: 3,
       ),
       BookableVehicle(
         id: 'cab',
@@ -198,6 +208,7 @@ List<BookableVehicle> fallbackBookableVehicles() => const [
         perKmRate: 15,
         icon: Icons.directions_car,
         imageAsset: 'assets/images/services/car.png',
+        capacity: 4,
       ),
     ];
 

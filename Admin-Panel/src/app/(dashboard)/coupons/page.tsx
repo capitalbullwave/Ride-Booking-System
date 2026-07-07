@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
   MoreHorizontal,
@@ -10,6 +10,7 @@ import {
   Copy,
   Trash2,
   Eye,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { ExportButton } from "@/components/shared/export-button";
@@ -42,9 +43,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { coupons as initialCoupons } from "@/data/mock-data";
 import { Coupon, CouponStatus, DiscountType } from "@/types";
 import { formatDate, capitalize } from "@/lib/format";
+import {
+  createCoupon,
+  deleteCoupon,
+  listCoupons,
+  updateCoupon,
+} from "@/lib/coupons-api";
 import { toast } from "sonner";
 
 type CouponFormData = {
@@ -151,7 +157,9 @@ function CouponFormFields({
 
 export default function CouponsPage() {
   const [tab, setTab] = useState("active");
-  const [couponList, setCouponList] = useState<Coupon[]>(initialCoupons);
+  const [couponList, setCouponList] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -159,6 +167,22 @@ export default function CouponsPage() {
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
   const [createForm, setCreateForm] = useState<CouponFormData>(emptyForm);
   const [editForm, setEditForm] = useState<CouponFormData>(emptyForm);
+
+  const fetchCoupons = useCallback(async () => {
+    setLoading(true);
+    try {
+      const coupons = await listCoupons();
+      setCouponList(coupons);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load coupons");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchCoupons();
+  }, [fetchCoupons]);
 
   const filteredCoupons = useMemo(() => {
     return couponList.filter((c) => {
@@ -168,76 +192,110 @@ export default function CouponsPage() {
     });
   }, [couponList, tab]);
 
-  const updateCouponStatus = (id: string, status: CouponStatus) => {
-    setCouponList((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status } : c))
-    );
+  const updateCouponStatus = async (id: string, status: CouponStatus) => {
+    try {
+      const updated = await updateCoupon(id, { status });
+      setCouponList((prev) =>
+        prev.map((c) => (c.id === id ? updated : c)),
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update coupon");
+      throw error;
+    }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!createForm.code.trim()) {
       toast.error("Coupon code is required");
       return;
     }
-    const newCoupon: Coupon = {
-      id: `CPN-${Date.now()}`,
-      code: createForm.code,
-      discountType: createForm.discountType,
-      discountValue: Number(createForm.discountValue) || 0,
-      maxDiscount: Number(createForm.maxDiscount) || 0,
-      expiryDate: createForm.expiryDate || new Date().toISOString().split("T")[0],
-      usageLimit: Number(createForm.usageLimit) || 100,
-      usedCount: 0,
-      status: "active",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setCouponList((prev) => [newCoupon, ...prev]);
-    setCreateForm(emptyForm);
-    setCreateOpen(false);
-    toast.success(`Coupon ${newCoupon.code} created`);
+    setSaving(true);
+    try {
+      const newCoupon = await createCoupon({
+        code: createForm.code,
+        discountType: createForm.discountType,
+        discountValue: Number(createForm.discountValue) || 0,
+        maxDiscount: Number(createForm.maxDiscount) || 0,
+        expiryDate: createForm.expiryDate || new Date().toISOString().split("T")[0],
+        usageLimit: Number(createForm.usageLimit) || 100,
+        status: "active",
+      });
+      setCouponList((prev) => [newCoupon, ...prev]);
+      setCreateForm(emptyForm);
+      setCreateOpen(false);
+      toast.success(`Coupon ${newCoupon.code} created`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create coupon");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!selectedCoupon || !editForm.code.trim()) return;
-    setCouponList((prev) =>
-      prev.map((c) =>
-        c.id === selectedCoupon.id
-          ? {
-              ...c,
-              code: editForm.code,
-              discountType: editForm.discountType,
-              discountValue: Number(editForm.discountValue) || 0,
-              maxDiscount: Number(editForm.maxDiscount) || 0,
-              expiryDate: editForm.expiryDate,
-              usageLimit: Number(editForm.usageLimit) || 0,
-            }
-          : c
-      )
-    );
-    setEditOpen(false);
-    setSelectedCoupon(null);
-    toast.success("Coupon updated successfully");
+    setSaving(true);
+    try {
+      const updated = await updateCoupon(selectedCoupon.id, {
+        code: editForm.code,
+        discountType: editForm.discountType,
+        discountValue: Number(editForm.discountValue) || 0,
+        maxDiscount: Number(editForm.maxDiscount) || 0,
+        expiryDate: editForm.expiryDate,
+        usageLimit: Number(editForm.usageLimit) || 0,
+      });
+      setCouponList((prev) =>
+        prev.map((c) => (c.id === selectedCoupon.id ? updated : c)),
+      );
+      setEditOpen(false);
+      setSelectedCoupon(null);
+      toast.success("Coupon updated successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update coupon");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDuplicate = (coupon: Coupon) => {
-    const duplicate: Coupon = {
-      ...coupon,
-      id: `CPN-${Date.now()}`,
-      code: `${coupon.code}_COPY`,
-      usedCount: 0,
-      status: "active",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-    setCouponList((prev) => [duplicate, ...prev]);
-    toast.success(`Duplicated as ${duplicate.code}`);
+  const handleDuplicate = async (coupon: Coupon) => {
+    setSaving(true);
+    try {
+      const duplicate = await createCoupon({
+        code: `${coupon.code}_COPY`,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maxDiscount: coupon.maxDiscount,
+        expiryDate: coupon.expiryDate,
+        usageLimit: coupon.usageLimit,
+        status: "active",
+      });
+      setCouponList((prev) => [duplicate, ...prev]);
+      toast.success(`Duplicated as ${duplicate.code}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to duplicate coupon");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedCoupon) return;
-    setCouponList((prev) => prev.filter((c) => c.id !== selectedCoupon.id));
-    setDeleteOpen(false);
-    toast.success(`Coupon ${selectedCoupon.code} deleted`);
-    setSelectedCoupon(null);
+    setSaving(true);
+    try {
+      const result = await deleteCoupon(selectedCoupon.id);
+      if (result.deactivated) {
+        await fetchCoupons();
+        toast.success(`${selectedCoupon.code} deactivated (already used)`);
+      } else {
+        setCouponList((prev) => prev.filter((c) => c.id !== selectedCoupon.id));
+        toast.success(`Coupon ${selectedCoupon.code} deleted`);
+      }
+      setDeleteOpen(false);
+      setSelectedCoupon(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete coupon");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openEdit = (coupon: Coupon) => {
@@ -288,11 +346,23 @@ export default function CouponsPage() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {coupon.status === "active" ? (
-              <DropdownMenuItem onClick={() => { updateCouponStatus(coupon.id, "disabled"); toast.success(`${coupon.code} deactivated`); }}>
+              <DropdownMenuItem
+                onClick={() => {
+                  void updateCouponStatus(coupon.id, "disabled").then(() => {
+                    toast.success(`${coupon.code} deactivated`);
+                  });
+                }}
+              >
                 <Ban className="mr-2 h-4 w-4" /> Deactivate
               </DropdownMenuItem>
             ) : coupon.status === "disabled" ? (
-              <DropdownMenuItem onClick={() => { updateCouponStatus(coupon.id, "active"); toast.success(`${coupon.code} activated`); }}>
+              <DropdownMenuItem
+                onClick={() => {
+                  void updateCouponStatus(coupon.id, "active").then(() => {
+                    toast.success(`${coupon.code} activated`);
+                  });
+                }}
+              >
                 <CheckCircle className="mr-2 h-4 w-4" /> Activate
               </DropdownMenuItem>
             ) : null}
@@ -320,7 +390,10 @@ export default function CouponsPage() {
             <CouponFormFields form={createForm} onChange={(u) => setCreateForm((f) => ({ ...f, ...u }))} />
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button onClick={handleCreate}>Create Coupon</Button>
+              <Button onClick={() => void handleCreate()} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Create Coupon
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -333,12 +406,19 @@ export default function CouponsPage() {
           <TabsTrigger value="disabled">Disabled</TabsTrigger>
         </TabsList>
         <TabsContent value={tab} className="mt-6">
-          <DataTable
-            data={filteredCoupons}
-            columns={columns}
-            emptyTitle="No coupons found"
-            emptyDescription="Create a new coupon to get started."
-          />
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading coupons...
+            </div>
+          ) : (
+            <DataTable
+              data={filteredCoupons}
+              columns={columns}
+              emptyTitle="No coupons found"
+              emptyDescription="Create a new coupon to get started."
+            />
+          )}
         </TabsContent>
       </Tabs>
 
@@ -351,7 +431,10 @@ export default function CouponsPage() {
           <CouponFormFields form={editForm} onChange={(u) => setEditForm((f) => ({ ...f, ...u }))} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={handleEdit}>Save Changes</Button>
+            <Button onClick={() => void handleEdit()} disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -399,7 +482,10 @@ export default function CouponsPage() {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete Coupon</Button>
+            <Button variant="destructive" onClick={() => void handleDelete()} disabled={saving}>
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete Coupon
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

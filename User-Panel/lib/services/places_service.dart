@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/dio_client.dart';
+import 'package:wavego_user/models/coupon_models.dart';
 import 'package:wavego_user/models/fare_models.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/services/base_api_service.dart';
@@ -271,6 +272,64 @@ class PlacesService extends BaseApiService {
 class RideBookingService extends BaseApiService {
   RideBookingService(super.dio);
 
+  Future<List<RideCoupon>> listCoupons() async {
+    if (useMock) {
+      return const [
+        RideCoupon(
+          id: 'mock-1',
+          code: 'GOFREE',
+          title: 'Free ride discount',
+          discountType: 'flat',
+          discountValue: 10,
+        ),
+      ];
+    }
+
+    final data = await get<List<dynamic>>(
+      ApiEndpoints.userCoupons,
+      parser: (raw) => raw as List<dynamic>,
+    );
+    return data
+        .map((item) => RideCoupon.fromJson(item as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AppliedCoupon> validateCoupon({
+    required String code,
+    required double orderAmount,
+  }) async {
+    if (useMock) {
+      final coupon = RideCoupon(
+        id: 'mock',
+        code: code.toUpperCase(),
+        title: 'Mock offer',
+        discountType: 'flat',
+        discountValue: 10,
+      );
+      final discount = 10.0;
+      return AppliedCoupon(
+        coupon: coupon,
+        discountAmount: discount,
+        finalAmount: (orderAmount - discount).clamp(0, double.infinity),
+      );
+    }
+
+    final data = await post<Map<String, dynamic>>(
+      ApiEndpoints.validateCoupon,
+      data: {
+        'code': code,
+        'order_amount': orderAmount,
+      },
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+
+    return AppliedCoupon(
+      coupon: RideCoupon.fromJson(data['coupon'] as Map<String, dynamic>),
+      discountAmount: (data['discount_amount'] as num).toDouble(),
+      finalAmount: (data['final_amount'] as num).toDouble(),
+    );
+  }
+
   Future<RideFareEstimateResult> estimateRide({
     required double pickupLat,
     required double pickupLng,
@@ -320,6 +379,7 @@ class RideBookingService extends BaseApiService {
     required double dropoffLat,
     required double dropoffLng,
     String paymentMethod = 'CASH',
+    String? promoCode,
     String? vehicleCategoryId,
     double? rentalHours,
     DateTime? scheduledAt,
@@ -345,6 +405,7 @@ class RideBookingService extends BaseApiService {
         'dropoff_lat': dropoffLat,
         'dropoff_lng': dropoffLng,
         'payment_method': paymentMethod,
+        if (promoCode != null && promoCode.isNotEmpty) 'promo_code': promoCode,
         if (vehicleCategoryId != null) 'vehicle_category_id': vehicleCategoryId,
         if (rentalHours != null) 'rental_hours': rentalHours,
         if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),

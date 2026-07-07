@@ -157,6 +157,7 @@ class VehicleCategory {
     this.perHourRate,
     this.iconUrl,
     this.serviceGroup = 'ride',
+    this.capacity = 4,
   });
 
   final String id;
@@ -170,6 +171,7 @@ class VehicleCategory {
   final double? perHourRate;
   final String? iconUrl;
   final String serviceGroup;
+  final int capacity;
 
   factory VehicleCategory.fromJson(Map<String, dynamic> json) => VehicleCategory(
         id: json['id'] as String? ?? '',
@@ -183,6 +185,7 @@ class VehicleCategory {
         perHourRate: (json['per_hour_rate'] as num?)?.toDouble(),
         iconUrl: json['icon_url'] as String?,
         serviceGroup: json['service_group'] as String? ?? 'ride',
+        capacity: (json['capacity'] as num?)?.toInt() ?? 4,
       );
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_user/core/auth/auth_refresh_notifier.dart';
 import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/screens/ambulance/ambulance_screen.dart';
@@ -34,11 +35,13 @@ final _shellNavigatorProfileKey = GlobalKey<NavigatorState>(debugLabel: 'profile
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRepo = ref.watch(authRepositoryProvider);
+  final authRefresh = ref.watch(authRefreshNotifierProvider);
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: RouteNames.splash,
     debugLogDiagnostics: true,
+    refreshListenable: authRefresh,
     redirect: (context, state) async {
       final path = state.uri.path;
 

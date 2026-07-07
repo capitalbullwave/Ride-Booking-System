@@ -15,7 +15,7 @@ String? resolveMediaUrl(String? url) {
     return trimmed;
   }
 
-  final base = AppConfig.baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+  final base = AppConfig.backendOrigin.replaceAll(RegExp(r'/$'), '');
   final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
   return '$base$path';
 }

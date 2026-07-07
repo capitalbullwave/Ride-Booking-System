@@ -51,6 +51,8 @@ function resolveUserPath(path: string): string {
 
 
 
+const PRODUCTION_API_URL = "http://127.0.0.1:8000";
+
 export function getApiBaseUrl(): string {
 
   if (typeof window !== "undefined") {
@@ -59,7 +61,7 @@ export function getApiBaseUrl(): string {
 
   }
 
-  return process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
+  return process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL ?? PRODUCTION_API_URL;
 
 }
 

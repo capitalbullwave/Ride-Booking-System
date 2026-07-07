@@ -119,6 +119,7 @@ export interface VehicleCategory {
   icon: string;
   imageUrl?: string | null;
   serviceGroup?: "ride" | "rental" | string;
+  capacity?: number;
 }
 
 export interface Transaction {
