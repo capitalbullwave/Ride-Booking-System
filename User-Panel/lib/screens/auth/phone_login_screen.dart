@@ -42,6 +42,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
 
     final state = ref.read(authViewModelProvider);
     if (state.otpState is ViewStateSuccess && mounted) {
+      context.showSnackBar('OTP sent to your number. Check SMS.');
       context.push(RouteNames.otpVerification);
     } else if (state.otpState is ViewStateError && mounted) {
       context.showSnackBar(
@@ -81,7 +82,7 @@ class _PhoneLoginScreenState extends ConsumerState<PhoneLoginScreen> {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Welcome to Fast Bull',
+                  'Welcome to Bull Wave Rides',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

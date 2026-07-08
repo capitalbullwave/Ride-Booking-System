@@ -10,6 +10,7 @@ class AuthSessionNotifier extends StateNotifier<bool> {
   }
 
   final Ref _ref;
+  bool _expiring = false;
 
   Future<void> refresh() async {
     final token = await _ref.read(authTokenStoreProvider).readAccessToken();
@@ -18,9 +19,19 @@ class AuthSessionNotifier extends StateNotifier<bool> {
 
   void setAuthenticated(bool value) => state = value;
 
+  /// Called when any API returns 401 after refresh fails.
+  /// Never hits `/auth/logout` — that caused an infinite 401/logout loop.
   Future<void> expireSession() async {
-    await _ref.read(authRepositoryProvider).logout();
-    state = false;
+    if (_expiring || !state) return;
+    _expiring = true;
+    try {
+      state = false;
+      await _ref.read(authRepositoryProvider).clearLocalSession(
+            reason: 'session_expired_401',
+          );
+    } finally {
+      _expiring = false;
+    }
   }
 }
 

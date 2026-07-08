@@ -1,5 +1,5 @@
 /**
- * Fast Bull brand palette — single source of truth.
+ * Bull Wave Rides brand palette — single source of truth.
  * Keep in sync with `globals.css`.
  */
 export const WAVEGO_BRAND = {

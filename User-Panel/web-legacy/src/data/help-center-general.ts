@@ -34,7 +34,7 @@ export const accountProfileHub: HelpArticle = {
     },
     {
       id: "lost-phone",
-      title: "I lost my phone in Fast Bull",
+      title: "I lost my phone in Bull Wave Rides",
       kind: "content",
       paragraphs: [
         "Select the relevant trip in Bookings and report a lost phone.",
@@ -54,7 +54,7 @@ export const accountPaymentsHub: HelpArticle = {
       title: "Payment methods",
       kind: "content",
       paragraphs: [
-        "Add or manage cash, UPI, cards, and Fast Bull Wallet from the Wallet page.",
+        "Add or manage cash, UPI, cards, and Bull Wave Rides Wallet from the Wallet page.",
       ],
       link: { label: "Open Wallet", href: ROUTES.wallet },
     },
@@ -72,7 +72,7 @@ export const accountPaymentsHub: HelpArticle = {
       title: "Gift cards and vouchers",
       kind: "content",
       paragraphs: [
-        "Redeem gift cards in Wallet. Enter the code under Fast Bull Cash to add balance.",
+        "Redeem gift cards in Wallet. Enter the code under Bull Wave Rides Cash to add balance.",
       ],
     },
     {
@@ -86,10 +86,10 @@ export const accountPaymentsHub: HelpArticle = {
     },
     {
       id: "wavego-cash",
-      title: "Fast Bull Cash",
+      title: "Bull Wave Rides Cash",
       kind: "content",
       paragraphs: [
-        "Fast Bull Cash is your in-app wallet balance for rides and deliveries.",
+        "Bull Wave Rides Cash is your in-app wallet balance for rides and deliveries.",
         "Top up, view history, and manage refunds from the Wallet tab.",
       ],
       link: { label: "Open Wallet", href: ROUTES.wallet },
@@ -116,7 +116,7 @@ export const safetyPolicyHub: HelpArticle = {
       title: "Read Safety Policy",
       kind: "content",
       paragraphs: [
-        "Learn how Fast Bull protects riders, captains, and patients on every trip and emergency request.",
+        "Learn how Bull Wave Rides protects riders, captains, and patients on every trip and emergency request.",
       ],
       link: { label: "Open full Safety Policy", href: ROUTES.safety },
     },
@@ -141,7 +141,7 @@ export const emergencyAssistanceHub: HelpArticle = {
       title: "Request an ambulance",
       kind: "content",
       paragraphs: [
-        "Book emergency medical transport through Fast Bull Ambulance. For life-threatening situations, also call 112.",
+        "Book emergency medical transport through Bull Wave Rides Ambulance. For life-threatening situations, also call 112.",
       ],
       link: { label: "Open Ambulance SOS", href: ROUTES.ambulance },
     },
@@ -190,7 +190,7 @@ export const guidesGettingStartedHub: HelpArticle = {
       title: "Signing up",
       kind: "content",
       paragraphs: [
-        "Download Fast Bull, enter your phone number, verify OTP, and complete your profile to start booking.",
+        "Download Bull Wave Rides, enter your phone number, verify OTP, and complete your profile to start booking.",
       ],
     },
     {
@@ -203,10 +203,10 @@ export const guidesGettingStartedHub: HelpArticle = {
     },
     {
       id: "how-wavego-works",
-      title: "How Fast Bull works",
+      title: "How Bull Wave Rides works",
       kind: "content",
       paragraphs: [
-        "Fast Bull connects you with nearby captains for rides, deliveries, and emergency ambulance services in real time.",
+        "Bull Wave Rides connects you with nearby captains for rides, deliveries, and emergency ambulance services in real time.",
       ],
     },
     {
@@ -253,12 +253,12 @@ export const guidesPoliciesHub: HelpArticle = {
 
 export const guidesServicesHub: HelpArticle = {
   id: "wavego-services",
-  title: "Fast Bull services",
+  title: "Bull Wave Rides services",
   kind: "hub",
   children: [
     {
       id: "wavego-delivery",
-      title: "Fast Bull for delivery",
+      title: "Bull Wave Rides for delivery",
       kind: "content",
       paragraphs: [
         "Send packages across the city with live tracking and proof of delivery.",
@@ -266,7 +266,7 @@ export const guidesServicesHub: HelpArticle = {
     },
     {
       id: "business-travel",
-      title: "Fast Bull for business travel",
+      title: "Bull Wave Rides for business travel",
       kind: "content",
       paragraphs: [
         "Corporate accounts offer centralized billing, trip reports, and admin dashboards.",
@@ -274,7 +274,7 @@ export const guidesServicesHub: HelpArticle = {
     },
     {
       id: "intercity-faqs",
-      title: "Fast Bull Intercity FAQs",
+      title: "Bull Wave Rides Intercity FAQs",
       kind: "content",
       paragraphs: [
         "Intercity trips connect cities with upfront pricing and scheduled pickups.",
@@ -282,7 +282,7 @@ export const guidesServicesHub: HelpArticle = {
     },
     {
       id: "wavego-pet",
-      title: "Fast Bull Pet — a ride for all paws",
+      title: "Bull Wave Rides Pet — a ride for all paws",
       kind: "content",
       paragraphs: [
         "Pet-friendly rides are available in select cities. Choose Pet option when booking and follow pet carrier guidelines.",
@@ -308,7 +308,7 @@ export const guidesSupportHub: HelpArticle = {
       id: "india-support",
       title: "About India Customer support",
       kind: "content",
-      paragraphs: ["Fast Bull support is available 24/7 for riders across India in English and Hindi."],
+      paragraphs: ["Bull Wave Rides support is available 24/7 for riders across India in English and Hindi."],
     },
     {
       id: "faq",
@@ -323,7 +323,7 @@ export const guidesSupportHub: HelpArticle = {
       title: "Careers",
       kind: "content",
       paragraphs: [
-        "Join the Fast Bull team. Visit careers.wavego.in for open roles in engineering, operations, and support.",
+        "Join the Bull Wave Rides team. Visit careers.wavego.in for open roles in engineering, operations, and support.",
       ],
     },
   ],
@@ -331,15 +331,15 @@ export const guidesSupportHub: HelpArticle = {
 
 export const membershipOverviewHub: HelpArticle = {
   id: "membership-overview",
-  title: "Fast Bull Plus",
+  title: "Bull Wave Rides Plus",
   kind: "hub",
   children: [
     {
       id: "wavego-plus",
-      title: "Fast Bull Plus membership",
+      title: "Bull Wave Rides Plus membership",
       kind: "content",
       paragraphs: [
-        "Fast Bull Plus offers discounted rides, priority support, and exclusive promos for frequent riders.",
+        "Bull Wave Rides Plus offers discounted rides, priority support, and exclusive promos for frequent riders.",
       ],
     },
     {
@@ -371,7 +371,7 @@ export const accessibilityResourcesHub: HelpArticle = {
       title: "Resources for riders with disabilities",
       kind: "content",
       paragraphs: [
-        "Fast Bull supports accessible vehicles where available. Enable accessibility preferences in Account Settings.",
+        "Bull Wave Rides supports accessible vehicles where available. Enable accessibility preferences in Account Settings.",
         "Contact support to request wheelchair-accessible cabs or assistance at pickup.",
       ],
     },
@@ -380,7 +380,7 @@ export const accessibilityResourcesHub: HelpArticle = {
       title: "Using TalkBack and VoiceOver",
       kind: "content",
       paragraphs: [
-        "Fast Bull is compatible with TalkBack (Android) and VoiceOver (iOS).",
+        "Bull Wave Rides is compatible with TalkBack (Android) and VoiceOver (iOS).",
         "Enable your device's screen reader for labeled buttons, trip status announcements, and navigation support.",
       ],
     },
@@ -394,7 +394,7 @@ export const mapIssuesHub: HelpArticle = {
   children: [
     {
       id: "report-map-problem",
-      title: "Report a problem in the Fast Bull map",
+      title: "Report a problem in the Bull Wave Rides map",
       kind: "content",
       paragraphs: [
         "If pickup pins or routes appear wrong, report the issue with a screenshot and location details.",
@@ -402,7 +402,7 @@ export const mapIssuesHub: HelpArticle = {
     },
     {
       id: "business-landmark",
-      title: "Fix a business or landmark issue on Fast Bull Maps",
+      title: "Fix a business or landmark issue on Bull Wave Rides Maps",
       kind: "content",
       paragraphs: [
         "Submit corrections for missing or incorrect business names and landmarks.",
@@ -410,7 +410,7 @@ export const mapIssuesHub: HelpArticle = {
     },
     {
       id: "incorrect-address",
-      title: "Fix an incorrect address on Fast Bull Maps",
+      title: "Fix an incorrect address on Bull Wave Rides Maps",
       kind: "content",
       paragraphs: [
         "Help us improve by reporting addresses that don't match the actual location.",
@@ -418,7 +418,7 @@ export const mapIssuesHub: HelpArticle = {
     },
     {
       id: "road-info",
-      title: "Fix road information on Fast Bull Maps",
+      title: "Fix road information on Bull Wave Rides Maps",
       kind: "content",
       paragraphs: [
         "Report closed roads, one-way errors, or missing streets for our map team to review.",
@@ -437,7 +437,7 @@ export const transitHub: HelpArticle = {
       title: "Delhi Metro",
       kind: "content",
       paragraphs: [
-        "Plan metro journeys with Fast Bull transit integration. View routes, fares, and nearby stations.",
+        "Plan metro journeys with Bull Wave Rides transit integration. View routes, fares, and nearby stations.",
       ],
     },
     {
@@ -453,7 +453,7 @@ export const transitHub: HelpArticle = {
       title: "Intercity Bus",
       kind: "content",
       paragraphs: [
-        "Find intercity bus routes and book last-mile rides to bus terminals with Fast Bull.",
+        "Find intercity bus routes and book last-mile rides to bus terminals with Bull Wave Rides.",
       ],
     },
   ],
@@ -487,7 +487,7 @@ export const passesHub: HelpArticle = {
       title: "Commute Pass",
       kind: "content",
       paragraphs: [
-        "Save on daily commutes with a Fast Bull Commute Pass — fixed rides at a discounted rate for 30 days.",
+        "Save on daily commutes with a Bull Wave Rides Commute Pass — fixed rides at a discounted rate for 30 days.",
         "Purchase from Wallet → Ride Passes and apply automatically on eligible trips.",
       ],
     },
@@ -504,7 +504,7 @@ export const grievanceHub: HelpArticle = {
       title: "Grievance Redressal",
       kind: "content",
       paragraphs: [
-        "Fast Bull is committed to resolving rider grievances fairly and promptly.",
+        "Bull Wave Rides is committed to resolving rider grievances fairly and promptly.",
         "Submit a grievance via Help & Support with your trip ID and details. Our team responds within 48 hours.",
         "For unresolved issues, escalate to our Grievance Officer at grievance@wavego.in.",
       ],

@@ -18,7 +18,7 @@ class PlacesService extends BaseApiService {
       receiveTimeout: const Duration(seconds: 12),
       headers: const {
         'Accept': 'application/json',
-        'User-Agent': 'Fast Bull-User/1.0 (support@ridebook.com)',
+        'User-Agent': 'Bull Wave Rides-User/1.0 (support@ridebook.com)',
       },
     ),
   );

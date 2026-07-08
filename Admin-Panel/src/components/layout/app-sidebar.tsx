@@ -90,7 +90,7 @@ export function AppSidebar() {
       <SidebarFooter className="wavego-sidebar-footer border-t border-sidebar-border p-4">
         <div className="relative overflow-hidden rounded-[1.25rem] border border-secondary/30 bg-secondary/12 p-4">
           <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-secondary/20 blur-2xl" />
-          <p className="relative font-heading text-sm font-semibold text-secondary">Fast Bull Admin</p>
+          <p className="relative font-heading text-sm font-semibold text-secondary">Bull Wave Rides Admin</p>
           <p className="relative mt-1 text-xs leading-relaxed text-sidebar-foreground/75">
             Rides & ambulance operations
           </p>

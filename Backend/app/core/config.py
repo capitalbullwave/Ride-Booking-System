@@ -48,14 +48,18 @@ class Settings(BaseSettings):
     aws_region: str = "us-east-1"
     upload_dir: str = "uploads"
 
-    # Firebase
-    firebase_credentials_path: str = "./firebase-credentials.json"
+    # Firebase (prefer Backend/app/serviceAccountKey.json in production)
+    firebase_credentials_path: str = "./app/serviceAccountKey.json"
 
     # Twilio (Verify API for SMS OTP)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_verify_service_sid: str = ""
     twilio_phone_number: str = ""  # optional; Verify API does not require it
+    # OTP delivery: auto | twilio | local
+    # - auto/twilio: send real SMS via Twilio to the entered phone number
+    # - local: only for emergency offline testing (hardcoded 123456, no SMS)
+    otp_delivery_mode: str = "auto"
 
     # Email
     smtp_host: str = "smtp.gmail.com"

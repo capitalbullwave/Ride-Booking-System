@@ -20,6 +20,7 @@ class AuthRepository {
   final AuthService _authService;
   final AuthTokenStore _tokenStore;
   final LocalStorageService _localStorage;
+  bool _loggingOut = false;
 
   Future<OtpSendResult> sendOtp({
     required String phone,
@@ -68,8 +69,23 @@ class AuthRepository {
     return token != null && token.isNotEmpty;
   }
 
+  /// User-initiated logout: revoke on server (if token exists), then clear local state.
   Future<void> logout() async {
-    await _authService.logout();
+    if (_loggingOut) return;
+    _loggingOut = true;
+    try {
+      final token = await _tokenStore.readAccessToken();
+      if (token != null && token.isNotEmpty) {
+        await _authService.logout(accessToken: token);
+      }
+      await clearLocalSession(reason: 'user_logout');
+    } finally {
+      _loggingOut = false;
+    }
+  }
+
+  /// Local-only cleanup used for session expiry. Never calls `/auth/logout`.
+  Future<void> clearLocalSession({String reason = 'local_clear'}) async {
     await _tokenStore.clear();
     await _localStorage.remove(AppConstants.driverProfileKey);
     await _localStorage.remove(AppConstants.driverRegisteredKey);

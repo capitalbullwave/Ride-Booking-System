@@ -1,5 +1,5 @@
 name: wavego_user
-description: Fast Bull User - Mobile ride booking application.
+description: Bull Wave Rides User - Mobile ride booking application.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -19,6 +19,10 @@ dependencies:
   google_maps_flutter: ^2.12.1
   geolocator: ^13.0.4
 
+  firebase_core: ^3.13.0
+  firebase_messaging: ^15.2.5
+  flutter_local_notifications: ^19.0.0
+
   flutter_secure_storage: ^9.2.4
   shared_preferences: ^2.5.3
 
@@ -33,6 +37,7 @@ dependencies:
   image_picker: ^1.1.2
   permission_handler: ^11.4.0
   razorpay_flutter: ^1.4.0
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:

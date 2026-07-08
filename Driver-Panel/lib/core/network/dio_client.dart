@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_driver/core/config/app_config.dart';
 import 'package:wavego_driver/core/network/api_interceptors.dart';
@@ -10,6 +11,11 @@ class DioClient {
     this._tokenStore, {
     void Function()? onSessionExpired,
   }) {
+    assert(() {
+      debugPrint('Driver API base URL: ${AppConfig.baseUrl}');
+      return true;
+    }());
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,

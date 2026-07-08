@@ -1,11 +1,11 @@
 {
-    "name": "Fast Bull",
-    "short_name": "Fast Bull",
+    "name": "Bull Wave Rides",
+    "short_name": "Bull Wave Rides",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#73398f",
     "theme_color": "#73398f",
-    "description": "Fast Bull - Mobile ride booking application.",
+    "description": "Bull Wave Rides - Mobile ride booking application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

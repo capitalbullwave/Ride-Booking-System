@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Fast Bull Admin Panel",
-  description: "Enterprise admin dashboard for Fast Bull rides & ambulance mobility",
+  title: "Bull Wave Rides Admin Panel",
+  description: "Enterprise admin dashboard for Bull Wave Rides rides & ambulance mobility",
 };
 
 export default function RootLayout({

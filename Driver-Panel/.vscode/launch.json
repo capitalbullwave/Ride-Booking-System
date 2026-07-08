@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Fast Bull — iPhone Simulator",
+      "name": "Bull Wave Rides — iPhone Simulator",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "name": "Fast Bull — macOS Phone Frame (fallback)",
+      "name": "Bull Wave Rides — macOS Phone Frame (fallback)",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",

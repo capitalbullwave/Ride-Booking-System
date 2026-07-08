@@ -89,7 +89,7 @@ class _SubscriptionScreenState extends ConsumerState<SubscriptionScreen> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Fast Bull Membership',
+                            'Bull Wave Rides Membership',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,

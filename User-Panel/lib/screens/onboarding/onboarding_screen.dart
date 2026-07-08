@@ -43,7 +43,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       icon: Icons.rocket_launch_rounded,
       color: AppColors.primary,
       title: 'All Mobility, One App',
-      subtitle: 'Join Fast Bull and move smarter across your city.',
+      subtitle: 'Join Bull Wave Rides and move smarter across your city.',
     ),
   ];
 

@@ -18,7 +18,7 @@ export interface AuthUserDisplay {
 }
 
 const DEFAULT_USER: AuthUserDisplay = {
-  name: "Fast Bull User",
+  name: "Bull Wave Rides User",
   phone: "",
   email: "Add email",
   initial: "?",
@@ -38,7 +38,7 @@ export function getNameInitial(name: string): string {
 
 export function getDisplayName(session: Pick<AuthSession, "name">): string {
   const name = session.name?.trim();
-  return name || "Fast Bull User";
+  return name || "Bull Wave Rides User";
 }
 
 export function sessionToUserDisplay(

@@ -1,11 +1,11 @@
 {
-    "name": "Fast Bull Captain",
-    "short_name": "Fast Bull Captain",
+    "name": "Bull Wave Rides Captain",
+    "short_name": "Bull Wave Rides Captain",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#73398f",
     "theme_color": "#73398f",
-    "description": "Fast Bull Captain - Driver application.",
+    "description": "Bull Wave Rides Captain - Driver application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

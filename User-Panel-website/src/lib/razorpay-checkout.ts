@@ -58,7 +58,7 @@ export async function openSubscriptionCheckout(checkout: {
       amount: checkout.amount,
       currency: checkout.currency,
       order_id: checkout.order_id,
-      name: "Fast Bull",
+      name: "Bull Wave Rides",
       description: checkout.plan.name,
       prefill: checkout.prefill,
       handler(response: Record<string, string>) {

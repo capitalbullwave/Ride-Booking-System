@@ -183,7 +183,7 @@ export function SignupView() {
             <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-[20px] border border-border/60 bg-card p-6 shadow-[0_20px_60px_-24px_rgba(49,82,110,0.18)] sm:p-8">
             <div className="mb-5">
               <h1 className="font-heading text-2xl font-bold text-primary sm:text-[1.65rem]">
-                Join Fast Bull
+                Join Bull Wave Rides
               </h1>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Create your account to get started
@@ -402,7 +402,7 @@ export function SignupView() {
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-primary"
                   />
                   <span>
-                    I agree to Fast Bull&apos;s{" "}
+                    I agree to Bull Wave Rides&apos;s{" "}
                     <Link href={ROUTES.terms} className="font-semibold text-primary hover:underline">
                       Terms
                     </Link>

@@ -1,4 +1,4 @@
-package com.wavego.wavego_user
+package com.bullwave.rides.user
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

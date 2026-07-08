@@ -30,7 +30,7 @@ class _DrivingLicenseQuestionScreenState
 
     if (choice == DrivingLicenseChoice.no) {
       context.showSnackBar(
-        'A valid driving license is required for Fast Bull Captain rides.',
+        'A valid driving license is required for Bull Wave Rides Captain rides.',
         isError: true,
       );
       return;
@@ -244,7 +244,7 @@ class _HeroBackground extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
-                  'Fast Bull Captain',
+                  'Bull Wave Rides Captain',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

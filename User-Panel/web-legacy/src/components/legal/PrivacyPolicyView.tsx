@@ -66,7 +66,7 @@ const policySections: {
     title: "How we use your data",
     points: [
       "Match you with nearby captains and ambulance partners.",
-      "Process payments, send receipts, and manage your Fast Bull Wallet.",
+      "Process payments, send receipts, and manage your Bull Wave Rides Wallet.",
       "Enable live tracking, safety features, and in-app notifications.",
       "Investigate safety reports and respond to support requests.",
       "Improve app performance through anonymised usage analytics.",
@@ -78,7 +78,7 @@ const policySections: {
     points: [
       "Location and contact details are shared with assigned captains or medical crews during active bookings only.",
       "Hospital partners receive medical information for ambulance dispatches.",
-      "Payment processors handle transactions — Fast Bull does not store full card numbers.",
+      "Payment processors handle transactions — Bull Wave Rides does not store full card numbers.",
       "We may disclose data to authorities when required by law or in safety emergencies.",
       "All data is encrypted in transit (TLS) and at rest on secure servers.",
     ],
@@ -147,7 +147,7 @@ export function PrivacyPolicyView() {
             Privacy Policy
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/80 sm:text-base">
-            How Fast Bull collects, uses, stores, and protects your personal information across
+            How Bull Wave Rides collects, uses, stores, and protects your personal information across
             rides, deliveries, wallet, and emergency ambulance services.
           </p>
           <p className="mt-4 text-xs font-medium text-white/50">Last updated: June 2026</p>
@@ -210,7 +210,7 @@ export function PrivacyPolicyView() {
               Your privacy matters to us
             </p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Fast Bull never sells your personal data to third parties. We collect only what is
+              Bull Wave Rides never sells your personal data to third parties. We collect only what is
               necessary to provide safe, reliable mobility services and keep your account secure.
             </p>
           </div>

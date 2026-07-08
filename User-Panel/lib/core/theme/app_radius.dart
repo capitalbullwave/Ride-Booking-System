@@ -1,4 +1,4 @@
-/// Fast Bull border radius tokens.
+/// Bull Wave Rides border radius tokens.
 class AppRadius {
   AppRadius._();
 

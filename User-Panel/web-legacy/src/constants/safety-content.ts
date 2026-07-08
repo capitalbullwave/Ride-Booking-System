@@ -35,17 +35,17 @@ const captainImages = {
 export const safetyHeroImages = [
   {
     src: landingHeroSlides[0].src,
-    alt: "Fast Bull rider on a bike taxi",
+    alt: "Bull Wave Rides rider on a bike taxi",
     className: "left-0 top-8 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
   {
     src: landingHeroSlides[1].src,
-    alt: "Fast Bull customer on electric auto",
+    alt: "Bull Wave Rides customer on electric auto",
     className: "left-1/2 top-0 z-20 h-40 w-32 -translate-x-1/2 sm:h-44 sm:w-36",
   },
   {
     src: landingCaptainImage,
-    alt: "Happy Fast Bull captain and customer",
+    alt: "Happy Bull Wave Rides captain and customer",
     className: "right-0 top-10 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
 ] as const;
@@ -57,16 +57,16 @@ export const coversEveryoneCards = [
     description:
       "Every ride is protected through live tracking, verified captain information, emergency support, and trip-sharing features designed to keep you safe.",
     image: customerImages.quickPickup,
-    alt: "Fast Bull customer safety",
+    alt: "Bull Wave Rides customer safety",
     tab: "customer" as const,
   },
   {
     id: "captains",
     title: "For Captains",
     description:
-      "Fast Bull supports captains with verification systems, safety training, emergency support tools, and fair platform policies.",
+      "Bull Wave Rides supports captains with verification systems, safety training, emergency support tools, and fair platform policies.",
     image: captainImages.partner,
-    alt: "Fast Bull captain safety",
+    alt: "Bull Wave Rides captain safety",
     tab: "captain" as const,
   },
 ] as const;
@@ -169,7 +169,7 @@ export const protectionSteps = [
 export const safetyFaqItems = [
   {
     id: "verify",
-    question: "How does Fast Bull verify drivers?",
+    question: "How does Bull Wave Rides verify drivers?",
     answer:
       "Every captain submits government ID, driving license, vehicle documents, and passes background screening. Profiles are re-verified periodically to maintain platform standards.",
   },
@@ -183,19 +183,19 @@ export const safetyFaqItems = [
     id: "emergency",
     question: "What should I do in an emergency?",
     answer:
-      "Use in-app SOS for immediate Fast Bull support. For life-threatening situations, call local emergency services first, then report the incident through Help & Support.",
+      "Use in-app SOS for immediate Bull Wave Rides support. For life-threatening situations, call local emergency services first, then report the incident through Help & Support.",
   },
   {
     id: "sos",
     question: "How does the SOS feature work?",
     answer:
-      "SOS connects you to Fast Bull's safety team with your live location and trip details. The team can coordinate with local authorities when required.",
+      "SOS connects you to Bull Wave Rides's safety team with your live location and trip details. The team can coordinate with local authorities when required.",
   },
   {
     id: "privacy",
     question: "Is my personal data secure?",
     answer:
-      "Fast Bull encrypts personal data and follows our Privacy Policy. Trip data is used for safety, support, and service improvement — never sold to third parties.",
+      "Bull Wave Rides encrypts personal data and follows our Privacy Policy. Trip data is used for safety, support, and service improvement — never sold to third parties.",
   },
   {
     id: "report",
@@ -207,7 +207,7 @@ export const safetyFaqItems = [
 
 export const safetyFooterLinks = {
   company: [
-    { label: "About Fast Bull", href: ROUTES.about },
+    { label: "About Bull Wave Rides", href: ROUTES.about },
     { label: "Safety", href: ROUTES.safety },
     { label: "Contact Us", href: ROUTES.profileHelp },
     { label: "Careers", href: ROUTES.landing + "#captains" },
@@ -237,17 +237,17 @@ export const safetyTabs: { id: SafetyAudience; label: string }[] = [
 const customerHeroImages = [
   {
     src: customerImages.quickPickup,
-    alt: "Fast Bull customer booking a ride on the app",
+    alt: "Bull Wave Rides customer booking a ride on the app",
     className: "left-2 top-6 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
   {
     src: customerImages.familyRide,
-    alt: "Fast Bull family riding in electric auto",
+    alt: "Bull Wave Rides family riding in electric auto",
     className: "left-1/2 top-0 z-20 h-40 w-32 -translate-x-1/2 sm:h-44 sm:w-36",
   },
   {
     src: customerImages.bikePassenger,
-    alt: "Fast Bull customer on a bike taxi",
+    alt: "Bull Wave Rides customer on a bike taxi",
     className: "right-0 top-10 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
 ] as const;
@@ -255,17 +255,17 @@ const customerHeroImages = [
 const captainHeroImages = [
   {
     src: captainImages.partner,
-    alt: "Fast Bull captain partner with vehicle",
+    alt: "Bull Wave Rides captain partner with vehicle",
     className: "left-0 top-8 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
   {
     src: captainImages.fleet,
-    alt: "Fast Bull captain fleet on the road",
+    alt: "Bull Wave Rides captain fleet on the road",
     className: "left-1/2 top-0 z-20 h-40 w-32 -translate-x-1/2 sm:h-44 sm:w-36",
   },
   {
     src: captainImages.delivery,
-    alt: "Fast Bull delivery captain with parcel",
+    alt: "Bull Wave Rides delivery captain with parcel",
     className: "right-0 top-10 z-10 h-36 w-32 sm:h-40 sm:w-36",
   },
 ] as const;
@@ -274,7 +274,7 @@ export const safetyTabContent = {
   all: {
     heroTitle: "Safety for Everyone.",
     heroDescription:
-      "At Fast Bull, your safety is our highest priority. From verified drivers and real-time ride tracking to emergency assistance and 24×7 support, we are committed to making every journey secure, reliable, and comfortable.",
+      "At Bull Wave Rides, your safety is our highest priority. From verified drivers and real-time ride tracking to emergency assistance and 24×7 support, we are committed to making every journey secure, reliable, and comfortable.",
     heroImages: safetyHeroImages,
     highlightsTitle: "Covers Everyone",
     highlights: [
@@ -283,21 +283,21 @@ export const safetyTabContent = {
         description:
           "Every ride is protected through live tracking, verified driver information, emergency support, and trip-sharing features designed to keep you safe.",
         image: landingHeroSlides[1].src,
-        alt: "Fast Bull rider safety",
+        alt: "Bull Wave Rides rider safety",
       },
       {
         title: "For Captains",
         description:
-          "Fast Bull supports captains with verification systems, safety training, emergency support tools, and fair platform policies.",
+          "Bull Wave Rides supports captains with verification systems, safety training, emergency support tools, and fair platform policies.",
         image: landingCaptainImage,
-        alt: "Fast Bull captain safety",
+        alt: "Bull Wave Rides captain safety",
       },
       {
         title: "Emergency Support",
         description:
           "Ambulance rides with verified medical transport captains and 24×7 emergency assistance when every second counts.",
         image: landingHeroSlides[4].src,
-        alt: "Fast Bull ambulance safety",
+        alt: "Bull Wave Rides ambulance safety",
       },
     ],
     measuresHeading: "Measures to ensure the well-being of both Riders and Drivers.",
@@ -309,7 +309,7 @@ export const safetyTabContent = {
   customer: {
     heroTitle: "Safety for Customers.",
     heroDescription:
-      "At Fast Bull, the well-being of our customers is above everything else. We constantly enhance safety measures — live tracking, verified captains, SOS support, and trip sharing — so every ride is secure and comfortable.",
+      "At Bull Wave Rides, the well-being of our customers is above everything else. We constantly enhance safety measures — live tracking, verified captains, SOS support, and trip sharing — so every ride is secure and comfortable.",
     heroImages: customerHeroImages,
     highlightsTitle: "Built for riders",
     highlights: [
@@ -323,13 +323,13 @@ export const safetyTabContent = {
         title: "In-app SOS",
         description: "Emergency assistance available throughout your active ride.",
         image: customerImages.ambulance,
-        alt: "Fast Bull emergency ambulance support",
+        alt: "Bull Wave Rides emergency ambulance support",
       },
       {
         title: "Verified captains",
         description: "See captain and vehicle details before you board every trip.",
         image: customerImages.familyRide,
-        alt: "Verified Fast Bull captain with passengers",
+        alt: "Verified Bull Wave Rides captain with passengers",
       },
     ],
     measuresHeading: "Measures to ensure the well-being of our customers.",
@@ -342,7 +342,7 @@ export const safetyTabContent = {
       {
         icon: Siren,
         title: "SOS Emergency Assistance",
-        description: "One-tap access to Fast Bull safety support during active trips.",
+        description: "One-tap access to Bull Wave Rides safety support during active trips.",
       },
       {
         icon: Phone,
@@ -364,7 +364,7 @@ export const safetyTabContent = {
   captain: {
     heroTitle: "Safety for Captains.",
     heroDescription:
-      "Captains are the backbone of Fast Bull. We provide verification support, safety training, emergency tools, fair policies, and 24×7 assistance — so you can focus on safe, reliable rides every day.",
+      "Captains are the backbone of Bull Wave Rides. We provide verification support, safety training, emergency tools, fair policies, and 24×7 assistance — so you can focus on safe, reliable rides every day.",
     heroImages: captainHeroImages,
     highlightsTitle: "Built for captains",
     highlights: [
@@ -372,19 +372,19 @@ export const safetyTabContent = {
         title: "Safety training",
         description: "Mandatory onboarding and refresher courses every six months.",
         image: captainImages.partnerIllustration,
-        alt: "Fast Bull captain in professional uniform",
+        alt: "Bull Wave Rides captain in professional uniform",
       },
       {
         title: "Fatigue guidelines",
         description: "Rest reminders and shift limits to prevent tired driving.",
         image: captainImages.fleet,
-        alt: "Fast Bull captains on the road",
+        alt: "Bull Wave Rides captains on the road",
       },
       {
         title: "Captain helpline",
         description: "Dedicated 24×7 support for on-road safety concerns.",
         image: captainImages.partner,
-        alt: "Fast Bull captain partner support",
+        alt: "Bull Wave Rides captain partner support",
       },
     ],
     measuresHeading: "Measures to ensure the well-being of our captains.",
@@ -480,21 +480,21 @@ export const safetyOverviewPage = {
   hero: {
     title: "Safety for all.",
     description:
-      "At Fast Bull, the well-being of our customers and captains is above everything else. We constantly enhance our safety technologies and processes so every ride is secure, reliable, and comfortable.",
+      "At Bull Wave Rides, the well-being of our customers and captains is above everything else. We constantly enhance our safety technologies and processes so every ride is secure, reliable, and comfortable.",
     images: [
       {
         src: customerImages.quickPickup,
-        alt: "Fast Bull customer booking a ride",
+        alt: "Bull Wave Rides customer booking a ride",
         className: "left-0 top-8 z-10 h-36 w-32 sm:h-40 sm:w-36",
       },
       {
         src: landingHeroSlides[0].src,
-        alt: "Fast Bull captain and customer on bike",
+        alt: "Bull Wave Rides captain and customer on bike",
         className: "left-1/2 top-0 z-20 h-40 w-32 -translate-x-1/2 sm:h-44 sm:w-36",
       },
       {
         src: landingCaptainImage,
-        alt: "Fast Bull captain partner",
+        alt: "Bull Wave Rides captain partner",
         className: "right-0 top-10 z-10 h-36 w-32 sm:h-40 sm:w-36",
       },
     ],
@@ -511,7 +511,7 @@ export const safetyOverviewPage = {
   wayForward: {
     title: "Way forward on Safety",
     description:
-      "We are continuously working on new safety features — smarter route monitoring, enhanced SOS response, and improved verification — to make every Fast Bull trip safer.",
+      "We are continuously working on new safety features — smarter route monitoring, enhanced SOS response, and improved verification — to make every Bull Wave Rides trip safer.",
     linkLabel: "KNOW MORE",
     href: ROUTES.profileHelp,
   },
@@ -522,22 +522,22 @@ export const customerSafetyPage = {
   hero: {
     title: "Customers Safety",
     description:
-      "At Fast Bull, the well-being of our customers is above everything else. We constantly enhance our safety technologies and processes — live tracking, verified captains, SOS support, and trip sharing — so every ride is secure and comfortable.",
+      "At Bull Wave Rides, the well-being of our customers is above everything else. We constantly enhance our safety technologies and processes — live tracking, verified captains, SOS support, and trip sharing — so every ride is secure and comfortable.",
     image: customerImages.quickPickup,
-    alt: "Fast Bull customer booking a safe ride",
+    alt: "Bull Wave Rides customer booking a safe ride",
   },
   captainVerification: {
     title: "Captain Verification",
     description:
-      "At Fast Bull, the safety and security of our customers is of utmost importance. We have a zero-tolerance policy towards captains who violate our community guidelines. Every captain undergoes a thorough background check and verification before joining the platform.",
+      "At Bull Wave Rides, the safety and security of our customers is of utmost importance. We have a zero-tolerance policy towards captains who violate our community guidelines. Every captain undergoes a thorough background check and verification before joining the platform.",
     image: captainImages.partner,
-    alt: "Verified Fast Bull captain partner",
+    alt: "Verified Bull Wave Rides captain partner",
     accordion: [
       {
         id: "hiring",
         title: "Hiring Process",
         content:
-          "Captains apply through the Fast Bull partner app with valid ID, driving license, and vehicle documents. Our team reviews each application before scheduling onboarding.",
+          "Captains apply through the Bull Wave Rides partner app with valid ID, driving license, and vehicle documents. Our team reviews each application before scheduling onboarding.",
       },
       {
         id: "third-party",
@@ -584,7 +584,7 @@ export const customerSafetyPage = {
         icon: Siren,
         title: "SOS Button",
         description:
-          "One-tap SOS connects you to Fast Bull's safety team with your live location and trip details during an active ride.",
+          "One-tap SOS connects you to Bull Wave Rides's safety team with your live location and trip details during an active ride.",
       },
       {
         icon: UserCheck,
@@ -610,7 +610,7 @@ export const customerSafetyPage = {
   wayForward: {
     title: "Way forward on Safety",
     description:
-      "We are continuously working on new safety features — smarter route monitoring, enhanced SOS response, and improved verification — to make every Fast Bull trip safer.",
+      "We are continuously working on new safety features — smarter route monitoring, enhanced SOS response, and improved verification — to make every Bull Wave Rides trip safer.",
     linkLabel: "KNOW MORE",
     href: ROUTES.profileHelp,
   },
@@ -621,9 +621,9 @@ export const captainSafetyPage = {
   hero: {
     title: "Captains Safety",
     description:
-      "At Fast Bull, every captain on the road matters. All active rides are insured — with accidental coverage and medical benefits up to ₹5 Lakh for you and your family. From OPD treatment and hospitalisation to emergency support, we stand behind our partners so you can ride with confidence, every single trip.",
+      "At Bull Wave Rides, every captain on the road matters. All active rides are insured — with accidental coverage and medical benefits up to ₹5 Lakh for you and your family. From OPD treatment and hospitalisation to emergency support, we stand behind our partners so you can ride with confidence, every single trip.",
     image: customerImages.bikePassenger,
-    alt: "Fast Bull captain on a bike taxi",
+    alt: "Bull Wave Rides captain on a bike taxi",
   },
   measures: {
     heading:
@@ -633,19 +633,19 @@ export const captainSafetyPage = {
         icon: Shield,
         title: "Insurance",
         description:
-          "Insurance can be claimed for any accident that occurs during the ride covering OPD treatment, hospitalisation, and accidental benefit with a maximum sum insured of ₹5 Lakh. Claims can be initiated as soon as the ride ends through the Fast Bull captain app.",
+          "Insurance can be claimed for any accident that occurs during the ride covering OPD treatment, hospitalisation, and accidental benefit with a maximum sum insured of ₹5 Lakh. Claims can be initiated as soon as the ride ends through the Bull Wave Rides captain app.",
       },
       {
         icon: Headphones,
         title: "24×7 Customer Support",
         description:
-          "Both our captains and customers can report any kind of issues to Fast Bull through the 24×7 support feature on the app during and after the ride.",
+          "Both our captains and customers can report any kind of issues to Bull Wave Rides through the 24×7 support feature on the app during and after the ride.",
       },
       {
         icon: Star,
         title: "Two-way Rating System",
         description:
-          "After every ride, both parties can rate each other. Any rating below 3 is flagged by Fast Bull — our team reaches out within 10 minutes to address concerns. Captains are removed immediately in case of misconduct.",
+          "After every ride, both parties can rate each other. Any rating below 3 is flagged by Bull Wave Rides — our team reaches out within 10 minutes to address concerns. Captains are removed immediately in case of misconduct.",
       },
     ],
   },

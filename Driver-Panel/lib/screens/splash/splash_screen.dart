@@ -86,34 +86,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           children: [
             ScaleTransition(
               scale: _scaleAnimation,
-              child: Container(
-                width: 108,
-                height: 108,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.28),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.waves_rounded,
-                      size: 52,
-                      color: AppColors.secondary.withValues(alpha: 0.35),
-                    ),
-                    const Icon(
-                      Icons.local_taxi_rounded,
-                      size: 44,
-                      color: Colors.white,
-                    ),
-                  ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 108,
+                  height: 108,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -127,7 +106,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Rides & mobility — drive with Fast Bull',
+              'Rides & mobility — drive with Bull Wave Rides',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: AppColors.mutedForeground,
                   ),

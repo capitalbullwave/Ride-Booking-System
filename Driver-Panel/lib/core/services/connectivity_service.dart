@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ConnectivityService {
@@ -19,11 +20,13 @@ class ConnectivityService {
   }
 
   bool _hasConnection(List<ConnectivityResult> results) {
+    if (kIsWeb) return true;
     return results.any(
       (r) =>
           r == ConnectivityResult.mobile ||
           r == ConnectivityResult.wifi ||
-          r == ConnectivityResult.ethernet,
+          r == ConnectivityResult.ethernet ||
+          r == ConnectivityResult.other,
     );
   }
 

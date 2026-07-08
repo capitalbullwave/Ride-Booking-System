@@ -37,7 +37,7 @@ const faqs = [
 
 const quickLinks = [
   { title: "Support Tickets", description: "Manage user and driver support requests", href: ROUTES.support, icon: MessageCircle },
-  { title: "Documentation", description: "Fast Bull admin panel user guide", href: "#", icon: BookOpen },
+  { title: "Documentation", description: "Bull Wave Rides admin panel user guide", href: "#", icon: BookOpen },
   { title: "Alert Inbox", description: "View all admin platform alerts", href: ROUTES.alerts, icon: HelpCircle },
 ];
 
@@ -46,7 +46,7 @@ export default function HelpCenterPage() {
     <div className="space-y-6">
       <PageHeader
         title="Help Center"
-        description="Find answers, guides, and ways to contact the Fast Bull support team"
+        description="Find answers, guides, and ways to contact the Bull Wave Rides support team"
       >
         <ButtonLink href={ROUTES.support}>
           <MessageCircle className="mr-2 h-4 w-4" />
@@ -79,7 +79,7 @@ export default function HelpCenterPage() {
             <FileQuestion className="h-5 w-5 text-primary" />
             Frequently Asked Questions
           </CardTitle>
-          <CardDescription>Common questions about using the Fast Bull admin panel</CardDescription>
+          <CardDescription>Common questions about using the Bull Wave Rides admin panel</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {faqs.map((faq, i) => (
@@ -94,7 +94,7 @@ export default function HelpCenterPage() {
       <Card>
         <CardHeader>
           <CardTitle>Contact Support</CardTitle>
-          <CardDescription>Reach the Fast Bull team directly</CardDescription>
+          <CardDescription>Reach the Bull Wave Rides team directly</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="flex items-center gap-3 rounded-[1rem] border p-4">

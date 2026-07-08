@@ -111,7 +111,7 @@ Future<RazorpayCheckoutResult> openRazorpayCheckout(
     'amount': checkout.amount,
     'currency': checkout.currency,
     'order_id': checkout.orderId,
-    'name': 'Fast Bull',
+    'name': 'Bull Wave Rides',
     'description': checkout.planName,
     'prefill': {
       if (checkout.contact != null) 'contact': checkout.contact,

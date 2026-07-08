@@ -23,6 +23,7 @@ class ApiEndpoints {
   static const String wallet = '/user/wallet';
   static const String walletTransactions = '/user/transactions';
   static const String notifications = '/user/notifications';
+  static const String deviceToken = '/user/device-token';
   static const String rides = '/user/rides';
   static const String bookRide = '/user/book-ride';
   static const String rideEstimate = '/rides/estimate';

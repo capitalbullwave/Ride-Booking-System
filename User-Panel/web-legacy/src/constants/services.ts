@@ -56,11 +56,11 @@ export const landingServices: ServiceItem[] = [
 export const landingHeroImage = "/images/landing/hero-mobility.png";
 
 export const landingHeroSlides = [
-  { src: "/images/landing/hero-slide-bike.png", alt: "Fast Bull bike taxi ride" },
-  { src: "/images/landing/hero-slide-e-auto.png", alt: "Fast Bull electric auto ride" },
-  { src: "/images/landing/hero-slide-parcel.png", alt: "Fast Bull parcel delivery" },
-  { src: "/images/landing/hero-slide-fleet.png", alt: "Fast Bull mobility fleet" },
-  { src: "/images/landing/hero-slide-ambulance.png", alt: "Fast Bull ambulance service" },
+  { src: "/images/landing/hero-slide-bike.png", alt: "Bull Wave Rides bike taxi ride" },
+  { src: "/images/landing/hero-slide-e-auto.png", alt: "Bull Wave Rides electric auto ride" },
+  { src: "/images/landing/hero-slide-parcel.png", alt: "Bull Wave Rides parcel delivery" },
+  { src: "/images/landing/hero-slide-fleet.png", alt: "Bull Wave Rides mobility fleet" },
+  { src: "/images/landing/hero-slide-ambulance.png", alt: "Bull Wave Rides ambulance service" },
 ] as const;
 export const landingCaptainImage = "/images/landing/captain-partner.png";
 
@@ -76,7 +76,7 @@ export const landingFeatures = [
   {
     title: "Quick Pickup",
     desc: "Captains nearby, matched in seconds — not minutes.",
-    body: "Fast Bull uses smart routing to connect you with the closest available captain the moment you confirm your ride. Whether you're heading to work, catching a flight, or rushing to an appointment, you spend less time waiting on the curb and more time moving.",
+    body: "Bull Wave Rides uses smart routing to connect you with the closest available captain the moment you confirm your ride. Whether you're heading to work, catching a flight, or rushing to an appointment, you spend less time waiting on the curb and more time moving.",
     points: [
       "Live captain matching across bike, auto, and cab",
       "Average pickup under 5 minutes in active zones",
@@ -87,7 +87,7 @@ export const landingFeatures = [
   {
     title: "Best Fares",
     desc: "Upfront pricing with no surprises at the end of your trip.",
-    body: "Know your fare before you ride. Fast Bull shows a clear price estimate based on distance, time, and demand — so there are no awkward surprises when you reach your destination. What you see is what you pay.",
+    body: "Know your fare before you ride. Bull Wave Rides shows a clear price estimate based on distance, time, and demand — so there are no awkward surprises when you reach your destination. What you see is what you pay.",
     points: [
       "Transparent fare breakdown before every trip",
       "No hidden charges or last-minute add-ons",
@@ -98,7 +98,7 @@ export const landingFeatures = [
   {
     title: "Never Too Far",
     desc: "Dense city coverage that keeps you connected wherever you go.",
-    body: "From busy city centres to growing suburbs, Fast Bull is built to keep you connected. Our captain network spans across neighbourhoods, highways, and key landmarks — so a reliable ride is never more than a few taps away.",
+    body: "From busy city centres to growing suburbs, Bull Wave Rides is built to keep you connected. Our captain network spans across neighbourhoods, highways, and key landmarks — so a reliable ride is never more than a few taps away.",
     points: [
       "Wide coverage across 50+ cities and counting",
       "Airport, hospital, and office routes supported",

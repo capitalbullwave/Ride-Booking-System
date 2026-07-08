@@ -26,8 +26,8 @@ export function WaveGoLogo({
 
   return (
     <Image
-      src="/images/fast-bull-logo.png"
-      alt="Fast Bull"
+      src="/images/bull-wave-rides-logo.png"
+      alt="Bull Wave Rides"
       width={width}
       height={height}
       priority={priority}

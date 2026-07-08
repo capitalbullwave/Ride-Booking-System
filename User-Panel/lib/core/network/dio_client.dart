@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/auth/session_manager.dart';
 import 'package:wavego_user/core/config/app_config.dart';
@@ -7,6 +8,11 @@ import 'package:wavego_user/core/storage/secure_storage_service.dart';
 
 class DioClient {
   DioClient(this._storage, this._sessionManager) {
+    assert(() {
+      debugPrint('User API base URL: ${AppConfig.baseUrl}');
+      return true;
+    }());
+
     _dio = Dio(
       BaseOptions(
         baseUrl: AppConfig.baseUrl,

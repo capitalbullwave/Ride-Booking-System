@@ -1,4 +1,4 @@
-# Fast Bull Design System (Driver App)
+# Bull Wave Rides Design System (Driver App)
 
 Brand tokens used across the Flutter driver app. Match these when building or redesigning screens.
 
@@ -32,4 +32,4 @@ Defined in `lib/core/theme/app_colors.dart`.
 
 ## App name
 
-**Fast Bull Captain** — rides + ambulance mobility platform.
+**Bull Wave Rides Captain** — rides + ambulance mobility platform.

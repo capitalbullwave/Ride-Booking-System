@@ -13,7 +13,7 @@ export const mockNotifications: AppNotification[] = [
     id: "2",
     type: "payment",
     title: "Payment successful",
-    message: "₹142 was charged to your Fast Bull Wallet for your last ride.",
+    message: "₹142 was charged to your Bull Wave Rides Wallet for your last ride.",
     time: "1 hour ago",
     read: false,
   },

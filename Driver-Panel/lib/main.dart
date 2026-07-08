@@ -12,6 +12,7 @@ import 'package:wavego_driver/core/theme/app_theme.dart';
 import 'package:wavego_driver/providers/auth_session_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
+import 'package:wavego_driver/services/push_notification_service.dart';
 import 'package:wavego_driver/widgets/common/connectivity_banner.dart';
 import 'package:wavego_driver/widgets/common/phone_mode_shell.dart';
 
@@ -58,9 +59,19 @@ class _WaveGoDriverAppState extends ConsumerState<WaveGoDriverApp> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    Future.microtask(() async {
       hydrateAppPreferences(ref);
-      ref.read(authSessionProvider.notifier).refresh();
+      await ref.read(authSessionProvider.notifier).refresh();
+
+      final push = ref.read(pushNotificationServiceProvider);
+      final router = ref.read(routerProvider);
+      push.onNavigate = (data) {
+        PushNotificationService.navigateFromPayload(router.go, data);
+      };
+      await push.initialize();
+      if (ref.read(authSessionProvider)) {
+        await push.syncTokenToBackend();
+      }
     });
   }
 
@@ -73,6 +84,9 @@ class _WaveGoDriverAppState extends ConsumerState<WaveGoDriverApp> {
       if (previous == true && next == false) {
         router.go(RouteNames.phoneLogin);
       }
+      if (previous != true && next == true) {
+        ref.read(pushNotificationServiceProvider).syncTokenToBackend();
+      }
     });
 
     ref.listen(rideViewModelProvider.select((s) => s.activeRide?.id), (prev, next) {
@@ -84,7 +98,7 @@ class _WaveGoDriverAppState extends ConsumerState<WaveGoDriverApp> {
     });
 
     return MaterialApp.router(
-      title: 'Fast Bull Captain',
+      title: 'Bull Wave Rides Captain',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

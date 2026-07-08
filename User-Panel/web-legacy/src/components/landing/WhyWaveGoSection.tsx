@@ -44,14 +44,14 @@ export function WhyWaveGoSection() {
     >
       <div className="mx-auto max-w-6xl">
         <p className="text-base font-bold uppercase tracking-[0.24em] text-primary sm:text-lg">
-          Why Fast Bull
+          Why Bull Wave Rides
         </p>
         <div className="mt-4 h-px w-full bg-border" />
 
         {/* Header — left aligned, editorial */}
         <div className="mt-10 mb-12 max-w-2xl lg:mb-16">
           <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
-            The Fast Bull difference
+            The Bull Wave Rides difference
           </h2>
           <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Premium experience inspired by global standards — with a distinctly Indian touch.

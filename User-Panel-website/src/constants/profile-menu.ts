@@ -7,5 +7,5 @@ export const profileMenuItems = [
   { id: "subscription", label: "Subscriptions", icon: Crown, route: ROUTES.profileSubscription },
   { id: "student-pass", label: "Student Pass", icon: GraduationCap, route: ROUTES.profileStudentPass },
   { id: "help", label: "Help & Support", icon: HelpCircle, route: ROUTES.profileHelp },
-  { id: "about", label: "About Fast Bull", icon: Info, route: ROUTES.profileAbout },
+  { id: "about", label: "About Bull Wave Rides", icon: Info, route: ROUTES.profileAbout },
 ] as const;

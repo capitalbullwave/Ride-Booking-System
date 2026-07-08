@@ -388,7 +388,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
-                          'When you reach pickup, slide to confirm arrival. Then enter the passenger\'s 4-digit start code from their Fast Bull app.',
+                          'When you reach pickup, slide to confirm arrival. Then enter the passenger\'s 4-digit start code from their Bull Wave Rides app.',
                           style: TextStyle(fontSize: 12, height: 1.4),
                         ),
                       ),

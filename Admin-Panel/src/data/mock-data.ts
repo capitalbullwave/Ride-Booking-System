@@ -260,7 +260,7 @@ export const adminAlerts: AdminAlert[] = [
   {
     id: "ALT-006",
     title: "System health check passed",
-    message: "All Fast Bull services are operational. Last checked at 6:00 AM IST.",
+    message: "All Bull Wave Rides services are operational. Last checked at 6:00 AM IST.",
     type: "system",
     time: "Yesterday",
     createdAt: "2025-06-22T06:00:00",
@@ -279,7 +279,7 @@ export const driverDocuments: DriverDocument[] = [
 ];
 
 export const appSettings: AppSettings = {
-  appName: "Fast Bull",
+  appName: "Bull Wave Rides",
   logo: "/logo.svg",
   contactEmail: "support@wavego.com",
   contactPhone: "+91 1800-WAVE-GO",

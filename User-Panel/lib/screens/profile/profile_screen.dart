@@ -56,7 +56,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     ),
     _ProfileMenuItem(
       icon: Icons.info_outline,
-      label: 'About Fast Bull',
+      label: 'About Bull Wave Rides',
       route: RouteNames.profileAbout,
     ),
   ];
@@ -307,7 +307,7 @@ class _SubscriptionSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isFree ? 'Upgrade to Fast Bull Plus' : '${plan!.name} Member',
+                        isFree ? 'Upgrade to Bull Wave Rides Plus' : '${plan!.name} Member',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

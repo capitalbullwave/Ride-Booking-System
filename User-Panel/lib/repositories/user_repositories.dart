@@ -25,6 +25,7 @@ class AuthRepository {
   final SecureStorageService _secureStorage;
   final LocalStorageService _localStorage;
 
+  bool _loggingOut = false;
   String _pendingPhone = '';
   String _pendingCountryCode = '+91';
 
@@ -175,7 +176,21 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _authService.logout();
+    if (_loggingOut) return;
+    _loggingOut = true;
+    try {
+      final token = await _secureStorage.read(AppConstants.accessTokenKey);
+      if (token != null && token.isNotEmpty) {
+        await _authService.logout(accessToken: token);
+      }
+      await clearLocalSession(reason: 'user_logout');
+    } finally {
+      _loggingOut = false;
+    }
+  }
+
+  /// Used for expired sessions / splash recovery. Never calls `/auth/logout`.
+  Future<void> clearLocalSession({String reason = 'local_clear'}) async {
     await _secureStorage.deleteAll();
     await _localStorage.remove(AppConstants.userProfileKey);
   }

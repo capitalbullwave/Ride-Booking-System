@@ -1,0 +1,60 @@
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+serviceAccountKey.json
+firebase-credentials.json
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Testing / type checking
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Logs
+*.log
+logs/
+
+# Runtime uploads (user/driver documents, vehicle icons)
+uploads/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Local databases / sqlite
+*.db
+*.sqlite3
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

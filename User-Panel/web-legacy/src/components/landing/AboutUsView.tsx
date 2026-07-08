@@ -159,7 +159,7 @@ export function AboutUsView() {
                   We are not an option, we are a choice
                 </h2>
                 <p className="mt-3 max-w-lg text-base leading-relaxed text-muted-foreground">
-                  Millions of riders choose Fast Bull because we solve everyday intra-city travel —
+                  Millions of riders choose Bull Wave Rides because we solve everyday intra-city travel —
                   with assured safety, transparent pricing, and rides that fit every need from
                   bike-taxi to emergency ambulance.
                 </p>
@@ -171,7 +171,7 @@ export function AboutUsView() {
                 </h2>
                 <p className="mt-3 max-w-lg text-base leading-relaxed text-muted-foreground">
                   Our captains navigate peak-hour traffic so you reach faster. Parcels get delivered
-                  securely. And when every second counts, Fast Bull ambulance is there — one app for
+                  securely. And when every second counts, Bull Wave Rides ambulance is there — one app for
                   every journey.
                 </p>
               </div>
@@ -184,7 +184,7 @@ export function AboutUsView() {
             <div className="absolute bottom-6 left-0 h-44 w-44 overflow-hidden rounded-full border-4 border-background shadow-xl sm:h-52 sm:w-52">
               <Image
                 src={landingHeroSlides[0].src}
-                alt="Fast Bull rider on a bike taxi"
+                alt="Bull Wave Rides rider on a bike taxi"
                 fill
                 className="object-cover"
                 sizes="(max-width: 640px) 176px, 208px"
@@ -193,7 +193,7 @@ export function AboutUsView() {
             <div className="absolute right-0 top-8 h-[78%] w-[52%] overflow-hidden rounded-[999px] border-4 border-background shadow-2xl">
               <Image
                 src={landingCaptainImage}
-                alt="Fast Bull captain with the app"
+                alt="Bull Wave Rides captain with the app"
                 fill
                 className="object-cover object-top"
                 sizes="(max-width: 1024px) 50vw, 320px"
@@ -219,7 +219,7 @@ export function AboutUsView() {
               of our success story
             </h2>
             <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-              Fast Bull has come a long way since our founding. With hard work and perseverance we
+              Bull Wave Rides has come a long way since our founding. With hard work and perseverance we
               have earned the trust of riders and captains across India. As a brand and as a
               service, we constantly reinvent ourselves to move cities forward.
             </p>
@@ -238,7 +238,7 @@ export function AboutUsView() {
       <section className="relative min-h-[420px] overflow-hidden md:min-h-[480px]">
         <Image
           src={landingHeroSlides[3].src}
-          alt="Fast Bull team"
+          alt="Bull Wave Rides team"
           fill
           className="object-cover"
           sizes="100vw"
@@ -248,7 +248,7 @@ export function AboutUsView() {
 
         <AnimateIn delay={0.1} className="relative flex min-h-[420px] flex-col items-center justify-center px-6 py-20 text-center md:min-h-[480px]">
           <h2 className="font-heading text-4xl font-bold text-white sm:text-5xl md:text-6xl">
-            Jobs @ Fast Bull
+            Jobs @ Bull Wave Rides
           </h2>
           <p className="mt-4 max-w-xl text-base text-white/85 sm:text-lg">
             Join us in exploring a world of endless opportunities. Let&apos;s find a spot for you.
@@ -326,7 +326,7 @@ export function AboutUsView() {
           </div>
 
           <p className="mt-12 border-t border-white/10 pt-8 text-center text-sm text-white/50">
-            © 2026 Fast Bull Technologies. All rights reserved.
+            © 2026 Bull Wave Rides Technologies. All rights reserved.
           </p>
         </div>
       </footer>

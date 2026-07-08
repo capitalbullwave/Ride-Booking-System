@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "190366169198",
+    "project_id": "bullwaverides-d6267",
+    "storage_bucket": "bullwaverides-d6267.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190366169198:android:3a2095134914c509980e7f",
+        "android_client_info": {
+          "package_name": "com.bullwave.rides.driver"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqW-B2uUo-Vdq5Y_GenhVNPlOuaICiwAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190366169198:android:6c728e04e04b3030980e7f",
+        "android_client_info": {
+          "package_name": "com.bullwave.rides.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqW-B2uUo-Vdq5Y_GenhVNPlOuaICiwAw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

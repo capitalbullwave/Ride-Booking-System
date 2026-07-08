@@ -1,18 +1,42 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'Fast Bull';
+  static const String appName = 'Bull Wave Rides';
   static const String appTagline = 'Rides, parcels & ambulance — one app';
   static const String appVersion = '1.0.0';
 
-  /// Local backend origin. API calls use `/api/v1` on this host.
-  static const String backendOrigin = 'http://127.0.0.1:8000';
+  static const String productionApiBaseUrl =
+      'https://ride-application-backend.onrender.com/api/v1';
 
-  static const String productionApiBaseUrl = '$backendOrigin/api/v1';
+  /// Host for local dev backend. On a real phone use:
+  /// `flutter run --dart-define=HOST_IP=192.168.x.x`
+  static String get _localHost {
+    if (kIsWeb) return 'localhost';
+
+    const hostIp = String.fromEnvironment('HOST_IP');
+    if (hostIp.isNotEmpty) return hostIp;
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return '10.0.2.2';
+    }
+
+    return '127.0.0.1';
+  }
+
+  static String get localApiBaseUrl => 'http://$_localHost:8000/api/v1';
+
+  /// API host without `/api/v1` — used for `/uploads/...` media URLs.
+  static String get backendOrigin =>
+      baseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
 
   static String get baseUrl {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
+
+    const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: false);
+    if (useLocal) return localApiBaseUrl;
 
     return productionApiBaseUrl;
   }
@@ -31,8 +55,6 @@ class AppConfig {
   static const int connectTimeout = 30000;
   static const int receiveTimeout = 30000;
 
-  /// Use the real backend by default. Pass `--dart-define=ENABLE_MOCK_API=true`
-  /// only when you want to run without a server.
   static const bool enableMockApi = bool.fromEnvironment(
     'ENABLE_MOCK_API',
     defaultValue: false,

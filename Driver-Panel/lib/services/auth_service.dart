@@ -13,9 +13,11 @@ import 'package:wavego_driver/services/base_api_service.dart';
 class AuthService extends BaseApiService {
   AuthService(AuthTokenStore tokenStore, Dio dio)
       : _tokenStore = tokenStore,
+        _dio = dio,
         super(dio, tokenStore);
 
   final AuthTokenStore _tokenStore;
+  final Dio _dio;
 
   Future<OtpSendResult> sendOtp({
     required String phone,
@@ -109,12 +111,26 @@ class AuthService extends BaseApiService {
     }
   }
 
-  Future<void> logout() async {
+  /// Revokes the session on the server. Skips the call when [accessToken] is empty.
+  Future<void> logout({String? accessToken}) async {
     if (useMock) return;
+    final token = (accessToken ??
+            _tokenStore.accessToken ??
+            await _tokenStore.readAccessToken())
+        ?.trim();
+    if (token == null || token.isEmpty) return;
+
     try {
-      await post(ApiEndpoints.logout);
+      await _dio.post<dynamic>(
+        ApiEndpoints.logout,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          // Prevent interceptor session handling from touching logout.
+          extra: {'skip_session_expire': true},
+        ),
+      );
     } catch (_) {
-      // Token may already be invalid; local cleanup still proceeds.
+      // Best-effort revoke — local logout always continues.
     }
   }
 }

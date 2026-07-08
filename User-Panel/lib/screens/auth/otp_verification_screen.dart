@@ -12,6 +12,7 @@ import 'package:wavego_user/core/utils/responsive.dart';
 import 'package:wavego_user/core/utils/view_state.dart';
 import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/providers/app_providers.dart';
+import 'package:wavego_user/services/push_notification_service.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -85,6 +86,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
       refreshUserProfile(ref);
       ref.read(authRefreshNotifierProvider).notifyAuthChanged();
+
+      // Sync FCM device token after login (best-effort).
+      try {
+        await ref.read(pushNotificationServiceProvider).refreshAndSyncToken();
+      } catch (_) {}
 
       final needsSetup = response.user?.isPlaceholderName ?? true;
       final destination =

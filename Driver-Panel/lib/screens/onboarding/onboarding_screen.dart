@@ -43,7 +43,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       icon: Icons.rocket_launch_rounded,
       color: AppColors.primary,
       title: 'Start Driving Today',
-      subtitle: 'Join thousands of captains earning with Fast Bull. Register in minutes.',
+      subtitle: 'Join thousands of captains earning with Bull Wave Rides. Register in minutes.',
     ),
   ];
 

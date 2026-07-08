@@ -1,4 +1,4 @@
-package com.wavego.wavego_driver
+package com.bullwave.rides.driver
 
 import io.flutter.embedding.android.FlutterActivity
 

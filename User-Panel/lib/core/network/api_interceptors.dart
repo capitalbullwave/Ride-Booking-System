@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:wavego_user/core/auth/session_manager.dart';
+import 'package:wavego_user/core/config/app_config.dart';
 import 'package:wavego_user/core/constants/app_constants.dart';
 import 'package:wavego_user/core/network/api_exception.dart';
 import 'package:wavego_user/core/storage/secure_storage_service.dart';
@@ -47,6 +49,7 @@ class RefreshTokenInterceptor extends QueuedInterceptor {
     '/auth/send-otp',
     '/auth/login',
     '/auth/register',
+    '/auth/logout',
   ];
 
   @override
@@ -61,7 +64,8 @@ class RefreshTokenInterceptor extends QueuedInterceptor {
     }
 
     final path = err.requestOptions.path;
-    if (_skipRefreshPaths.any(path.contains)) {
+    if (_skipRefreshPaths.any(path.contains) ||
+        err.requestOptions.extra['skip_session_expire'] == true) {
       handler.next(err);
       return;
     }
@@ -209,7 +213,9 @@ class ErrorInterceptor extends Interceptor {
       case DioExceptionType.receiveTimeout:
         return const ApiException(message: 'Connection timeout. Please try again.');
       case DioExceptionType.connectionError:
-        return const NetworkException();
+        return const NetworkException(
+          'Cannot reach server. Start backend on PC (0.0.0.0:8000) and use HOST_IP for real phone.',
+        );
       case DioExceptionType.badResponse:
         return _handleResponseError(error.response);
       default:
@@ -246,6 +252,11 @@ class ErrorInterceptor extends Interceptor {
 class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.baseUrl = AppConfig.baseUrl;
+    assert(() {
+      debugPrint('API ${options.method} ${options.baseUrl}${options.path}');
+      return true;
+    }());
     handler.next(options);
   }
 

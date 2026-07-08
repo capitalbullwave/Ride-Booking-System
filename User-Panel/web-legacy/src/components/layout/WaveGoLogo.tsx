@@ -41,7 +41,7 @@ export function WaveGoLogo({
           "leading-none [font-feature-settings:'calt'_1,'liga'_1,'kern'_1]"
         )}
       >
-        Fast Bull
+        Bull Wave Rides
       </span>
     </div>
   );

@@ -53,7 +53,7 @@ export default function LoginPage() {
     setIsSubmitting(false);
 
     if (result.success) {
-      toast.success("Welcome back to Fast Bull Admin");
+      toast.success("Welcome back to Bull Wave Rides Admin");
       router.replace("/");
       router.refresh();
     } else {

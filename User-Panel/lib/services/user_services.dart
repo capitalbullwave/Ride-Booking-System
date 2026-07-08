@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
@@ -12,7 +13,11 @@ import 'package:wavego_user/services/profile_service.dart';
 import 'package:wavego_user/services/support_service.dart';
 
 class AuthService extends BaseApiService {
-  AuthService(super.dio);
+  AuthService(Dio dio)
+      : _dio = dio,
+        super(dio);
+
+  final Dio _dio;
 
   Future<OtpSendResult> sendOtp({
     required String phone,
@@ -79,10 +84,18 @@ class AuthService extends BaseApiService {
     return BackendMappers.loginFromToken(tokens);
   }
 
-  Future<void> logout() async {
+  Future<void> logout({String? accessToken}) async {
     if (useMock) return;
+    final token = accessToken?.trim();
+    if (token == null || token.isEmpty) return;
     try {
-      await post(ApiEndpoints.logout);
+      await _dio.post<dynamic>(
+        ApiEndpoints.logout,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          extra: {'skip_session_expire': true},
+        ),
+      );
     } catch (_) {}
   }
 

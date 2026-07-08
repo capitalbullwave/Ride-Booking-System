@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.wavego.wavego_driver"
+    namespace = "com.bullwave.rides.driver"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.wavego.wavego_driver"
+        applicationId = "com.bullwave.rides.driver"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -28,7 +28,7 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
+            // TODO: Add your own signing config for the release release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -47,4 +47,9 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Apply only when Firebase Android config is present (avoids hard build failure).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }

@@ -48,7 +48,7 @@ DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 DEFAULT_SETTINGS = {
-    "appName": "Fast Bull",
+    "appName": "Bull Wave Rides",
     "logo": "",
     "contactEmail": "support@ridebook.com",
     "contactPhone": "+91 98765 43210",
@@ -214,7 +214,7 @@ def _map_support_ticket(
         messages.append(
             {
                 "id": str(reply.id),
-                "sender": "Fast Bull Support" if reply.sender_type == "ADMIN" else user_name,
+                "sender": "Bull Wave Rides Support" if reply.sender_type == "ADMIN" else user_name,
                 "senderType": reply.sender_type.lower(),
                 "message": reply.message,
                 "timestamp": reply.created_at.isoformat(),

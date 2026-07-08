@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Fast Bull brand color tokens — aligned with User-Panel-website.
+/// Bull Wave Rides brand color tokens — aligned with User-Panel-website.
 class AppColors {
   AppColors._();
 

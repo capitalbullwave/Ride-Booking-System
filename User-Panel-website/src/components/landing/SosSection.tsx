@@ -48,7 +48,7 @@ export function SosSection() {
                 <span className="block text-destructive">Request an ambulance in one tap.</span>
               </h2>
               <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-                When every second counts, Fast Bull helps you request verified medical transport,
+                When every second counts, Bull Wave Rides helps you request verified medical transport,
                 track live ETA, and keep your family informed.
               </p>
 
@@ -87,7 +87,7 @@ export function SosSection() {
               <div className="relative aspect-[5/4] overflow-hidden rounded-2xl shadow-2xl ring-2 ring-primary/10">
                 <Image
                   src={landingHeroSlides[4].src}
-                  alt="Fast Bull ambulance SOS"
+                  alt="Bull Wave Rides ambulance SOS"
                   fill
                   className="object-cover"
                   sizes="(max-width: 1024px) 100vw, 40vw"

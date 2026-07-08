@@ -27,5 +27,5 @@ export const ROUTES = {
   settingsDriverCommission: "/settings/driver-commission",
 } as const;
 
-export const APP_NAME = "Fast Bull";
+export const APP_NAME = "Bull Wave Rides";
 export const APP_TAGLINE = "Rides & ambulance mobility";

@@ -56,7 +56,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted) return;
 
     if (!sessionOk) {
-      await authRepo.logout();
+      // Do not hit /auth/logout with a dead token — clear locally once.
+      await authRepo.clearLocalSession(reason: 'splash_session_invalid');
       context.go(RouteNames.phoneLogin);
       return;
     }
@@ -92,34 +93,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           children: [
             ScaleTransition(
               scale: _scaleAnimation,
-              child: Container(
-                width: 108,
-                height: 108,
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.28),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.waves_rounded,
-                      size: 52,
-                      color: AppColors.secondary.withValues(alpha: 0.35),
-                    ),
-                    const Icon(
-                      Icons.local_taxi_rounded,
-                      size: 44,
-                      color: Colors.white,
-                    ),
-                  ],
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 108,
+                  height: 108,
+                  fit: BoxFit.cover,
                 ),
               ),
             ),

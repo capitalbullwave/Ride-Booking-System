@@ -41,7 +41,7 @@ export function BlogsView() {
       <section className="border-b border-border bg-card px-6 py-14 md:py-20">
         <AnimateIn className="mx-auto max-w-6xl">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">
-            Fast Bull Blog
+            Bull Wave Rides Blog
           </p>
           <h1 className="mt-3 font-heading text-4xl font-bold text-foreground sm:text-5xl">
             Stories, updates &amp; insights

@@ -6,11 +6,11 @@ export default function TermsPage() {
   return (
     <LegalDocumentView
       title="Terms of Service"
-      subtitle="These terms govern your use of Fast Bull rides, deliveries, wallet, and emergency ambulance services."
+      subtitle="These terms govern your use of Bull Wave Rides rides, deliveries, wallet, and emergency ambulance services."
       icon={FileText}
       sections={[
         {
-          title: "Using Fast Bull",
+          title: "Using Bull Wave Rides",
           content:
             "By creating an account or booking a service, you agree to follow community guidelines, pay applicable fares and fees, and treat captains, medical partners, and support staff with respect.",
         },
@@ -22,7 +22,7 @@ export default function TermsPage() {
         {
           title: "Captain & partner relationship",
           content:
-            "Fast Bull connects riders with independent captains and licensed ambulance partners. We do not employ captains directly, but we enforce platform standards through verification and ratings.",
+            "Bull Wave Rides connects riders with independent captains and licensed ambulance partners. We do not employ captains directly, but we enforce platform standards through verification and ratings.",
         },
         {
           title: "Account & conduct",

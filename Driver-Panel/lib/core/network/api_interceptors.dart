@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+import 'package:wavego_driver/core/config/app_config.dart';
 import 'package:wavego_driver/core/constants/api_endpoints.dart';
 import 'package:wavego_driver/core/network/api_exception.dart';
 import 'package:wavego_driver/core/storage/auth_token_store.dart';
@@ -43,15 +45,26 @@ class TokenRefreshInterceptor extends Interceptor {
     }
 
     final path = err.requestOptions.path;
+    final skipSessionExpire =
+        err.requestOptions.extra['skip_session_expire'] == true;
+    // Never refresh/retry auth endpoints — logout 401 must not re-trigger logout.
     if (path.contains(ApiEndpoints.refreshToken) ||
-        path.contains(ApiEndpoints.verifyOtp)) {
+        path.contains(ApiEndpoints.verifyOtp) ||
+        path.contains(ApiEndpoints.logout) ||
+        path.contains(ApiEndpoints.sendOtp) ||
+        skipSessionExpire) {
       return handler.next(err);
+    }
+
+    void expireOnce() {
+      if (skipSessionExpire) return;
+      onSessionExpired?.call();
     }
 
     try {
       final refreshToken = await _tokenStore.readRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
-        onSessionExpired?.call();
+        expireOnce();
         return handler.next(err);
       }
 
@@ -66,7 +79,7 @@ class TokenRefreshInterceptor extends Interceptor {
       final refresh = data?['refresh_token'] as String? ?? data?['data']?['refresh_token'] as String? ?? refreshToken;
 
       if (access == null || access.isEmpty) {
-        onSessionExpired?.call();
+        expireOnce();
         return handler.next(err);
       }
 
@@ -77,7 +90,7 @@ class TokenRefreshInterceptor extends Interceptor {
       final retryResponse = await _dio.fetch<dynamic>(retryOptions);
       return handler.resolve(retryResponse);
     } catch (_) {
-      onSessionExpired?.call();
+      expireOnce();
       return handler.next(err);
     }
   }
@@ -104,7 +117,9 @@ class ErrorInterceptor extends Interceptor {
       case DioExceptionType.receiveTimeout:
         return const ApiException(message: 'Connection timeout. Please try again.');
       case DioExceptionType.connectionError:
-        return const NetworkException();
+        return const NetworkException(
+          'Cannot reach the server. Start the local backend or check your API URL.',
+        );
       case DioExceptionType.badResponse:
         return _handleResponseError(error.response);
       default:
@@ -166,6 +181,11 @@ class ErrorInterceptor extends Interceptor {
 class LoggingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.baseUrl = AppConfig.baseUrl;
+    assert(() {
+      debugPrint('API ${options.method} ${options.baseUrl}${options.path}');
+      return true;
+    }());
     handler.next(options);
   }
 

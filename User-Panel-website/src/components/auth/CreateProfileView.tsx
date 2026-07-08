@@ -231,7 +231,7 @@ export function CreateProfileView() {
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            By continuing, you agree to Fast Bull&apos;s{" "}
+            By continuing, you agree to Bull Wave Rides&apos;s{" "}
             <Link href={ROUTES.terms} className="font-semibold text-primary hover:underline">
               Terms
             </Link>{" "}

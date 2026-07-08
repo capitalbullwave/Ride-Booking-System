@@ -57,6 +57,7 @@ class ApiEndpoints {
 
   // Notifications
   static const String driverNotifications = '/driver/notifications';
+  static const String deviceToken = '/driver/device-token';
 
   // Support
   static const String faq = '/common/support/faqs';

@@ -809,7 +809,7 @@ class AboutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('About Fast Bull')),
+      appBar: AppBar(title: const Text('About Bull Wave Rides')),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -832,7 +832,7 @@ class AboutScreen extends StatelessWidget {
             const Text('Version 1.0.0', style: TextStyle(color: AppColors.mutedForeground)),
             const SizedBox(height: 24),
             const Text(
-              'Fast Bull is your all-in-one mobility platform for rides, parcel delivery, and emergency ambulance services across your city.',
+              'Bull Wave Rides is your all-in-one mobility platform for rides, parcel delivery, and emergency ambulance services across your city.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.mutedForeground, height: 1.5),
             ),

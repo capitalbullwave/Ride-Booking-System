@@ -113,7 +113,7 @@ def _ticket_messages(ticket: SupportTicket, replies: list[SupportTicketReply], u
         messages.append(
             {
                 "id": str(reply.id),
-                "sender": "Fast Bull Support" if reply.sender_type == "ADMIN" else user_name,
+                "sender": "Bull Wave Rides Support" if reply.sender_type == "ADMIN" else user_name,
                 "sender_type": reply.sender_type.lower(),
                 "message": reply.message,
                 "created_at": reply.created_at.isoformat(),
@@ -548,6 +548,15 @@ async def cancel_ride(
                 "reason": data.reason or "Cancelled by passenger",
             },
         )
+    try:
+        await NotificationService(db).notify_ride_cancelled(
+            ride,
+            reason=data.reason or "Cancelled by passenger",
+            notify_user=False,
+            notify_driver=True,
+        )
+    except Exception:
+        pass
     return RideResponse.model_validate(ride)
 
 

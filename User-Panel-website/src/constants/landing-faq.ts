@@ -1,43 +1,43 @@
 export const landingFaqItems = [
   {
     id: "book-ride",
-    question: "How do I book a ride on Fast Bull?",
+    question: "How do I book a ride on Bull Wave Rides?",
     answer:
       "Enter your pickup and dropoff on the home page or open the app, choose Rides, Parcel, or Emergency, and confirm. You will see upfront pricing before you book and can track your captain live from pickup to destination.",
   },
   {
     id: "payment",
-    question: "What payment methods does Fast Bull accept?",
+    question: "What payment methods does Bull Wave Rides accept?",
     answer:
-      "Pay with Fast Bull Wallet, UPI, debit or credit cards, and cash on select trips. Wallet top-ups and ride receipts are available in the app under Wallet and Activity.",
+      "Pay with Bull Wave Rides Wallet, UPI, debit or credit cards, and cash on select trips. Wallet top-ups and ride receipts are available in the app under Wallet and Activity.",
   },
   {
     id: "cities",
-    question: "Is Fast Bull available in my city?",
+    question: "Is Bull Wave Rides available in my city?",
     answer:
-      "Fast Bull operates in 50+ cities across India and is expanding every month. Download the app or enter a location on the landing page to see available services in your area.",
+      "Bull Wave Rides operates in 50+ cities across India and is expanding every month. Download the app or enter a location on the landing page to see available services in your area.",
   },
   {
     id: "ambulance",
     question: "How does Ambulance SOS work?",
     answer:
-      "Tap Emergency on the booking widget or home screen, enter pickup and hospital or destination details, and confirm. Fast Bull matches you with verified medical transport and shares live trip updates with your emergency contacts.",
+      "Tap Emergency on the booking widget or home screen, enter pickup and hospital or destination details, and confirm. Bull Wave Rides matches you with verified medical transport and shares live trip updates with your emergency contacts.",
   },
   {
     id: "parcel",
-    question: "Can I send parcels through Fast Bull?",
+    question: "Can I send parcels through Bull Wave Rides?",
     answer:
       "Yes. Switch to the Parcel tab, set pickup and delivery addresses, and book same-day intra-city delivery with live tracking and photo proof at pickup and drop-off on eligible trips.",
   },
   {
     id: "safety",
-    question: "How does Fast Bull keep rides safe?",
+    question: "How does Bull Wave Rides keep rides safe?",
     answer:
       "Every captain is document-verified before going online. Riders get live GPS tracking, in-app SOS, trip sharing with family, and 24×7 support. Read more on our Safety page.",
   },
   {
     id: "captain",
-    question: "How do I become a Fast Bull captain?",
+    question: "How do I become a Bull Wave Rides captain?",
     answer:
       "Scroll to the Captains section on this page or tap Sign up to drive. Submit your ID, license, and vehicle documents through the partner app. Once verified, you can set your own hours and receive weekly payouts.",
   },

@@ -4,6 +4,7 @@ import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/models/api_response.dart';
 import 'package:wavego_driver/providers/auth_session_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
+import 'package:wavego_driver/services/push_notification_service.dart';
 
 class AuthViewModel extends StateNotifier<AuthState> {
   AuthViewModel(this._repository, this._ref) : super(const AuthState());
@@ -46,6 +47,12 @@ class AuthViewModel extends StateNotifier<AuthState> {
         isVerified: response.isVerified,
       );
       _ref.read(authSessionProvider.notifier).setAuthenticated(true);
+      // Sync FCM token after login (best-effort; never block auth).
+      Future.microtask(() async {
+        try {
+          await _ref.read(pushNotificationServiceProvider).refreshAndSyncToken();
+        } catch (_) {}
+      });
       return response;
     } catch (e) {
       state = state.copyWith(
