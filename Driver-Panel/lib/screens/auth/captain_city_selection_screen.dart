@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_driver/core/auth/post_auth_navigation.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/data/location_data.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
+import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 
 class CaptainCitySelectionScreen extends ConsumerStatefulWidget {
@@ -28,6 +31,18 @@ class _CaptainCitySelectionScreenState
     _selectedCity = (saved != null && saved.isNotEmpty)
         ? saved
         : LocationData.defaultServiceCity;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _redirectIfAlreadyRegistered());
+  }
+
+  Future<void> _redirectIfAlreadyRegistered() async {
+    final route = await PostAuthNavigation.resolveRoute(
+      profileRepo: ref.read(profileRepositoryProvider),
+      localStorage: ref.read(localStorageProvider),
+    );
+    if (!mounted) return;
+    if (PostAuthNavigation.shouldLeaveEarlyOnboarding(route)) {
+      context.go(route);
+    }
   }
 
   Future<void> _openCityPicker() async {

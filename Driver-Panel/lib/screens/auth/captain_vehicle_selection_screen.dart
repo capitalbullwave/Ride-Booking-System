@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_driver/core/auth/post_auth_navigation.dart';
+import 'package:wavego_driver/core/network/api_exception.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/data/captain_vehicle_options.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
@@ -27,7 +30,21 @@ class _CaptainVehicleSelectionScreenState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSaved());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _redirectIfAlreadyRegistered();
+      _loadSaved();
+    });
+  }
+
+  Future<void> _redirectIfAlreadyRegistered() async {
+    final route = await PostAuthNavigation.resolveRoute(
+      profileRepo: ref.read(profileRepositoryProvider),
+      localStorage: ref.read(localStorageProvider),
+    );
+    if (!mounted) return;
+    if (PostAuthNavigation.shouldLeaveEarlyOnboarding(route)) {
+      context.go(route);
+    }
   }
 
   Future<void> _loadSaved() async {
@@ -53,7 +70,9 @@ class _CaptainVehicleSelectionScreenState
                 option.registrationType,
               );
       if (vehicleTypeId == null) {
-        throw Exception('Vehicle type not found');
+        throw const ValidationException(
+          'Could not match this vehicle type on the server. Please try another option or contact support.',
+        );
       }
 
       await ref.read(profileRepositoryProvider).saveVehicleType(

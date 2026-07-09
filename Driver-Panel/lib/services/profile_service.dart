@@ -107,7 +107,11 @@ class ProfileService extends BaseApiService {
       parser: (data) => data as List<dynamic>,
     );
 
-    if (types.isEmpty) return null;
+    if (types.isEmpty) {
+      throw const ValidationException(
+        'Vehicle types are not configured on the server yet. Please try again in a few minutes.',
+      );
+    }
 
     final normalized = vehicleType.trim().toLowerCase();
     const aliases = <String, List<String>>{

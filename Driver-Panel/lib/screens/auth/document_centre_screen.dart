@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart' as permission_handler;
+import 'package:wavego_driver/core/network/backend_mappers.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
@@ -38,7 +39,28 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
     await _hydratePhone();
     await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
     await _syncProgress();
+    await _redirectIfVerified();
     if (mounted) setState(() => _hydrating = false);
+  }
+
+  Future<void> _redirectIfVerified() async {
+    try {
+      final profile = await ref.read(profileRepositoryProvider).getProfile();
+      if (!mounted) return;
+      if (BackendMappers.isDriverVerified(profile)) {
+        context.go(RouteNames.dashboard);
+      }
+    } catch (_) {}
+  }
+
+  void _goToDashboard() => context.go(RouteNames.dashboard);
+
+  void _handleBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      _goToDashboard();
+    }
   }
 
   Future<void> _syncProgress() async {
@@ -156,7 +178,7 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => context.pop(),
+          onPressed: _handleBack,
         ),
         title: Text(
           'Document Centre',
@@ -221,6 +243,15 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
                   height: 56,
                   isLoading: _submitting,
                   onPressed: _submitApplication,
+                ),
+              ),
+            if (progress.submitted)
+              Padding(
+                padding: padding.copyWith(bottom: 16),
+                child: AppButton(
+                  label: 'Go to Dashboard',
+                  height: 56,
+                  onPressed: _goToDashboard,
                 ),
               ),
           ],
@@ -311,7 +342,7 @@ class _VerificationBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'This will take only 10 mins. Please wait!',
+                  'This will take only 10 mins. You can go to the dashboard while you wait.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.textSecondary,
                       ),

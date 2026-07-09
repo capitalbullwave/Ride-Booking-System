@@ -254,15 +254,28 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
       minLng = minLng < p.longitude ? minLng : p.longitude;
       maxLng = maxLng > p.longitude ? maxLng : p.longitude;
     }
-    await controller.animateCamera(
-      CameraUpdate.newLatLngBounds(
-        LatLngBounds(
-          southwest: LatLng(minLat, minLng),
-          northeast: LatLng(maxLat, maxLng),
+
+    const pad = 0.002;
+    if ((maxLat - minLat).abs() < 0.0001) {
+      minLat -= pad;
+      maxLat += pad;
+    }
+    if ((maxLng - minLng).abs() < 0.0001) {
+      minLng -= pad;
+      maxLng += pad;
+    }
+
+    try {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          LatLngBounds(
+            southwest: LatLng(minLat, minLng),
+            northeast: LatLng(maxLat, maxLng),
+          ),
+          72,
         ),
-        72,
-      ),
-    );
+      );
+    } catch (_) {}
   }
 
   Set<Polyline> get _polylines {

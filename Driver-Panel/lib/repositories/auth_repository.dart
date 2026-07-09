@@ -46,7 +46,7 @@ class AuthRepository {
 
     await _localStorage.setBool(
       AppConstants.driverRegisteredKey,
-      response.isRegistered,
+      response.isRegistered || response.isVerified,
     );
 
     final verifiedPhone = response.driver?.phone ?? phone;

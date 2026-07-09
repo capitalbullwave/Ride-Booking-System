@@ -39,6 +39,7 @@ class BackendMappers {
     final lastName = json['last_name'] as String? ?? '';
     final status = (json['status'] as String? ?? 'OFFLINE').toUpperCase();
     final kyc = (json['kyc_status'] as String? ?? 'PENDING').toLowerCase();
+    final isVerified = json['is_verified'] as bool? ?? false;
 
     return DriverProfile(
       id: json['id']?.toString() ?? '',
@@ -49,7 +50,8 @@ class BackendMappers {
       rating: (json['rating_avg'] as num?)?.toDouble(),
       totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
       isOnline: status == 'ONLINE',
-      verificationStatus: _mapKycStatus(kyc),
+      verificationStatus:
+          isVerified ? 'approved' : _mapKycStatus(kyc),
     );
   }
 
@@ -90,11 +92,20 @@ class BackendMappers {
   }
 
   static bool _isKycApproved(Map<String, dynamic> profileJson) {
+    if (profileJson['is_verified'] == true) return true;
     final kyc = (profileJson['kyc_status'] as String? ?? 'PENDING').toUpperCase();
-    return kyc == 'APPROVED';
+    return kyc == 'APPROVED' || kyc == 'VERIFIED';
   }
 
   static bool _hasCompletedRegistration(Map<String, dynamic> profileJson) {
+    if (_isKycApproved(profileJson)) return true;
+
+    final kyc = (profileJson['kyc_status'] as String? ?? 'PENDING').toUpperCase();
+    if (kyc == 'SUBMITTED' || kyc == 'UNDER_REVIEW') return true;
+
+    final totalRides = (profileJson['total_rides'] as num?)?.toInt() ?? 0;
+    if (totalRides > 0) return true;
+
     final license = profileJson['license_number'] as String?;
     return license != null &&
         license.isNotEmpty &&

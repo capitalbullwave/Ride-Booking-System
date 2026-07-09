@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import 'package:wavego_driver/core/auth/post_auth_navigation.dart';
 import 'package:wavego_driver/core/config/app_config.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/models/api_response.dart';
@@ -100,13 +102,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
     setState(() => _isLoading = false);
 
-    if (!response.isRegistered) {
-      context.go(RouteNames.captainWelcome);
-    } else if (!response.isVerified) {
-      context.go(RouteNames.verificationPending);
-    } else {
-      context.go(RouteNames.dashboard);
-    }
+    final route = await PostAuthNavigation.resolveRoute(
+      profileRepo: ref.read(profileRepositoryProvider),
+      localStorage: ref.read(localStorageProvider),
+      loginResponse: response,
+    );
+    if (!mounted) return;
+    context.go(route);
   }
 
   Future<void> _resendOtp() async {
