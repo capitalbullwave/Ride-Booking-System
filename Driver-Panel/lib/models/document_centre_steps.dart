@@ -53,8 +53,7 @@ class DocumentCentreProgress {
         (r.gender ?? '').trim().isNotEmpty;
 
     final licenseDone = (r.licenseNumber ?? '').trim().isNotEmpty &&
-        (r.licenseFrontUrl ?? '').trim().isNotEmpty &&
-        (r.licenseBackUrl ?? '').trim().isNotEmpty;
+        (r.licenseFrontUrl ?? '').trim().isNotEmpty;
 
     final vehicleNumberDone = (r.vehicleNumber ?? '').trim().isNotEmpty &&
         (r.rcUrl ?? '').trim().isNotEmpty &&

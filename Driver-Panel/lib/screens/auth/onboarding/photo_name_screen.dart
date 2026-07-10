@@ -6,11 +6,14 @@ import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/image_data_url.dart';
+import 'package:wavego_driver/core/utils/media_url_resolver.dart';
+import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/services/media_capture_launcher.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/forms/app_text_field.dart';
+import 'package:wavego_driver/widgets/profile/profile_photo_avatar.dart';
 
 class PhotoNameScreen extends ConsumerStatefulWidget {
   const PhotoNameScreen({super.key});
@@ -91,7 +94,7 @@ class _PhotoNameScreenState extends ConsumerState<PhotoNameScreen> {
       final registration = ref.read(registrationViewModelProvider);
       final photoUrl = await imagePathToDataUrl(_photoPath);
 
-      await ref.read(profileRepositoryProvider).saveProfileStep(
+      final saved = await ref.read(profileRepositoryProvider).saveProfileStep(
             firstName: firstName,
             lastName: lastName,
             dateOfBirth: _dob,
@@ -102,15 +105,22 @@ class _PhotoNameScreenState extends ConsumerState<PhotoNameScreen> {
             country: registration.country,
           );
 
+      final serverPhoto = saved['profile_photo'] as String?;
+      final resolvedPhoto = serverPhoto != null && serverPhoto.isNotEmpty
+          ? resolveMediaUrl(serverPhoto)
+          : _photoPath;
+
       ref.read(registrationViewModelProvider.notifier).updateRegistration(
             (r) => r.copyWith(
               fullName: name,
               dateOfBirth: _dob,
               gender: _gender,
-              profilePhotoUrl: _photoPath,
-              selfieUrl: _photoPath,
+              profilePhotoUrl: resolvedPhoto,
+              selfieUrl: resolvedPhoto,
             ),
           );
+
+      await ref.read(dashboardViewModelProvider.notifier).refreshProfile();
 
       if (!mounted) return;
       context.go(RouteNames.documentCentre);
@@ -141,16 +151,9 @@ class _PhotoNameScreenState extends ConsumerState<PhotoNameScreen> {
           children: [
             GestureDetector(
               onTap: _pickPhoto,
-              child: CircleAvatar(
+              child: ProfilePhotoAvatar(
+                photoPath: _photoPath,
                 radius: 52,
-                backgroundColor: AppColors.muted,
-                child: Icon(
-                  _photoPath != null ? Icons.check_circle : Icons.person,
-                  size: 48,
-                  color: _photoPath != null
-                      ? AppColors.success
-                      : AppColors.textSecondary,
-                ),
               ),
             ),
             TextButton(

@@ -13,6 +13,7 @@ import 'package:wavego_driver/data/location_data.dart';
 import 'package:wavego_driver/models/registration_model.dart';
 import 'package:wavego_driver/models/camera_models.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
+import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/services/media_capture_launcher.dart';
@@ -210,7 +211,9 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     if (!mounted) return;
 
     if (success) {
-      context.go(RouteNames.verificationPending);
+      await ref.read(dashboardViewModelProvider.notifier).refreshProfile();
+      if (!mounted) return;
+      context.go(RouteNames.dashboard);
     } else {
       final message = vm.submitError ?? 'Submission failed';
       context.showSnackBar(message, isError: true);

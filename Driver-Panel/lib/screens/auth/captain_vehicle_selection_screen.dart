@@ -87,7 +87,7 @@ class _CaptainVehicleSelectionScreenState
       if (context.canPop()) {
         context.pop();
       } else {
-        context.go(RouteNames.documentCentre);
+        context.go('${RouteNames.documentCentre}?autostart=1');
       }
     } catch (e) {
       if (mounted) {

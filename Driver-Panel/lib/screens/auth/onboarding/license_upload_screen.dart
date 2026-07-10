@@ -68,13 +68,6 @@ class _LicenseUploadScreenState extends ConsumerState<LicenseUploadScreen> {
       );
       return;
     }
-    if (!hasUploadedMedia(_backPath)) {
-      context.showSnackBar(
-        'Please upload the back side of your license',
-        isError: true,
-      );
-      return;
-    }
     setState(() => _saving = true);
     try {
       if (isLocalFilePath(_frontPath)) {
@@ -133,7 +126,7 @@ class _LicenseUploadScreenState extends ConsumerState<LicenseUploadScreen> {
           : 'One side of your DL',
       actionLabel: editing ? 'Save' : 'Continue',
       isLoading: _saving || _loading,
-      actionEnabled: hasFront && hasUploadedMedia(_backPath) && !_loading,
+      actionEnabled: hasFront && !_loading,
       onAction: _continue,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,14 +145,14 @@ class _LicenseUploadScreenState extends ConsumerState<LicenseUploadScreen> {
             ),
             if (hasFront) ...[
               const SizedBox(height: 16),
-              SavedDocumentPreview(path: _backPath, label: 'Back side'),
+              SavedDocumentPreview(path: _backPath, label: 'Back side (optional)'),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => _pick(false),
                 child: Text(
                   hasUploadedMedia(_backPath)
                       ? 'Replace back side'
-                      : 'Upload back side (required)',
+                      : 'Upload back side (optional)',
                 ),
               ),
             ],

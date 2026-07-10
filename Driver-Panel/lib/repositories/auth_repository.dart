@@ -46,7 +46,7 @@ class AuthRepository {
 
     await _localStorage.setBool(
       AppConstants.driverRegisteredKey,
-      response.isRegistered || response.isVerified,
+      response.isVerified,
     );
 
     final verifiedPhone = response.driver?.phone ?? phone;
@@ -134,7 +134,7 @@ class ProfileRepository {
       _service.saveLicenseUpload(documentUrl: documentUrl, side: side);
   Future<void> saveLicenseNumber({required String licenseNumber}) =>
       _service.saveLicenseNumber(licenseNumber: licenseNumber);
-  Future<void> saveProfileStep({
+  Future<Map<String, dynamic>> saveProfileStep({
     required String firstName,
     String lastName = '',
     String? dateOfBirth,

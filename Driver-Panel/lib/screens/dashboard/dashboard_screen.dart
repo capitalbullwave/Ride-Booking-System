@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:wavego_driver/core/auth/post_auth_navigation.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
@@ -15,6 +16,7 @@ import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
+import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/repositories/notification_repository.dart';
 import 'package:wavego_driver/services/ride_realtime_service.dart';
 import 'package:wavego_driver/screens/notifications/notifications_screen.dart';
@@ -51,6 +53,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     Future.microtask(() async {
+      if (await PostAuthNavigation.requiresDocumentCentre(
+        ref.read(profileRepositoryProvider),
+      )) {
+        if (mounted) context.go(RouteNames.documentCentre);
+        return;
+      }
+
       await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
       if (!mounted) return;
 

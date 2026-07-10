@@ -15,6 +15,21 @@ class PostAuthNavigation {
     RouteNames.captainVehicleSelection,
   };
 
+  /// True until the driver submits all documents for admin review.
+  static Future<bool> requiresDocumentCentre(
+    ProfileRepository profileRepo,
+  ) async {
+    try {
+      final profile = await profileRepo.getProfile();
+      if (BackendMappers.isDriverVerified(profile)) return false;
+
+      final progress = await profileRepo.getRegistrationProgress();
+      return progress['submitted'] != true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   static bool shouldLeaveEarlyOnboarding(String route) =>
       !_earlyOnboardingRoutes.contains(route);
 
@@ -40,7 +55,7 @@ class PostAuthNavigation {
       final submitted = progress['submitted'] == true;
 
       if (submitted) {
-        return RouteNames.documentCentre;
+        return RouteNames.dashboard;
       }
 
       final steps = progress['steps'] as List<dynamic>? ?? [];
@@ -66,7 +81,9 @@ class PostAuthNavigation {
 
       return RouteNames.captainWelcome;
     } catch (_) {
-      if (loginResponse?.isVerified == true) {
+      if (loginResponse != null &&
+          loginResponse.driver != null &&
+          BackendMappers.isDriverVerified(loginResponse.driver!)) {
         return RouteNames.dashboard;
       }
       if (loginResponse?.isRegistered == true) {
@@ -80,11 +97,14 @@ class PostAuthNavigation {
     LocalStorageService localStorage,
     DriverProfile profile,
   ) async {
-    await localStorage.setBool(AppConstants.driverRegisteredKey, true);
     await localStorage.setJson(AppConstants.driverProfileKey, profile.toJson());
     if (profile.phone.isNotEmpty) {
       await localStorage.setString(AppConstants.driverPhoneKey, profile.phone);
     }
+    await localStorage.setBool(
+      AppConstants.driverRegisteredKey,
+      BackendMappers.isDriverVerified(profile),
+    );
   }
 
   static bool _hasRegistrationData(Map<String, dynamic> data) {
@@ -92,8 +112,9 @@ class PostAuthNavigation {
 
     const keys = [
       'vehicle_type',
+      'vehicle_type_name',
+      'vehicle_type_id',
       'city',
-      'first_name',
       'license_number',
       'vehicle_number',
       'profile_photo',
@@ -107,6 +128,12 @@ class PostAuthNavigation {
         return true;
       }
     }
+
+    final documents = data['documents'];
+    if (documents is Map && documents.isNotEmpty) {
+      return true;
+    }
+
     return false;
   }
 }

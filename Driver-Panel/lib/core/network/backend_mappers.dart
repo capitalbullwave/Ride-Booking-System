@@ -39,7 +39,6 @@ class BackendMappers {
     final lastName = json['last_name'] as String? ?? '';
     final status = (json['status'] as String? ?? 'OFFLINE').toUpperCase();
     final kyc = (json['kyc_status'] as String? ?? 'PENDING').toLowerCase();
-    final isVerified = json['is_verified'] as bool? ?? false;
 
     return DriverProfile(
       id: json['id']?.toString() ?? '',
@@ -50,8 +49,8 @@ class BackendMappers {
       rating: (json['rating_avg'] as num?)?.toDouble(),
       totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
       isOnline: status == 'ONLINE',
-      verificationStatus:
-          isVerified ? 'approved' : _mapKycStatus(kyc),
+      // Phone OTP verified (`is_verified`) is not the same as KYC/document approval.
+      verificationStatus: _mapKycStatus(kyc),
     );
   }
 
@@ -78,6 +77,10 @@ class BackendMappers {
         profile.verificationStatus == 'verified';
   }
 
+  /// True when admin has approved documents (not just phone OTP verified).
+  static bool isDriverKycApproved(Map<String, dynamic> profileJson) =>
+      _isKycApproved(profileJson);
+
   static LoginResponse loginWithProfile(
     Map<String, dynamic> tokenJson,
     Map<String, dynamic> profileJson,
@@ -92,7 +95,6 @@ class BackendMappers {
   }
 
   static bool _isKycApproved(Map<String, dynamic> profileJson) {
-    if (profileJson['is_verified'] == true) return true;
     final kyc = (profileJson['kyc_status'] as String? ?? 'PENDING').toUpperCase();
     return kyc == 'APPROVED' || kyc == 'VERIFIED';
   }

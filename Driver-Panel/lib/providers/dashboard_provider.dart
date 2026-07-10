@@ -28,6 +28,17 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
 
   StreamSubscription<dynamic>? _locationSubscription;
 
+  Future<void> refreshProfile() async {
+    try {
+      final profile = await _profileRepo.getProfile();
+      await _localStorage.setJson(
+        AppConstants.driverProfileKey,
+        profile.toJson(),
+      );
+      state = state.copyWith(profile: profile);
+    } catch (_) {}
+  }
+
   Future<void> loadDashboard() async {
     state = state.copyWith(statsState: const ViewStateLoading());
     try {

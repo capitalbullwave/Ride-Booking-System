@@ -11,6 +11,7 @@ import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/models/document_centre_steps.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
+import 'package:wavego_driver/providers/dashboard_provider.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 
@@ -28,6 +29,7 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
   List<Map<String, dynamic>> _serverSteps = [];
   bool _submitting = false;
   bool _hydrating = true;
+  bool _autoStartHandled = false;
 
   @override
   void initState() {
@@ -39,15 +41,50 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
     await _hydratePhone();
     await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
     await _syncProgress();
-    await _redirectIfVerified();
-    if (mounted) setState(() => _hydrating = false);
+    await _redirectAfterBootstrap();
+    if (mounted) {
+      setState(() => _hydrating = false);
+      _maybeAutoOpenActiveStep();
+    }
   }
 
-  Future<void> _redirectIfVerified() async {
+  void _maybeAutoOpenActiveStep() {
+    if (_autoStartHandled || _submitted) return;
+    final shouldAutoStart =
+        GoRouterState.of(context).uri.queryParameters['autostart'] == '1';
+    if (!shouldAutoStart) return;
+    _autoStartHandled = true;
+
+    final registration = ref.read(registrationViewModelProvider);
+    final progress = DocumentCentreProgress.fromRegistration(
+      registration,
+      submitted: _submitted,
+      serverStepStatus: _serverStepStatus,
+      serverSteps: _serverSteps,
+    );
+    final activeItems = progress.items
+        .where((item) => item.status == DocumentStepStatus.active);
+    if (activeItems.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _openStep(activeItems.first),
+    );
+  }
+
+  Future<void> _redirectAfterBootstrap() async {
     try {
       final profile = await ref.read(profileRepositoryProvider).getProfile();
       if (!mounted) return;
+
       if (BackendMappers.isDriverVerified(profile)) {
+        context.go(RouteNames.dashboard);
+        return;
+      }
+
+      if (profile.verificationStatus == 'rejected') {
+        return;
+      }
+
+      if (_submitted) {
         context.go(RouteNames.dashboard);
       }
     } catch (_) {}
@@ -58,7 +95,9 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
   void _handleBack() {
     if (context.canPop()) {
       context.pop();
-    } else {
+      return;
+    }
+    if (_submitted) {
       _goToDashboard();
     }
   }
@@ -100,9 +139,9 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
         );
   }
 
-  void _openStep(DocumentCentreItem item) {
+  Future<void> _openStep(DocumentCentreItem item) async {
     if (item.isPermissions) {
-      _openPermissionsSheet();
+      await _openPermissionsSheet();
       return;
     }
 
@@ -113,22 +152,27 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
 
     switch (item.id) {
       case 'vehicle':
-        context.push(RouteNames.captainVehicleSelection);
+        await context.push(RouteNames.captainVehicleSelection);
       case 'license':
         if (item.status == DocumentStepStatus.completed) {
-          context.push(RouteNames.onboardingLicenseUpload);
+          await context.push(RouteNames.onboardingLicenseUpload);
         } else {
-          context.push(RouteNames.drivingLicenseQuestion);
+          await context.push(RouteNames.drivingLicenseQuestion);
         }
       case 'photo_name':
-        context.push(RouteNames.onboardingPhotoName);
+        await context.push(RouteNames.onboardingPhotoName);
       case 'vehicle_number':
-        context.push(RouteNames.onboardingVehicleNumber);
+        await context.push(RouteNames.onboardingVehicleNumber);
       case 'kyc':
-        context.push(RouteNames.onboardingKyc);
+        await context.push(RouteNames.onboardingKyc);
       case 'vehicle_docs':
-        context.push(RouteNames.onboardingVehicleDocuments);
+        await context.push(RouteNames.onboardingVehicleDocuments);
     }
+
+    if (!mounted) return;
+    await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
+    await _syncProgress();
+    await ref.read(dashboardViewModelProvider.notifier).refreshProfile();
   }
 
   Future<void> _openPermissionsSheet() async {
@@ -144,8 +188,9 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
     setState(() => _submitting = true);
     try {
       await ref.read(profileRepositoryProvider).submitRegistrationProgress();
+      await ref.read(dashboardViewModelProvider.notifier).refreshProfile();
       if (!mounted) return;
-      context.go(RouteNames.verificationPending);
+      context.go(RouteNames.dashboard);
     } catch (e) {
       if (mounted) context.showSnackBar(e.userMessage, isError: true);
     } finally {
@@ -176,10 +221,12 @@ class _DocumentCentreScreenState extends ConsumerState<DocumentCentreScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: _handleBack,
-        ),
+        leading: (_submitted || context.canPop())
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                onPressed: _handleBack,
+              )
+            : null,
         title: Text(
           'Document Centre',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(

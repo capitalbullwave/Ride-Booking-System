@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +6,6 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/account_verification_status.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
-import 'package:wavego_driver/core/utils/media_url_resolver.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
@@ -16,6 +14,7 @@ import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/common/app_dialog.dart';
 import 'package:wavego_driver/widgets/common/online_toggle.dart';
+import 'package:wavego_driver/widgets/profile/profile_photo_avatar.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key, this.embedded = false});
@@ -35,6 +34,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
       if (!mounted) return;
+      await ref.read(dashboardViewModelProvider.notifier).refreshProfile();
       await _loadAccountStatus();
     });
   }
@@ -92,24 +92,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             CircleAvatar(
                               radius: 52,
                               backgroundColor: Colors.white24,
-                              child: CircleAvatar(
+                              child: ProfilePhotoAvatar(
+                                photoPath: profile?.avatar,
                                 radius: 48,
-                                backgroundColor: AppColors.background,
-                                backgroundImage: profile?.avatar != null
-                                    ? CachedNetworkImageProvider(
-                                        resolveMediaUrl(profile!.avatar!),
-                                      )
-                                    : null,
-                                child: profile?.avatar == null
-                                    ? Text(
-                                        (profile?.name ?? 'D')[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 36,
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      )
-                                    : null,
                               ),
                             ),
                             if (isVerified)

@@ -186,7 +186,7 @@ class ProfileService extends BaseApiService {
     );
   }
 
-  Future<void> saveProfileStep({
+  Future<Map<String, dynamic>> saveProfileStep({
     required String firstName,
     String lastName = '',
     String? dateOfBirth,
@@ -196,8 +196,10 @@ class ProfileService extends BaseApiService {
     String? state,
     String? country,
   }) async {
-    if (useMock) return;
-    await patch(
+    if (useMock) {
+      return {'profile_photo': profilePhoto};
+    }
+    return patch(
       ApiEndpoints.registrationProfile,
       data: {
         'first_name': firstName,
@@ -209,6 +211,7 @@ class ProfileService extends BaseApiService {
         if (state != null) 'state': state,
         if (country != null) 'country': country,
       },
+      parser: (data) => data as Map<String, dynamic>,
     );
   }
 
