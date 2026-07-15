@@ -11,6 +11,7 @@ import {
   UserGrowthChart,
   DriverGrowthChart,
 } from "@/components/dashboard/charts";
+import { useDashboardCharts } from "@/hooks/use-dashboard-charts";
 import { toast } from "sonner";
 
 const reports = [
@@ -23,6 +24,8 @@ const reports = [
 ];
 
 export default function ReportsPage() {
+  const { charts, isLoading } = useDashboardCharts();
+
   const handleExport = (format: string, report: string) => {
     toast.success(`${report} exported as ${format}`);
   };
@@ -79,16 +82,16 @@ export default function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="rides" className="mt-6">
-          <RideBookingChart />
+          <RideBookingChart data={charts?.rideBooking ?? []} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="revenue" className="mt-6">
-          <RevenueChart />
+          <RevenueChart data={charts?.revenue ?? []} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="users" className="mt-6">
-          <UserGrowthChart />
+          <UserGrowthChart data={charts?.userGrowth ?? []} isLoading={isLoading} />
         </TabsContent>
         <TabsContent value="drivers" className="mt-6">
-          <DriverGrowthChart />
+          <DriverGrowthChart data={charts?.driverGrowth ?? []} isLoading={isLoading} />
         </TabsContent>
       </Tabs>
     </div>

@@ -34,6 +34,7 @@ class RouteNames {
   static const String editProfile = '/profile/edit';
   static const String emergencyContacts = '/profile/emergency-contacts';
   static const String rideStatistics = '/profile/statistics';
+  static const String referEarn = '/profile/refer-earn';
   static const String documents = '/documents';
   static const String settings = '/settings';
   static const String support = '/support';

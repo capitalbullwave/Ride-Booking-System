@@ -143,6 +143,7 @@ class ProfileRepository {
     String? city,
     String? state,
     String? country,
+    String? referralCode,
   }) =>
       _service.saveProfileStep(
         firstName: firstName,
@@ -153,6 +154,7 @@ class ProfileRepository {
         city: city,
         state: state,
         country: country,
+        referralCode: referralCode,
       );
   Future<void> saveVehicleNumber({
     required String licensePlate,

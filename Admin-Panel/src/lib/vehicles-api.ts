@@ -65,3 +65,12 @@ export function deleteVehicleCategory(
     { method: "DELETE" },
   );
 }
+
+export function reorderVehicleCategories(
+  items: { id: string; displayOrder: number }[],
+): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/api/v1/admin/vehicle-categories/reorder", {
+    method: "POST",
+    body: JSON.stringify({ items }),
+  });
+}

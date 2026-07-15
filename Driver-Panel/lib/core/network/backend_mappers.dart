@@ -1,3 +1,4 @@
+import 'package:wavego_driver/core/utils/media_url_resolver.dart';
 import 'package:wavego_driver/models/api_response.dart';
 import 'package:wavego_driver/models/registration_model.dart';
 import 'package:wavego_driver/models/ride_model.dart';
@@ -45,7 +46,7 @@ class BackendMappers {
       name: '$firstName $lastName'.trim().isEmpty ? 'Driver' : '$firstName $lastName'.trim(),
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
-      avatar: json['profile_photo'] as String?,
+      avatar: resolveMediaUrl(json['profile_photo'] as String?),
       rating: (json['rating_avg'] as num?)?.toDouble(),
       totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
       isOnline: status == 'ONLINE',

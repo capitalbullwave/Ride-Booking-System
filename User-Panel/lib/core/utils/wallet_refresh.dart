@@ -3,7 +3,7 @@ import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 
-/// Instant wallet UI after Razorpay payment before network refresh completes.
+/// Instant wallet UI after Cashfree payment before network refresh completes.
 final walletSummaryOverrideProvider = StateProvider<WalletSummary?>((ref) => null);
 
 final resolvedWalletProvider = Provider<AsyncValue<WalletSummary>>((ref) {

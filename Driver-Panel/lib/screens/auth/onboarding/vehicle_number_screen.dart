@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
+import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/image_data_url.dart';
@@ -73,11 +74,14 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
       lens: CameraLensPreference.back,
     );
     if (path == null) return;
+
+    final preview = await imagePathToDataUrl(path) ?? path;
+    if (!mounted) return;
     setState(() {
       if (front) {
-        _rcFront = path;
+        _rcFront = preview;
       } else {
-        _rcBack = path;
+        _rcBack = preview;
       }
     });
   }
@@ -191,30 +195,28 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
                     hint: 'KA 12 EZ 4231',
                     textCapitalization: TextCapitalization.characters,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   Text(
-                    'RC Images',
+                    'RC images',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                   ),
-                  const SizedBox(height: 12),
-                  SavedDocumentPreview(path: _rcFront, label: 'RC Front'),
-                  const SizedBox(height: 12),
-                  _RcUploadBox(
-                    label: 'FRONT',
-                    done: hasUploadedMedia(_rcFront),
-                    onTap: () => _pickRc(true),
+                  const SizedBox(height: 10),
+                  _RcUploadSection(
+                    title: 'RC Front',
+                    path: _rcFront,
+                    uploaded: hasUploadedMedia(_rcFront),
+                    onUpload: () => _pickRc(true),
                   ),
-                  const SizedBox(height: 16),
-                  SavedDocumentPreview(path: _rcBack, label: 'RC Back'),
-                  const SizedBox(height: 12),
-                  _RcUploadBox(
-                    label: 'BACK',
-                    done: hasUploadedMedia(_rcBack),
-                    onTap: () => _pickRc(false),
+                  const SizedBox(height: 10),
+                  _RcUploadSection(
+                    title: 'RC Back',
+                    path: _rcBack,
+                    uploaded: hasUploadedMedia(_rcBack),
+                    onUpload: () => _pickRc(false),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   AppButton(
                     label: editing ? 'Save changes' : 'Submit',
                     variant: AppButtonVariant.secondary,
@@ -228,42 +230,82 @@ class _VehicleNumberScreenState extends ConsumerState<VehicleNumberScreen> {
   }
 }
 
-class _RcUploadBox extends StatelessWidget {
-  const _RcUploadBox({
-    required this.label,
-    required this.done,
-    required this.onTap,
+class _RcUploadSection extends StatelessWidget {
+  const _RcUploadSection({
+    required this.title,
+    required this.path,
+    required this.uploaded,
+    required this.onUpload,
   });
 
-  final String label;
-  final bool done;
-  final VoidCallback onTap;
+  final String title;
+  final String? path;
+  final bool uploaded;
+  final VoidCallback onUpload;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 88,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: done ? AppColors.success : AppColors.border),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        color: AppColors.muted.withValues(alpha: 0.35),
+        border: Border.all(
+          color: uploaded ? AppColors.success : AppColors.border,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              done ? Icons.check_circle_outline : Icons.add_photo_alternate_outlined,
-              color: done ? AppColors.success : AppColors.textSecondary,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (uploaded && path != null)
+            DocumentThumbnail(path: path!)
+          else
+            Container(
+              width: 88,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(
+                Icons.description_outlined,
+                color: AppColors.textSecondary,
+                size: 28,
+              ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              done ? 'Replace $label' : 'Upload $label',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  uploaded ? 'Photo added' : 'Required',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: uploaded ? AppColors.success : AppColors.textSecondary,
+                      ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onUpload,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(uploaded ? 'Replace' : 'Upload'),
+          ),
+        ],
       ),
     );
   }

@@ -128,7 +128,7 @@ WalletTransaction _topUpTransactionFromResult(
   return WalletTransaction(
     id: 'topup-${DateTime.now().millisecondsSinceEpoch}',
     title: 'Wallet top-up',
-    subtitle: 'Wallet top-up via Razorpay',
+    subtitle: 'Wallet top-up via Cashfree',
     amount: amount,
     date: _formatTransactionDate(DateTime.now().toUtc().toIso8601String()),
     type: 'credit',
@@ -188,7 +188,7 @@ class _WalletBalanceScreenState extends ConsumerState<WalletBalanceScreen> {
     final txn = WalletTransaction(
       id: 'topup-${DateTime.now().millisecondsSinceEpoch}',
       title: 'Wallet top-up',
-      subtitle: 'Wallet top-up via Razorpay',
+      subtitle: 'Wallet top-up via Cashfree',
       amount: amount,
       date: _formatTransactionDate(DateTime.now().toUtc().toIso8601String()),
       type: 'credit',
@@ -246,7 +246,7 @@ class _WalletBalanceScreenState extends ConsumerState<WalletBalanceScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Enter amount and pay securely with Razorpay.',
+                    'Enter amount and pay securely with Cashfree.',
                     style: TextStyle(color: AppColors.mutedForeground),
                   ),
                   const SizedBox(height: 16),
@@ -280,7 +280,7 @@ class _WalletBalanceScreenState extends ConsumerState<WalletBalanceScreen> {
                   ),
                   const SizedBox(height: 20),
                   AppButton(
-                    label: 'Pay with Razorpay',
+                    label: 'Pay with UPI / Card',
                     isLoading: _paying,
                     onPressed: () {
                       final parsed = double.tryParse(amountController.text.trim()) ?? selectedAmount;
@@ -403,6 +403,13 @@ class _WalletBalanceScreenState extends ConsumerState<WalletBalanceScreen> {
           icon: Icons.add,
           isLoading: _paying,
           onPressed: _paying ? null : _openAddMoneySheet,
+        ),
+        const SizedBox(height: 12),
+        AppButton(
+          label: 'Withdraw',
+          variant: AppButtonVariant.outline,
+          icon: Icons.south_west,
+          onPressed: () => context.push(RouteNames.walletWithdraw),
         ),
       ],
     );

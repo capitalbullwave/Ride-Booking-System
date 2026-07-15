@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter/material.dart';
@@ -123,7 +125,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final paid = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _RazorpayQrDialog(
+      builder: (ctx) => _UpiQrDialog(
         rideId: completion.rideId,
         amount: payment.tripFare,
         fetchQr: () => ref
@@ -136,7 +138,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
 
     if (paid == true && mounted) {
-      context.showSnackBar('Online payment received');
+      context.showSnackBar('UPI payment received');
       await _onPaymentCollected();
     }
   }
@@ -283,9 +285,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
               const SizedBox(height: 12),
               _CollectOptionTile(
-                icon: Icons.qr_code_scanner_rounded,
-                title: 'Online',
-                subtitle: 'Show QR — passenger scans & pays via Razorpay',
+                icon: Icons.qr_code_2_rounded,
+                title: 'UPI',
+                subtitle: 'Show dynamic QR — passenger scans & pays',
                 enabled: !_collectingCash,
                 onTap: _collectOnline,
               ),
@@ -405,8 +407,8 @@ class _CollectOptionTile extends StatelessWidget {
   }
 }
 
-class _RazorpayQrDialog extends StatefulWidget {
-  const _RazorpayQrDialog({
+class _UpiQrDialog extends StatefulWidget {
+  const _UpiQrDialog({
     required this.rideId,
     required this.amount,
     required this.fetchQr,
@@ -419,19 +421,36 @@ class _RazorpayQrDialog extends StatefulWidget {
   final Future<bool> Function() onPollStatus;
 
   @override
-  State<_RazorpayQrDialog> createState() => _RazorpayQrDialogState();
+  State<_UpiQrDialog> createState() => _UpiQrDialogState();
 }
 
-class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
+class _UpiQrDialogState extends State<_UpiQrDialog> {
   Timer? _pollTimer;
   bool _checking = false;
   bool _loadingQr = true;
   String? _networkImageUrl;
   String? _qrData;
+  Uint8List? _base64ImageBytes;
   String? _error;
 
   static bool _isHttpUrl(String value) =>
       value.startsWith('http://') || value.startsWith('https://');
+
+  static bool _isBase64Image(String value) =>
+      value.startsWith('data:image') ||
+      (value.length > 200 && !value.startsWith('upi://') && !_isHttpUrl(value));
+
+  static Uint8List? _decodeBase64Image(String value) {
+    try {
+      var raw = value.trim();
+      if (raw.contains(',')) {
+        raw = raw.split(',').last;
+      }
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -456,22 +475,31 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
 
       String? networkImageUrl;
       String? qrPayload;
+      Uint8List? base64Bytes;
+
       if (_isHttpUrl(imageUrl)) {
         networkImageUrl = imageUrl;
+      } else if (imageContent.isNotEmpty && _isBase64Image(imageContent)) {
+        base64Bytes = _decodeBase64Image(imageContent);
+        if (base64Bytes == null) {
+          qrPayload = imageContent;
+        }
       } else if (imageContent.isNotEmpty) {
         qrPayload = imageContent;
       } else if (_isHttpUrl(shortUrl)) {
         networkImageUrl = shortUrl;
+        qrPayload = shortUrl;
       } else if (shortUrl.isNotEmpty) {
         qrPayload = shortUrl;
       } else {
-        throw Exception('Could not generate Razorpay payment QR');
+        throw Exception('Could not generate UPI payment QR');
       }
 
       setState(() {
         _loadingQr = false;
         _networkImageUrl = networkImageUrl;
         _qrData = qrPayload;
+        _base64ImageBytes = base64Bytes;
       });
     } catch (e) {
       if (!mounted) return;
@@ -488,6 +516,7 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
       _error = null;
       _networkImageUrl = null;
       _qrData = null;
+      _base64ImageBytes = null;
     });
     await _loadQr();
   }
@@ -516,6 +545,43 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
     }
   }
 
+  Widget _buildQrVisual() {
+    if (_base64ImageBytes != null) {
+      return Image.memory(
+        _base64ImageBytes!,
+        width: 240,
+        height: 240,
+        fit: BoxFit.contain,
+      );
+    }
+    if (_networkImageUrl != null) {
+      return Image.network(
+        _networkImageUrl!,
+        width: 240,
+        height: 240,
+        fit: BoxFit.contain,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) => _qrData != null
+            ? QrImageView(
+                data: _qrData!,
+                version: QrVersions.auto,
+                size: 240,
+                backgroundColor: Colors.white,
+              )
+            : const Icon(Icons.broken_image_outlined, size: 48),
+      );
+    }
+    return QrImageView(
+      data: _qrData!,
+      version: QrVersions.auto,
+      size: 240,
+      backgroundColor: Colors.white,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -542,7 +608,7 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Razorpay QR Payment',
+                        'UPI QR Payment',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -558,14 +624,6 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Passenger ko ye QR scan karke exact amount pay karna hai',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.mutedForeground,
-                  ),
             ),
             const SizedBox(height: 16),
             Container(
@@ -594,58 +652,31 @@ class _RazorpayQrDialogState extends State<_RazorpayQrDialog> {
                               ),
                             ),
                           )
-                        : _networkImageUrl != null
-                            ? Image.network(
-                                _networkImageUrl!,
-                                width: 240,
-                                height: 240,
-                                fit: BoxFit.contain,
-                                loadingBuilder: (context, child, progress) {
-                                  if (progress == null) return child;
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                },
-                                errorBuilder: (_, __, ___) => _qrData != null
-                                    ? QrImageView(
-                                        data: _qrData!,
-                                        version: QrVersions.auto,
-                                        size: 240,
-                                        backgroundColor: Colors.white,
-                                      )
-                                    : const Icon(
-                                        Icons.broken_image_outlined,
-                                        size: 48,
-                                      ),
-                              )
-                            : QrImageView(
-                                data: _qrData!,
-                                version: QrVersions.auto,
-                                size: 240,
-                                backgroundColor: Colors.white,
-                              ),
+                        : _buildQrVisual(),
               ),
             ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_checking)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+            if (_error == null) ...[
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_checking || _loadingQr)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  if (_checking || _loadingQr) const SizedBox(width: 8),
+                  Text(
+                    _loadingQr ? 'Generating QR…' : 'Waiting for payment…',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
-                if (_checking) const SizedBox(width: 8),
-                Text(
-                  _loadingQr ? 'Generating QR...' : 'Payment ka wait ho raha hai...',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 8),
               TextButton(

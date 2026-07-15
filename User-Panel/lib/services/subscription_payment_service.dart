@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/models/membership_models.dart';
+import 'package:wavego_user/services/cashfree/cashfree_checkout.dart';
 import 'package:wavego_user/services/membership_service.dart';
-import 'package:wavego_user/services/razorpay/razorpay_checkout.dart';
 
 class SubscriptionPaymentController {
   SubscriptionPaymentController(this._service);
@@ -17,11 +17,11 @@ class SubscriptionPaymentController {
     }
 
     final checkout = await _service.createCheckout(plan.slug);
-    if (checkout.orderId.isEmpty || checkout.keyId.isEmpty) {
+    if (!checkout.isReady) {
       throw StateError('Unable to start payment. Please try again.');
     }
 
-    final payment = await openRazorpayCheckout(
+    final payment = await openCashfreeCheckout(
       checkout,
       onOpened: onCheckoutOpened,
     );
@@ -29,8 +29,6 @@ class SubscriptionPaymentController {
     return _service.verifyPayment(
       planSlug: plan.slug,
       orderId: payment.orderId,
-      paymentId: payment.paymentId,
-      signature: payment.signature,
     );
   }
 }

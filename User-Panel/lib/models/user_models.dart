@@ -4,6 +4,7 @@ class UserProfile {
     required this.name,
     required this.phone,
     this.email,
+    this.gender,
     this.emergencyContactName,
     this.emergencyContactPhone,
     this.rating = 0,
@@ -15,11 +16,14 @@ class UserProfile {
   final String name;
   final String phone;
   final String? email;
+  final String? gender;
   final String? emergencyContactName;
   final String? emergencyContactPhone;
   final double rating;
   final int totalRides;
   final String initial;
+
+  bool get isFemale => (gender ?? '').trim().toLowerCase() == 'female';
 
   /// True when the backend only has the OTP signup placeholder name.
   bool get isPlaceholderName {
@@ -48,6 +52,7 @@ class UserProfile {
       name: name,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
+      gender: json['gender'] as String?,
       emergencyContactName: json['emergency_contact_name'] as String?,
       emergencyContactPhone: json['emergency_contact_phone'] as String?,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
@@ -62,6 +67,7 @@ class UserProfile {
         'name': name,
         'phone': phone,
         'email': email,
+        'gender': gender,
         'emergency_contact_name': emergencyContactName,
         'emergency_contact_phone': emergencyContactPhone,
         'rating': rating,
@@ -174,7 +180,7 @@ class VehicleCategory {
   final int capacity;
 
   factory VehicleCategory.fromJson(Map<String, dynamic> json) => VehicleCategory(
-        id: json['id'] as String? ?? '',
+        id: json['id']?.toString() ?? '',
         slug: json['slug'] as String? ?? '',
         name: json['name'] as String? ?? '',
         description: json['description'] as String?,
@@ -183,7 +189,7 @@ class VehicleCategory {
         includedDistanceKm: (json['included_distance_km'] as num?)?.toDouble(),
         includedHours: (json['included_hours'] as num?)?.toDouble(),
         perHourRate: (json['per_hour_rate'] as num?)?.toDouble(),
-        iconUrl: json['icon_url'] as String?,
+        iconUrl: json['icon_url'] as String? ?? json['image_url'] as String?,
         serviceGroup: json['service_group'] as String? ?? 'ride',
         capacity: (json['capacity'] as num?)?.toInt() ?? 4,
       );
@@ -223,12 +229,16 @@ class WalletSummary {
     required this.bonusBalance,
     required this.total,
     required this.paymentMethods,
+    this.hasBankAccount = false,
+    this.bank,
   });
 
   final double balance;
   final double bonusBalance;
   final double total;
   final List<PaymentMethod> paymentMethods;
+  final bool hasBankAccount;
+  final UserBankInfo? bank;
 
   factory WalletSummary.fromJson(Map<String, dynamic> json) => WalletSummary(
         balance: (json['balance'] as num?)?.toDouble() ?? 0,
@@ -237,7 +247,37 @@ class WalletSummary {
         paymentMethods: (json['payment_methods'] as List<dynamic>? ?? [])
             .map((e) => PaymentMethod.fromJson(e as Map<String, dynamic>))
             .toList(),
+        hasBankAccount: json['has_bank_account'] == true || json['bank'] != null,
+        bank: json['bank'] is Map<String, dynamic>
+            ? UserBankInfo.fromJson(json['bank'] as Map<String, dynamic>)
+            : null,
       );
+}
+
+class UserBankInfo {
+  const UserBankInfo({
+    required this.accountHolder,
+    required this.accountNumber,
+    required this.ifsc,
+    required this.bankName,
+    this.upiId,
+  });
+
+  final String accountHolder;
+  final String accountNumber;
+  final String ifsc;
+  final String bankName;
+  final String? upiId;
+
+  factory UserBankInfo.fromJson(Map<String, dynamic> json) => UserBankInfo(
+        accountHolder: json['account_holder'] as String? ?? '',
+        accountNumber: json['account_number'] as String? ?? '',
+        ifsc: json['ifsc'] as String? ?? '',
+        bankName: json['bank_name'] as String? ?? '',
+        upiId: json['upi_id'] as String?,
+      );
+
+  bool get isUpi => bankName.toUpperCase() == 'UPI' || (upiId?.isNotEmpty ?? false);
 }
 
 class PaymentMethod {

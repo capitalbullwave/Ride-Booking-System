@@ -121,7 +121,7 @@ class ProfileService extends BaseApiService {
       'cab': ['cab', 'car', 'economy', 'mini', 'mini cab', 'hatchback', 'sedan'],
       'mini cab': ['mini', 'mini cab', 'hatchback'],
       'sedan': ['sedan', 'comfort'],
-      'suv': ['suv', 'xl', 'premium'],
+      'suv': ['suv', 'premium'],
     };
     final keywords = aliases[normalized] ?? [normalized];
 
@@ -195,6 +195,7 @@ class ProfileService extends BaseApiService {
     String? city,
     String? state,
     String? country,
+    String? referralCode,
   }) async {
     if (useMock) {
       return {'profile_photo': profilePhoto};
@@ -210,6 +211,8 @@ class ProfileService extends BaseApiService {
         if (city != null) 'city': city,
         if (state != null) 'state': state,
         if (country != null) 'country': country,
+        if (referralCode != null && referralCode.trim().isNotEmpty)
+          'referral_code': referralCode.trim(),
       },
       parser: (data) => data as Map<String, dynamic>,
     );

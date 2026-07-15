@@ -24,6 +24,7 @@ export function RideSearchingView() {
   const tab = searchParams.get("tab") || "rides";
   const vehicleParam = searchParams.get("vehicle");
   const categoryIdParam = searchParams.get("categoryId");
+  const womenSafetyEnabled = searchParams.get("womenSafety") === "1";
   const vehicle = isRideVehicleId(vehicleParam) ? vehicleParam : "bike";
 
   const [progress, setProgress] = useState(10);
@@ -59,6 +60,7 @@ export function RideSearchingView() {
           pickup_address: pickup,
           dropoff_address: dropoff,
           vehicle_category_id: categoryId,
+          women_safety_enabled: womenSafetyEnabled,
         });
         rideIdRef.current = ride.id;
         setProgress(60);
@@ -88,7 +90,7 @@ export function RideSearchingView() {
     return () => {
       window.clearTimeout(timer1);
     };
-  }, [pickup, dropoff, vehicle, tab, categoryIdParam, router]);
+  }, [pickup, dropoff, vehicle, tab, categoryIdParam, womenSafetyEnabled, router]);
 
   const handleCancelRide = async (reason: string) => {
     if (rideIdRef.current) {

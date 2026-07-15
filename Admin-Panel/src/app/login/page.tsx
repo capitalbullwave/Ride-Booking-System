@@ -11,8 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/providers/auth-provider";
-import { DEMO_CREDENTIALS } from "@/lib/auth";
 import { APP_NAME, APP_TAGLINE } from "@/constants/routes";
+import { DEMO_CREDENTIALS } from "@/lib/auth";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -59,11 +59,6 @@ export default function LoginPage() {
     } else {
       toast.error(result.error ?? "Login failed");
     }
-  };
-
-  const fillDemoCredentials = () => {
-    setEmail(DEMO_CREDENTIALS.email);
-    setPassword(DEMO_CREDENTIALS.password);
   };
 
   return (
@@ -229,26 +224,10 @@ export default function LoginPage() {
                       </>
                     )}
                   </Button>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Demo: {DEMO_CREDENTIALS.email} / {DEMO_CREDENTIALS.password}
+                  </p>
                 </form>
-
-                <div className="mt-6 rounded-[1.25rem] border border-dashed border-secondary/50 bg-secondary/10 p-4">
-                  <p className="text-xs font-medium text-primary">Demo credentials</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Email: <span className="font-mono">{DEMO_CREDENTIALS.email}</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Password: <span className="font-mono">{DEMO_CREDENTIALS.password}</span>
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-3 w-full border-secondary/40"
-                    onClick={fillDemoCredentials}
-                  >
-                    Use demo credentials
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </div>

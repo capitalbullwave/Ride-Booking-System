@@ -163,17 +163,18 @@ class RideService extends BaseApiService {
         'success': true,
         'payment_status': 'PENDING',
         'payment_collected': false,
+        'provider': 'cashfree',
         'qr_code_id': 'mock_qr_1',
-        'short_url': 'https://rzp.io/rzp/mock-ride-payment',
+        'short_url': 'upi://pay?pa=mock@cashfree&am=100&cu=INR',
         'image_url': null,
+        'image_content': 'upi://pay?pa=mock@cashfree&am=100&cu=INR',
         'amount': breakdown['trip_fare'],
-        'key_id': 'rzp_test_T9MSfwbXZfCFjC',
       };
     }
 
     return post<Map<String, dynamic>>(
       ApiEndpoints.collectPayment,
-      data: {'ride_id': rideId, 'method': 'RAZORPAY'},
+      data: {'ride_id': rideId, 'method': 'CASHFREE'},
       parser: (data) => data as Map<String, dynamic>,
     );
   }

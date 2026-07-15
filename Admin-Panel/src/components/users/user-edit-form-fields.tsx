@@ -15,7 +15,7 @@ export type UserFormData = {
   name: string;
   mobile: string;
   email: string;
-  city: string;
+  gender: string;
   registrationDate: string;
   status: UserStatus;
 };
@@ -24,7 +24,7 @@ export function createUserFormData(user: {
   name: string;
   mobile: string;
   email: string;
-  city: string;
+  gender?: string;
   registrationDate: string;
   status: UserStatus;
 }): UserFormData {
@@ -32,7 +32,7 @@ export function createUserFormData(user: {
     name: user.name,
     mobile: user.mobile,
     email: user.email,
-    city: user.city,
+    gender: user.gender ?? "",
     registrationDate: user.registrationDate,
     status: user.status,
   };
@@ -75,12 +75,23 @@ export function UserEditFormFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-city`}>City</Label>
-        <Input
-          id={`${idPrefix}-city`}
-          value={form.city}
-          onChange={(e) => onChange({ city: e.target.value })}
-        />
+        <Label>Gender</Label>
+        <Select
+          value={form.gender || "unset"}
+          onValueChange={(value) =>
+            onChange({ gender: value === "unset" ? "" : value })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select gender" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unset">Not set</SelectItem>
+            <SelectItem value="male">Male</SelectItem>
+            <SelectItem value="female">Female</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-2">
         <Label htmlFor={`${idPrefix}-registration-date`}>Registration Date</Label>

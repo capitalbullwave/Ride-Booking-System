@@ -9,11 +9,13 @@ import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
 import 'package:wavego_driver/core/utils/date_formatter.dart';
 import 'package:wavego_driver/core/utils/extensions.dart';
+import 'package:wavego_driver/core/utils/media_url_resolver.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/core/utils/ride_notification_utils.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
+import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/providers/ride_provider.dart';
 import 'package:wavego_driver/providers/settings_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
@@ -27,6 +29,7 @@ import 'package:wavego_driver/widgets/common/online_toggle.dart';
 import 'package:wavego_driver/widgets/common/shimmer_loading.dart';
 import 'package:wavego_driver/widgets/common/state_widgets.dart';
 import 'package:wavego_driver/widgets/common/stat_card.dart';
+import 'package:wavego_driver/widgets/profile/profile_photo_avatar.dart';
 import 'package:wavego_driver/widgets/ride/ride_request_bottom_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -39,6 +42,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   int _navIndex = 0;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
+  Timer? _onlinePollTimer;
   final Set<String> _presentedRideIds = {};
   bool _showingRideSheet = false;
 
@@ -60,6 +64,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         return;
       }
 
+      await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
       await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
       if (!mounted) return;
 
@@ -76,14 +81,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (ref.read(dashboardViewModelProvider).isOnline) {
         await _refreshOnlineData();
         _startRealtimeRideListener();
+        _startOnlinePollTimer();
       }
     });
   }
 
   @override
   void dispose() {
+    _stopOnlinePollTimer();
     _stopRealtimeRideListener();
     super.dispose();
+  }
+
+  void _startOnlinePollTimer() {
+    _stopOnlinePollTimer();
+    _onlinePollTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      if (!ref.read(dashboardViewModelProvider).isOnline) return;
+      unawaited(_refreshOnlineData());
+    });
+  }
+
+  void _stopOnlinePollTimer() {
+    _onlinePollTimer?.cancel();
+    _onlinePollTimer = null;
   }
 
   Future<void> _refreshOnlineData() async {
@@ -156,7 +177,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (next && mounted) {
         unawaited(_refreshOnlineData());
         _startRealtimeRideListener();
+        _startOnlinePollTimer();
       } else {
+        _stopOnlinePollTimer();
         _stopRealtimeRideListener();
       }
     });
@@ -174,6 +197,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           _HomeTab(
             state: dashboardState,
             onRefresh: () async {
+              await ref.read(registrationViewModelProvider.notifier).hydrateFromServer();
               await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
               await _refreshOnlineData();
             },
@@ -318,6 +342,11 @@ class _HomeTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final padding = Responsive.pagePadding(context);
+    final registration = ref.watch(registrationViewModelProvider);
+    final photoPath = _resolveProfilePhoto(
+      state.profile?.avatar,
+      registration.profilePhotoUrl ?? registration.selfieUrl,
+    );
 
     return SafeArea(
       child: RefreshIndicator(
@@ -332,16 +361,9 @@ class _HomeTab extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
+                        ProfilePhotoAvatar(
+                          photoPath: photoPath,
                           radius: 24,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                          child: Text(
-                            (state.profile?.name ?? 'D')[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -583,4 +605,16 @@ class _SearchingAnimationState extends State<_SearchingAnimation>
       ),
     );
   }
+}
+
+String? _resolveProfilePhoto(String? profileAvatar, String? registrationPhoto) {
+  final primary = profileAvatar?.trim();
+  if (primary != null && primary.isNotEmpty) {
+    return resolveMediaUrl(primary);
+  }
+  final fallback = registrationPhoto?.trim();
+  if (fallback != null && fallback.isNotEmpty) {
+    return resolveMediaUrl(fallback);
+  }
+  return null;
 }

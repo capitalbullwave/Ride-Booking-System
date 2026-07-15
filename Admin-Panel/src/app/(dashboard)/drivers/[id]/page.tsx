@@ -46,20 +46,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Driver, DriverStatus } from "@/types";
-import { formatCurrency, formatDate, formatDateTime, capitalize } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime, capitalize, formatPublicId } from "@/lib/format";
 import {
   approveDriver,
+  creditDriverWallet,
   DriverDocument,
   DriverRide,
+  DriverWalletSummary,
   fetchDriver,
   fetchDriverDocuments,
   fetchDriverRides,
+  fetchDriverWallet,
   reactivateDriver,
   rejectDriver,
   setDriverStatus,
   suspendDriver,
   updateDriver,
+  updateDriverBank,
 } from "@/lib/drivers-api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 import {
@@ -170,6 +176,19 @@ export default function DriverDetailPage({
   const [driver, setDriver] = useState<Driver | null>(null);
   const [driverRides, setDriverRides] = useState<DriverRide[]>([]);
   const [documents, setDocuments] = useState<DriverDocument[]>([]);
+  const [wallet, setWallet] = useState<DriverWalletSummary | null>(null);
+  const [creditAmount, setCreditAmount] = useState("");
+  const [creditNote, setCreditNote] = useState("");
+  const [isCrediting, setIsCrediting] = useState(false);
+  const [bankEditOpen, setBankEditOpen] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    accountHolder: "",
+    accountNumber: "",
+    ifsc: "",
+    bankName: "",
+    upiId: "",
+  });
+  const [isSavingBank, setIsSavingBank] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [notFoundState, setNotFoundState] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -193,15 +212,17 @@ export default function DriverDetailPage({
     }
 
     try {
-      const [driverData, rides, docs] = await Promise.all([
+      const [driverData, rides, docs, walletData] = await Promise.all([
         fetchDriver(id),
         fetchDriverRides(id),
         fetchDriverDocuments(id),
+        fetchDriverWallet(id),
       ]);
 
       setDriver(driverData);
       setDriverRides(rides);
       setDocuments(docs);
+      setWallet(walletData);
     } catch (error) {
       if (error instanceof Error && error.message.includes("not found")) {
         setNotFoundState(true);
@@ -338,7 +359,7 @@ export default function DriverDetailPage({
         <ButtonLink variant="ghost" size="icon" href="/drivers">
           <ArrowLeft className="h-4 w-4" />
         </ButtonLink>
-        <PageHeader title={driver.name} description={`Driver ID: ${driver.id}`}>
+        <PageHeader title={driver.name} description={`Driver ID: ${formatPublicId(driver.publicId, driver.id)}`}>
           <Button variant="outline" size="sm" onClick={openEdit} disabled={isActionLoading}>
             <Pencil className="mr-2 h-4 w-4" /> Edit
           </Button>
@@ -441,6 +462,7 @@ export default function DriverDetailPage({
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="vehicle">Vehicle</TabsTrigger>
           <TabsTrigger value="bank">Bank Details</TabsTrigger>
+          <TabsTrigger value="wallet">Wallet</TabsTrigger>
           <TabsTrigger value="rides">Ride History</TabsTrigger>
         </TabsList>
 
@@ -554,26 +576,182 @@ export default function DriverDetailPage({
 
         <TabsContent value="bank" className="mt-6">
           <Card>
-            <CardHeader><CardTitle>Bank Details</CardTitle></CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+              <CardTitle>Bank Details</CardTitle>
+              {driver.bankDetails && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBankForm({
+                      accountHolder: driver.bankDetails?.accountHolder || "",
+                      accountNumber: driver.bankDetails?.isMasked
+                        ? ""
+                        : driver.bankDetails?.accountNumber || "",
+                      ifsc: driver.bankDetails?.ifsc || "",
+                      bankName: driver.bankDetails?.bankName || "",
+                      upiId: driver.bankDetails?.upiId || "",
+                    });
+                    setBankEditOpen(true);
+                  }}
+                >
+                  Edit
+                </Button>
+              )}
+            </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               {driver.bankDetails ? (
-                [
-                  ["Account Holder", driver.bankDetails.accountHolder],
-                  ["Bank Name", driver.bankDetails.bankName],
-                  ["Account Number", driver.bankDetails.accountNumber],
-                  ["IFSC Code", driver.bankDetails.ifsc],
-                  ["UPI ID", driver.bankDetails.upiId || "—"],
-                  ["Verified", driver.bankDetails.isVerified ? "Yes" : "No"],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border p-4">
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                    <p className="mt-1 font-medium">{value}</p>
-                  </div>
-                ))
+                <>
+                  {[
+                    ["Account Holder", driver.bankDetails.accountHolder],
+                    ["Bank Name", driver.bankDetails.bankName],
+                    ["Account Number", driver.bankDetails.accountNumber],
+                    ["IFSC Code", driver.bankDetails.ifsc],
+                    ["UPI ID", driver.bankDetails.upiId || "—"],
+                    ["Verified", driver.bankDetails.isVerified ? "Yes" : "No"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg border p-4">
+                      <p className="text-xs text-muted-foreground">{label}</p>
+                      <p className="mt-1 font-medium font-mono tracking-wide">{value}</p>
+                    </div>
+                  ))}
+                  {driver.bankDetails.isMasked && (
+                    <p className="text-sm text-amber-700 sm:col-span-2">
+                      Full account number was not stored earlier. Use Edit to enter the complete account number.
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground sm:col-span-2">
                   No bank details submitted yet.
                 </p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="wallet" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Driver Wallet</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Available</p>
+                  <p className="mt-1 text-2xl font-bold text-primary">
+                    {formatCurrency(wallet?.availableBalance ?? driver.walletBalance)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatCurrency(wallet?.pendingBalance ?? 0)}
+                  </p>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <p className="text-xs text-muted-foreground">Lifetime earnings</p>
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatCurrency(wallet?.lifetimeEarnings ?? 0)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4 space-y-3">
+                <p className="text-sm font-medium">Add funds</p>
+                <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="credit-amount">Amount (₹)</Label>
+                    <Input
+                      id="credit-amount"
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      placeholder="e.g. 500"
+                      value={creditAmount}
+                      onChange={(e) => setCreditAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="credit-note">Note (optional)</Label>
+                    <Input
+                      id="credit-note"
+                      placeholder="Reason for credit"
+                      value={creditNote}
+                      onChange={(e) => setCreditNote(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      disabled={isCrediting || !creditAmount}
+                      onClick={async () => {
+                        const amount = Number(creditAmount);
+                        if (!Number.isFinite(amount) || amount <= 0) {
+                          toast.error("Enter a valid amount");
+                          return;
+                        }
+                        setIsCrediting(true);
+                        try {
+                          const updated = await creditDriverWallet(
+                            id,
+                            amount,
+                            creditNote.trim() || undefined,
+                          );
+                          setWallet(updated);
+                          setDriver((prev) =>
+                            prev
+                              ? { ...prev, walletBalance: updated.availableBalance }
+                              : prev,
+                          );
+                          setCreditAmount("");
+                          setCreditNote("");
+                          toast.success(`Added ${formatCurrency(amount)} to wallet`);
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Failed to add funds",
+                          );
+                        } finally {
+                          setIsCrediting(false);
+                        }
+                      }}
+                    >
+                      {isCrediting ? "Adding…" : "Add"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {(wallet?.transactions.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">No wallet transactions yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Balance after</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {wallet?.transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {tx.date ? formatDateTime(tx.date) : "—"}
+                        </TableCell>
+                        <TableCell className="capitalize">{tx.type}</TableCell>
+                        <TableCell>{tx.description}</TableCell>
+                        <TableCell className="font-medium">
+                          {formatCurrency(tx.amount)}
+                        </TableCell>
+                        <TableCell>{formatCurrency(tx.balanceAfter)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>
@@ -602,7 +780,9 @@ export default function DriverDetailPage({
                   <TableBody>
                     {driverRides.map((ride) => (
                       <TableRow key={ride.id}>
-                        <TableCell className="font-mono text-xs">{ride.id}</TableCell>
+                        <TableCell className="font-mono text-xs">
+                          {formatPublicId(ride.publicId, ride.id)}
+                        </TableCell>
                         <TableCell>{ride.userName}</TableCell>
                         <TableCell className="max-w-[200px] truncate">
                           {ride.pickupLocation} → {ride.dropLocation}
@@ -687,6 +867,115 @@ export default function DriverDetailPage({
               disabled={isActionLoading}
             >
               {confirmAction ? confirmConfig[confirmAction].button : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bankEditOpen} onOpenChange={setBankEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Bank Details</DialogTitle>
+            <DialogDescription>
+              Enter the full account number — it will be visible to admins only.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="bank-holder">Account Holder</Label>
+              <Input
+                id="bank-holder"
+                value={bankForm.accountHolder}
+                onChange={(e) =>
+                  setBankForm((f) => ({ ...f, accountHolder: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="bank-number">Account Number</Label>
+              <Input
+                id="bank-number"
+                inputMode="numeric"
+                placeholder="Full account number"
+                value={bankForm.accountNumber}
+                onChange={(e) =>
+                  setBankForm((f) => ({ ...f, accountNumber: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-ifsc">IFSC</Label>
+              <Input
+                id="bank-ifsc"
+                value={bankForm.ifsc}
+                onChange={(e) =>
+                  setBankForm((f) => ({ ...f, ifsc: e.target.value.toUpperCase() }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bank-name">Bank Name</Label>
+              <Input
+                id="bank-name"
+                value={bankForm.bankName}
+                onChange={(e) =>
+                  setBankForm((f) => ({ ...f, bankName: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="bank-upi">UPI ID (optional)</Label>
+              <Input
+                id="bank-upi"
+                value={bankForm.upiId}
+                onChange={(e) =>
+                  setBankForm((f) => ({ ...f, upiId: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBankEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={isSavingBank}
+              onClick={async () => {
+                if (
+                  !bankForm.accountHolder.trim() ||
+                  !bankForm.accountNumber.trim() ||
+                  !bankForm.ifsc.trim() ||
+                  !bankForm.bankName.trim()
+                ) {
+                  toast.error("Fill all required bank fields");
+                  return;
+                }
+                setIsSavingBank(true);
+                try {
+                  const details = await updateDriverBank(id, {
+                    accountHolder: bankForm.accountHolder.trim(),
+                    accountNumber: bankForm.accountNumber.trim(),
+                    ifsc: bankForm.ifsc.trim(),
+                    bankName: bankForm.bankName.trim(),
+                    upiId: bankForm.upiId.trim() || undefined,
+                  });
+                  setDriver((prev) =>
+                    prev ? { ...prev, bankDetails: details ?? prev.bankDetails } : prev,
+                  );
+                  setBankEditOpen(false);
+                  toast.success("Bank details updated");
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Failed to update bank details",
+                  );
+                } finally {
+                  setIsSavingBank(false);
+                }
+              }}
+            >
+              {isSavingBank ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

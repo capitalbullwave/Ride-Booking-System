@@ -19,6 +19,7 @@ export type NotificationChannel = "push" | "sms" | "email";
 
 export interface User {
   id: string;
+  publicId?: string;
   name: string;
   mobile: string;
   email: string;
@@ -27,7 +28,7 @@ export interface User {
   walletBalance: number;
   status: UserStatus;
   avatar?: string;
-  city: string;
+  gender?: string;
   rating: number;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
@@ -35,6 +36,7 @@ export interface User {
 
 export interface Driver {
   id: string;
+  publicId?: string;
   name: string;
   phone: string;
   email: string;
@@ -70,6 +72,7 @@ export interface Driver {
     bankName: string;
     upiId?: string;
     isVerified?: boolean;
+    isMasked?: boolean;
   };
 }
 
@@ -84,9 +87,12 @@ export interface DriverDocument {
 
 export interface Ride {
   id: string;
+  publicId?: string;
   userId: string;
+  userPublicId?: string;
   userName: string;
   driverId?: string;
+  driverPublicId?: string;
   driverName?: string;
   vehicleType: VehicleType;
   pickupLocation: string;
@@ -120,6 +126,7 @@ export interface VehicleCategory {
   imageUrl?: string | null;
   serviceGroup?: "ride" | "rental" | string;
   capacity?: number;
+  displayOrder?: number;
 }
 
 export interface Transaction {
@@ -242,7 +249,8 @@ export interface AppSettings {
   contactPhone: string;
   googleMapsApiKey: string;
   firebaseConfig: string;
-  razorpayKey: string;
+  cashfreeAppId: string;
+  cashfreeSecretKey: string;
   stripeKey: string;
   driverCommission: number;
   platformFee: number;

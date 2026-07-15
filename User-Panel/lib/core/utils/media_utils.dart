@@ -4,7 +4,8 @@ bool isMediaUrl(String? value) {
   if (value == null || value.isEmpty) return false;
   return value.startsWith('http://') ||
       value.startsWith('https://') ||
-      value.startsWith('/uploads/');
+      value.startsWith('/uploads/') ||
+      value.startsWith('data:image');
 }
 
 String? resolveMediaUrl(String? url) {

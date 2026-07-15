@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Bike, Car, ImagePlus, Loader2, Pencil, Plus, Trash2, Truck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Bike, Car, ChevronDown, ChevronUp, ImagePlus, Loader2, Pencil, Plus, Trash2, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -32,10 +32,18 @@ import {
   createVehicleCategory,
   deleteVehicleCategory,
   listVehicleCategories,
+  reorderVehicleCategories,
   updateVehicleCategory,
 } from "@/lib/vehicles-api";
 import { resolveMediaUrl } from "@/lib/api";
 import { toast } from "sonner";
+
+function parseNumber(value: string, fallback: number): number {
+  const trimmed = value.trim();
+  if (trimmed === "") return fallback;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 function getCategoryImageUrl(category: VehicleCategory): string | null {
   if (category.imageUrl) return resolveMediaUrl(category.imageUrl);
@@ -44,6 +52,40 @@ function getCategoryImageUrl(category: VehicleCategory): string | null {
     return resolveMediaUrl(icon);
   }
   return null;
+}
+
+function VehicleCategoryThumbnail({
+  category,
+  imageClassName = "h-14 w-14 rounded-lg object-cover",
+}: {
+  category: VehicleCategory;
+  imageClassName?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const Icon = vehicleIcons[category.type] ?? vehicleIcons[category.icon] ?? Car;
+  const imageSrc = getCategoryImageUrl(category);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageSrc, category.id]);
+
+  if (!imageSrc || imageFailed) {
+    return (
+      <div className="p-2">
+        <Icon className="h-6 w-6 text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={imageSrc}
+      alt={category.name}
+      className={imageClassName}
+      onError={() => setImageFailed(true)}
+    />
+  );
 }
 
 const vehicleIcons: Record<string, typeof Bike> = {
@@ -115,11 +157,11 @@ function categoryToForm(category: VehicleCategory): VehicleFormData {
     includedHours: String(category.includedHours ?? (category.serviceGroup === "rental" ? 4 : 0)),
     perHourRate: String(category.perHourRate ?? 0),
     waitingCharge: String(category.waitingCharge),
-    cancellationCharge: String(category.cancellationCharge ?? 20),
+    cancellationCharge: String(category.cancellationCharge ?? 0),
     capacity: String(category.capacity ?? 4),
     isActive: category.isActive,
     image: null,
-    existingImageUrl: category.imageUrl ?? null,
+    existingImageUrl: getCategoryImageUrl(category),
   };
 }
 
@@ -142,7 +184,7 @@ function VehicleFormFields({
     form.image ?? (form.existingImageUrl ? resolveMediaUrl(form.existingImageUrl) : null);
 
   return (
-    <div className="grid gap-4 py-2">
+    <div className="grid gap-3">
       <div className="space-y-2">
         <Label>Vehicle Name</Label>
         <Input
@@ -176,7 +218,7 @@ function VehicleFormFields({
                 <SelectItem value="bike">Bike</SelectItem>
                 <SelectItem value="auto">Auto</SelectItem>
                 <SelectItem value="car">Car / Cab</SelectItem>
-                <SelectItem value="truck">SUV / XL</SelectItem>
+                <SelectItem value="truck">SUV / Large</SelectItem>
               </>
             )}
           </SelectContent>
@@ -193,7 +235,7 @@ function VehicleFormFields({
           placeholder="e.g. 4"
         />
         <p className="text-xs text-muted-foreground">
-          Shown on user panel when choosing a ride (person icon + number)
+          Shown when users choose a ride
         </p>
       </div>
       <div className="space-y-2">
@@ -208,20 +250,20 @@ function VehicleFormFields({
         <button
           type="button"
           onClick={() => imageInputRef.current?.click()}
-          className="flex w-full items-center gap-4 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-left transition-colors hover:bg-muted/50"
+          className="flex w-full items-center gap-3 rounded-xl border border-dashed border-border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/50"
         >
           {previewImage ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewImage} alt="Vehicle preview" className="h-16 w-16 rounded-lg object-cover" />
+            <img src={previewImage} alt="Vehicle preview" className="h-12 w-12 rounded-lg object-cover" />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10">
-              <ImagePlus className="h-6 w-6 text-primary" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <ImagePlus className="h-5 w-5 text-primary" />
             </div>
           )}
           <div>
             <p className="font-medium">Upload vehicle image</p>
-            <p className="text-sm text-muted-foreground">
-              Shown on user home, booking, and service tiles
+            <p className="text-xs text-muted-foreground">
+              Shown on user home and booking screens
             </p>
           </div>
         </button>
@@ -264,7 +306,7 @@ function VehicleFormFields({
           </div>
         </div>
       ) : (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <div className="space-y-2">
           <Label>Base Fare (₹)</Label>
           <Input
@@ -310,7 +352,7 @@ function VehicleFormFields({
       </div>
       )}
       {showStatus ? (
-        <div className="flex items-center justify-between rounded-lg border border-border px-4 py-3">
+        <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
           <div>
             <p className="font-medium">Active on user panel</p>
             <p className="text-sm text-muted-foreground">Inactive vehicles are hidden from users</p>
@@ -335,6 +377,7 @@ export default function VehiclesPage() {
   const [deleteTarget, setDeleteTarget] = useState<VehicleCategory | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ServiceTab>("ride");
   const addImageInputRef = useRef<HTMLInputElement>(null);
   const editImageInputRef = useRef<HTMLInputElement>(null);
@@ -355,9 +398,43 @@ export default function VehiclesPage() {
     void loadCategories();
   }, [loadCategories]);
 
-  const filteredCategories = categories.filter(
-    (cat) => (cat.serviceGroup ?? "ride") === activeTab,
+  const filteredCategories = useMemo(
+    () =>
+      categories
+        .filter((cat) => (cat.serviceGroup ?? "ride") === activeTab)
+        .sort(
+          (a, b) =>
+            (a.displayOrder ?? 0) - (b.displayOrder ?? 0) ||
+            a.name.localeCompare(b.name),
+        ),
+    [categories, activeTab],
   );
+
+  const handleMoveCategory = async (category: VehicleCategory, direction: "up" | "down") => {
+    const index = filteredCategories.findIndex((cat) => cat.id === category.id);
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || swapIndex < 0 || swapIndex >= filteredCategories.length) return;
+
+    const reordered = [...filteredCategories];
+    [reordered[index], reordered[swapIndex]] = [reordered[swapIndex], reordered[index]];
+    const items = reordered.map((cat, order) => ({ id: cat.id, displayOrder: order }));
+
+    setReorderingId(category.id);
+    try {
+      await reorderVehicleCategories(items);
+      setCategories((prev) =>
+        prev.map((cat) => {
+          const item = items.find((entry) => entry.id === cat.id);
+          return item ? { ...cat, displayOrder: item.displayOrder } : cat;
+        }),
+      );
+      toast.success(`${category.name} moved ${direction}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reorder vehicles");
+    } finally {
+      setReorderingId(null);
+    }
+  };
 
   const handleImageChange = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -401,8 +478,8 @@ export default function VehiclesPage() {
         includedDistanceKm: activeTab === "rental" ? 0 : (Number(addForm.includedDistanceKm) || 2),
         includedHours: activeTab === "rental" ? Number(addForm.includedHours) || 4 : 0,
         perHourRate: activeTab === "rental" ? Number(addForm.perHourRate) || 50 : 0,
-        waitingCharge: Number(addForm.waitingCharge) || 2,
-        cancellationCharge: Number(addForm.cancellationCharge) || 20,
+        waitingCharge: parseNumber(addForm.waitingCharge, 2),
+        cancellationCharge: parseNumber(addForm.cancellationCharge, 20),
         capacity: Number(addForm.capacity) || 4,
         isActive: true,
         image: addForm.image ?? undefined,
@@ -454,8 +531,11 @@ export default function VehiclesPage() {
           (editingCategory?.serviceGroup ?? "ride") === "rental"
             ? Number(editForm.perHourRate) || 0
             : 0,
-        waitingCharge: Number(editForm.waitingCharge) || 0,
-        cancellationCharge: Number(editForm.cancellationCharge) || 20,
+        waitingCharge: parseNumber(editForm.waitingCharge, 0),
+        cancellationCharge: parseNumber(
+          editForm.cancellationCharge,
+          editingCategory.cancellationCharge ?? 0,
+        ),
         capacity: Number(editForm.capacity) || 4,
         isActive: editForm.isActive,
       };
@@ -530,7 +610,7 @@ export default function VehiclesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Vehicle Management" description="Configure vehicle categories and pricing">
+      <PageHeader title="Vehicle Management" description="Configure vehicle categories, pricing, and display order on the user app">
         <ButtonLink variant="outline" href="/vehicles/approval">
           Vehicle Approval
         </ButtonLink>
@@ -538,8 +618,8 @@ export default function VehiclesPage() {
           <DialogTrigger render={<Button variant="outline" />}>
             <Plus className="mr-2 h-4 w-4" /> Add Vehicle
           </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+            <DialogHeader className="shrink-0 space-y-1 border-b px-5 py-3 pr-12">
               <DialogTitle>
                 {activeTab === "rental" ? "Add Rental Vehicle" : "Add Vehicle Category"}
               </DialogTitle>
@@ -549,14 +629,16 @@ export default function VehiclesPage() {
                   : "New vehicles appear on the user app immediately after saving."}
               </DialogDescription>
             </DialogHeader>
-            <VehicleFormFields
-              form={addForm}
-              onChange={(updates) => setAddForm((prev) => ({ ...prev, ...updates }))}
-              imageInputRef={addImageInputRef}
-              onImageChange={(event) => handleImageChange(event, "add")}
-              isRental={activeTab === "rental"}
-            />
-            <DialogFooter>
+            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-3">
+              <VehicleFormFields
+                form={addForm}
+                onChange={(updates) => setAddForm((prev) => ({ ...prev, ...updates }))}
+                imageInputRef={addImageInputRef}
+                onImageChange={(event) => handleImageChange(event, "add")}
+                isRental={activeTab === "rental"}
+              />
+            </div>
+            <DialogFooter className="m-0 shrink-0 rounded-none rounded-b-xl border-t px-5 py-3">
               <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
                 Cancel
               </Button>
@@ -600,28 +682,44 @@ export default function VehiclesPage() {
         </Card>
       ) : (
         <div className="grid gap-6">
-          {filteredCategories.map((category) => {
-            const Icon = vehicleIcons[category.type] ?? vehicleIcons[category.icon] ?? Car;
-            const imageSrc = getCategoryImageUrl(category);
-
+          {filteredCategories.map((category, index) => {
             return (
               <Card key={category.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex flex-col items-center gap-1">
+                        <Badge variant="outline" className="min-w-[2rem] justify-center px-2">
+                          #{index + 1}
+                        </Badge>
+                        <div className="flex flex-col">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7"
+                            disabled={index === 0 || reorderingId === category.id}
+                            onClick={() => void handleMoveCategory(category, "up")}
+                            aria-label={`Move ${category.name} up`}
+                          >
+                            <ChevronUp className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="h-7 w-7"
+                            disabled={
+                              index === filteredCategories.length - 1 ||
+                              reorderingId === category.id
+                            }
+                            onClick={() => void handleMoveCategory(category, "down")}
+                            aria-label={`Move ${category.name} down`}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                       <div className="rounded-xl bg-primary/10 p-1">
-                        {imageSrc ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={imageSrc}
-                            alt={category.name}
-                            className="h-14 w-14 rounded-lg object-cover"
-                          />
-                        ) : (
-                          <div className="p-2">
-                            <Icon className="h-6 w-6 text-primary" />
-                          </div>
-                        )}
+                        <VehicleCategoryThumbnail category={category} />
                       </div>
                       <div className="min-w-0">
                         <CardTitle>{category.name}</CardTitle>
@@ -717,22 +815,24 @@ export default function VehiclesPage() {
       </Tabs>
 
       <Dialog open={editDialogOpen} onOpenChange={resetEditDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+          <DialogHeader className="shrink-0 space-y-1 border-b px-5 py-3 pr-12">
             <DialogTitle>Edit {editingCategory?.name}</DialogTitle>
             <DialogDescription>
               Changes are saved to the user panel immediately after updating.
             </DialogDescription>
           </DialogHeader>
-          <VehicleFormFields
-            form={editForm}
-            onChange={(updates) => setEditForm((prev) => ({ ...prev, ...updates }))}
-            imageInputRef={editImageInputRef}
-            onImageChange={(event) => handleImageChange(event, "edit")}
-            showStatus
-            isRental={(editingCategory?.serviceGroup ?? "ride") === "rental"}
-          />
-          <DialogFooter>
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-3">
+            <VehicleFormFields
+              form={editForm}
+              onChange={(updates) => setEditForm((prev) => ({ ...prev, ...updates }))}
+              imageInputRef={editImageInputRef}
+              onImageChange={(event) => handleImageChange(event, "edit")}
+              showStatus
+              isRental={(editingCategory?.serviceGroup ?? "ride") === "rental"}
+            />
+          </div>
+          <DialogFooter className="m-0 shrink-0 rounded-none rounded-b-xl border-t px-5 py-3">
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>

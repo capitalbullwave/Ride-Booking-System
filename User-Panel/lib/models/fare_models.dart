@@ -17,7 +17,7 @@ class VehicleFareQuote {
 
   factory VehicleFareQuote.fromJson(Map<String, dynamic> json) {
     return VehicleFareQuote(
-      vehicleTypeId: json['vehicle_type_id']?.toString() ?? '',
+      vehicleTypeId: json['vehicle_type_id']?.toString().toLowerCase() ?? '',
       estimatedFare: (json['estimated_fare'] as num?)?.toDouble() ?? 0,
       originalFare: (json['original_fare'] as num?)?.toDouble(),
       memberDiscount: (json['member_discount'] as num?)?.toDouble() ?? 0,

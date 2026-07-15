@@ -2,18 +2,18 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Bull Wave Rides — Production API",
+      "name": "Bull Wave Rides — Local Backend",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart"
     },
     {
-      "name": "Bull Wave Rides — Local Backend",
+      "name": "Bull Wave Rides — Production API",
       "request": "launch",
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": [
-        "--dart-define=USE_LOCAL_API=true"
+        "--dart-define=USE_PRODUCTION_API=true"
       ]
     },
     {

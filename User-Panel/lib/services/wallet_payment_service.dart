@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/dio_client.dart';
-import 'package:wavego_user/models/membership_models.dart';
 import 'package:wavego_user/services/base_api_service.dart';
-import 'package:wavego_user/services/razorpay/razorpay_checkout.dart';
+import 'package:wavego_user/services/cashfree/cashfree_checkout.dart';
+import 'package:wavego_user/services/cashfree/cashfree_checkout_models.dart';
 
 class WalletTopUpResult {
   const WalletTopUpResult({
@@ -34,7 +34,7 @@ class WalletTopUpResult {
 class WalletPaymentApiService extends BaseApiService {
   WalletPaymentApiService(super.dio);
 
-  Future<SubscriptionCheckoutSession> createCheckout(double amount) async {
+  Future<CashfreeCheckoutSession> createCheckout(double amount) async {
     final data = await post<Map<String, dynamic>>(
       ApiEndpoints.walletCheckout,
       data: {'amount': amount},
@@ -44,28 +44,20 @@ class WalletPaymentApiService extends BaseApiService {
         return <String, dynamic>{};
       },
     );
-    final session = SubscriptionCheckoutSession.fromWalletCheckout(data);
-    if (session.orderId.isEmpty || session.keyId.isEmpty) {
+    final session = CashfreeCheckoutSession.fromWalletCheckout(data);
+    if (!session.isReady) {
       throw StateError('Unable to start payment. Please try again.');
     }
     return session;
   }
 
-  Future<WalletTopUpResult> verifyPayment({
-    required String orderId,
-    required String paymentId,
-    required String signature,
-  }) async {
+  Future<WalletTopUpResult> verifyPayment({required String orderId}) async {
     Object? lastError;
     for (var attempt = 0; attempt < 5; attempt++) {
       try {
         return await post(
           ApiEndpoints.walletVerifyPayment,
-          data: {
-            'razorpay_order_id': orderId,
-            'razorpay_payment_id': paymentId,
-            'razorpay_signature': signature,
-          },
+          data: {'order_id': orderId},
           parser: (data) {
             if (data is Map<String, dynamic>) {
               return WalletTopUpResult.fromJson(data);
@@ -106,7 +98,7 @@ class WalletPaymentController {
 
     final checkout = await _service.createCheckout(amount);
 
-    final payment = await openRazorpayCheckout(
+    final payment = await openCashfreeCheckout(
       checkout,
       onOpened: onCheckoutOpened,
       onPaymentSuccess: (_) {
@@ -114,23 +106,11 @@ class WalletPaymentController {
       },
     );
 
-    return _service.verifyPayment(
-      orderId: payment.orderId,
-      paymentId: payment.paymentId,
-      signature: payment.signature,
-    );
+    return _service.verifyPayment(orderId: payment.orderId);
   }
 
-  Future<WalletTopUpResult> verifyExistingPayment({
-    required String orderId,
-    required String paymentId,
-    required String signature,
-  }) {
-    return _service.verifyPayment(
-      orderId: orderId,
-      paymentId: paymentId,
-      signature: signature,
-    );
+  Future<WalletTopUpResult> verifyExistingPayment({required String orderId}) {
+    return _service.verifyPayment(orderId: orderId);
   }
 }
 

@@ -16,6 +16,7 @@ class BookableVehicle {
     this.description,
     this.imageUrl,
     this.capacity = 4,
+    this.includedDistanceKm = 2,
   });
 
   final String id;
@@ -28,9 +29,11 @@ class BookableVehicle {
   final String? description;
   final String? imageUrl;
   final int capacity;
+  final double includedDistanceKm;
 
   String fareForDistanceKm(double distanceKm) {
-    return '₹${(baseFare + perKmRate * distanceKm).round()}';
+    final billableKm = (distanceKm - includedDistanceKm).clamp(0.0, double.infinity);
+    return '₹${(baseFare + perKmRate * billableKm).round()}';
   }
 
   String etaLabel(int index) => '${3 + index} min';
@@ -44,6 +47,7 @@ class BookableVehicle {
 String vehicleImageAssetForSlug(String slug) {
   final normalized = slug.toLowerCase();
   if (normalized.contains('bike')) return 'assets/images/services/bike.png';
+  if (normalized.contains('rickshaw')) return 'assets/images/services/auto.png';
   if (normalized.contains('auto')) return 'assets/images/services/auto.png';
   if (normalized.contains('parcel')) return 'assets/images/services/parcel.png';
   if (normalized.contains('travel')) return 'assets/images/services/travel.png';
@@ -71,6 +75,7 @@ BookableVehicle bookableVehicleFromCategory(VehicleCategory category, int index)
     slug: category.slug,
     baseFare: category.baseFare,
     perKmRate: category.perKmRate,
+    includedDistanceKm: category.includedDistanceKm ?? 2,
     icon: vehicleIconForSlug(category.slug),
     imageAsset: vehicleImageAssetForSlug(category.slug),
     description: category.description,
@@ -97,22 +102,28 @@ HomeServiceItem homeServiceFromCategory(VehicleCategory category) {
   );
 }
 
-List<HomeServiceItem> fallbackRentalServices() => const [
-      HomeServiceItem(
-        name: 'Rental Bike',
-        description: 'Rent a bike by the day',
-        imageAsset: 'assets/images/services/bike.png',
-        route: '/rental',
-      ),
-      HomeServiceItem(
-        name: 'Rental Car',
-        description: 'Flexible car rental packages',
-        imageAsset: 'assets/images/services/car.png',
-        route: '/rental',
-      ),
-    ];
-
-List<HomeServiceItem> fallbackHomeServices() => AppServices.homeServices;
+List<HomeServiceItem> homeServicesForMode(
+  List<HomeServiceItem> services,
+  HomeBookingMode mode,
+) {
+  switch (mode) {
+    case HomeBookingMode.ride:
+      return services
+          .where(
+            (s) =>
+                !s.name.toLowerCase().contains('parcel') &&
+                !s.name.toLowerCase().contains('rental') &&
+                !s.isEmergency,
+          )
+          .toList();
+    case HomeBookingMode.parcel:
+      return services
+          .where((s) => s.name.toLowerCase().contains('parcel'))
+          .toList();
+    case HomeBookingMode.rental:
+      return services;
+  }
+}
 
 bool isParcelCategorySlug(String slug) => slug.toLowerCase().contains('parcel');
 
@@ -155,72 +166,3 @@ List<BookableVehicle> filterBookableVehiclesForMode(
       return vehicles;
   }
 }
-
-List<HomeServiceItem> homeServicesForMode(
-  List<HomeServiceItem> services,
-  HomeBookingMode mode,
-) {
-  switch (mode) {
-    case HomeBookingMode.ride:
-      return services
-          .where(
-            (s) =>
-                !s.name.toLowerCase().contains('parcel') &&
-                !s.name.toLowerCase().contains('rental') &&
-                !s.isEmergency,
-          )
-          .toList();
-    case HomeBookingMode.parcel:
-      return services
-          .where((s) => s.name.toLowerCase().contains('parcel'))
-          .toList();
-    case HomeBookingMode.rental:
-      return fallbackRentalServices();
-  }
-}
-
-List<BookableVehicle> fallbackBookableVehicles() => const [
-      BookableVehicle(
-        id: 'bike',
-        name: 'Bike',
-        slug: 'bike',
-        baseFare: 25,
-        perKmRate: 8,
-        icon: Icons.two_wheeler,
-        imageAsset: 'assets/images/services/bike.png',
-        capacity: 1,
-      ),
-      BookableVehicle(
-        id: 'auto',
-        name: 'Auto',
-        slug: 'auto',
-        baseFare: 35,
-        perKmRate: 12,
-        icon: Icons.electric_rickshaw,
-        imageAsset: 'assets/images/services/auto.png',
-        capacity: 3,
-      ),
-      BookableVehicle(
-        id: 'cab',
-        name: 'Cab',
-        slug: 'cab',
-        baseFare: 50,
-        perKmRate: 15,
-        icon: Icons.directions_car,
-        imageAsset: 'assets/images/services/car.png',
-        capacity: 4,
-      ),
-    ];
-
-List<BookableVehicle> fallbackParcelVehicles() => const [
-      BookableVehicle(
-        id: 'parcel',
-        name: 'Parcel',
-        slug: 'parcel',
-        baseFare: 30,
-        perKmRate: 10,
-        icon: Icons.inventory_2_outlined,
-        imageAsset: 'assets/images/services/parcel.png',
-        description: 'Quick, secure deliveries',
-      ),
-    ];

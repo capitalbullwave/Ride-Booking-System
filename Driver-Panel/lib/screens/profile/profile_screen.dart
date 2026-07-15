@@ -306,6 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _MenuCard(
                     items: [
                       _ProfileMenuItem(Icons.analytics_outlined, 'Ride Statistics', RouteNames.rideStatistics),
+                      _ProfileMenuItem(Icons.card_giftcard_outlined, 'Refer & Earn', RouteNames.referEarn),
                       _ProfileMenuItem(Icons.payments_outlined, 'Earnings', RouteNames.earnings),
                       _ProfileMenuItem(Icons.account_balance_wallet_outlined, 'Wallet', RouteNames.wallet),
                     ],

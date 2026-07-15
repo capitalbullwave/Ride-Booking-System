@@ -568,7 +568,7 @@ export default function SubscriptionsPage() {
             placeholder="Search name, phone, email..."
             className="flex-1"
           />
-          <Select value={subscriberPlanFilter} onValueChange={setSubscriberPlanFilter}>
+          <Select value={subscriberPlanFilter} onValueChange={(value) => setSubscriberPlanFilter(value ?? "all")}>
             <SelectTrigger className="w-full sm:w-[200px]">
               <SelectValue placeholder="Filter by plan" />
             </SelectTrigger>

@@ -203,6 +203,36 @@ class WalletService extends BaseApiService {
           .toList(),
     );
   }
+
+  Future<UserBankInfo> saveBank({
+    required String paymentType,
+    required String accountHolderName,
+    String? accountNumber,
+    String? ifscCode,
+    String? bankName,
+    String? upiId,
+  }) {
+    return post(
+      ApiEndpoints.walletBank,
+      data: {
+        'payment_type': paymentType,
+        'account_holder_name': accountHolderName,
+        if (accountNumber != null) 'account_number': accountNumber,
+        if (ifscCode != null) 'ifsc_code': ifscCode,
+        if (bankName != null) 'bank_name': bankName,
+        if (upiId != null) 'upi_id': upiId,
+      },
+      parser: (data) => UserBankInfo.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  Future<Map<String, dynamic>> withdraw(double amount) {
+    return post(
+      ApiEndpoints.walletWithdraw,
+      data: {'amount': amount},
+      parser: (data) => data as Map<String, dynamic>,
+    );
+  }
 }
 
 class NotificationService extends BaseApiService {

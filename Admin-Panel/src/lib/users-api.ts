@@ -13,7 +13,7 @@ export interface UserUpdatePayload {
   name?: string;
   mobile?: string;
   email?: string;
-  city?: string;
+  gender?: string;
   status?: UserStatus;
   registrationDate?: string;
 }

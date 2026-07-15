@@ -5,11 +5,19 @@ export interface WalletBalance {
   bonus_balance: number;
   referral_balance: number;
   total: number;
+  has_bank_account?: boolean;
+  bank?: {
+    account_holder: string;
+    account_number: string;
+    ifsc: string;
+    bank_name: string;
+    upi_id?: string | null;
+  } | null;
 }
 
 export interface WalletSummary extends WalletBalance {
-  cashback_total: number;
-  referral_earned: number;
+  cashback_total?: number;
+  referral_earned?: number;
 }
 
 export interface WalletTransaction {
@@ -53,6 +61,29 @@ export function getWalletTransactions(page = 1, pageSize = 20): Promise<WalletTr
       description: t.description,
       at: t.created_at,
     }))
+  );
+}
+
+export function saveWalletBank(payload: {
+  payment_type: "bank" | "upi";
+  account_holder_name: string;
+  account_number?: string;
+  ifsc_code?: string;
+  bank_name?: string;
+  upi_id?: string;
+}) {
+  return authFetch(
+    "/wallet/bank",
+    { method: "POST", body: JSON.stringify(payload) },
+    "Unable to save bank account"
+  );
+}
+
+export function requestWalletWithdraw(amount: number) {
+  return authFetch<{ id: string; status: string; message: string }>(
+    "/wallet/withdraw",
+    { method: "POST", body: JSON.stringify({ amount }) },
+    "Unable to request withdrawal"
   );
 }
 

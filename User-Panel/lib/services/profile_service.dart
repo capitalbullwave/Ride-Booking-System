@@ -23,8 +23,10 @@ class ProfileService extends BaseApiService {
   Future<UserProfile> updateProfile({
     String? fullName,
     String? email,
+    String? gender,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? referralCode,
   }) async {
     if (useMock) {
       final current = await getProfile();
@@ -45,10 +47,13 @@ class ProfileService extends BaseApiService {
       data: {
         if (fullName != null) 'full_name': fullName,
         if (email != null) 'email': email,
+        if (gender != null) 'gender': gender,
         if (emergencyContactName != null)
           'emergency_contact_name': emergencyContactName,
         if (emergencyContactPhone != null)
           'emergency_contact_phone': emergencyContactPhone,
+        if (referralCode != null && referralCode.trim().isNotEmpty)
+          'referral_code': referralCode.trim(),
       },
       parser: (data) =>
           BackendMappers.profileFromApi(data as Map<String, dynamic>),

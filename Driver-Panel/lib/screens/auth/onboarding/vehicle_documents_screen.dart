@@ -54,14 +54,18 @@ class _VehicleDocumentsScreenState extends ConsumerState<VehicleDocumentsScreen>
       ref,
       lens: CameraLensPreference.back,
     );
-    if (path != null) {
-      setState(() => _paths[type] = path);
-    }
+    if (path == null) return;
+
+    final preview = await imagePathToDataUrl(path) ?? path;
+    if (!mounted) return;
+    setState(() => _paths[type] = preview);
   }
 
   Future<String?> _payloadFor(String? path) async {
     if (!hasUploadedMedia(path)) return null;
-    if (isLocalFilePath(path)) return imagePathToDataUrl(path);
+    if (isLocalFilePath(path) || (path?.startsWith('data:image') ?? false)) {
+      return imagePathToDataUrl(path);
+    }
     return path;
   }
 
@@ -125,9 +129,10 @@ class _VehicleDocumentsScreenState extends ConsumerState<VehicleDocumentsScreen>
     final registration = ref.watch(registrationViewModelProvider);
     final vehicleType = registration.vehicleType ?? 'Vehicle';
     final specs = VehicleDocumentRequirements.specsFor(registration.vehicleType);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('$vehicleType Documents'),
         actions: [
@@ -141,84 +146,29 @@ class _VehicleDocumentsScreenState extends ConsumerState<VehicleDocumentsScreen>
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                     children: [
                       Text(
-                        'Upload all documents required for your $vehicleType. You cannot submit your application until every document is uploaded.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        'Upload all documents required for your $vehicleType.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                       ...specs.map((spec) {
                         final path = _paths[spec.type];
                         final uploaded = hasUploadedMedia(path);
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: AppColors.lightSurface,
-                            borderRadius: BorderRadius.circular(AppRadius.card),
-                            child: InkWell(
-                              onTap: () => _pick(spec.type),
-                              borderRadius: BorderRadius.circular(AppRadius.card),
-                              child: Ink(
-                                decoration: BoxDecoration(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.card),
-                                  border: Border.all(
-                                    color: uploaded
-                                        ? AppColors.success
-                                        : AppColors.border,
-                                  ),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              spec.label,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleSmall
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              uploaded ? 'Uploaded' : 'Required',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .bodySmall
-                                                  ?.copyWith(
-                                                    color: uploaded
-                                                        ? AppColors.success
-                                                        : AppColors.error,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (uploaded && path != null)
-                                        SavedDocumentPreview(path: path)
-                                      else
-                                        const Icon(
-                                          Icons.upload_file_outlined,
-                                          color: AppColors.primary,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _VehicleDocUploadSection(
+                            title: spec.label,
+                            path: path,
+                            uploaded: uploaded,
+                            onUpload: () => _pick(spec.type),
                           ),
                         );
                       }),
@@ -226,17 +176,120 @@ class _VehicleDocumentsScreenState extends ConsumerState<VehicleDocumentsScreen>
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + bottomInset),
                   child: AppButton(
                     label: 'Save & Continue',
-                    variant: AppButtonVariant.secondary,
-                    height: 56,
+                    height: 54,
                     isLoading: _saving,
                     onPressed: _allUploaded() ? _submit : null,
                   ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _VehicleDocUploadSection extends StatelessWidget {
+  const _VehicleDocUploadSection({
+    required this.title,
+    required this.path,
+    required this.uploaded,
+    required this.onUpload,
+  });
+
+  final String title;
+  final String? path;
+  final bool uploaded;
+  final VoidCallback onUpload;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        color: AppColors.muted.withValues(alpha: 0.35),
+        border: Border.all(
+          color: uploaded ? AppColors.success : AppColors.border,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (uploaded && path != null)
+            DocumentThumbnail(path: path!)
+          else
+            Container(
+              width: 88,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(
+                Icons.directions_car_outlined,
+                color: AppColors.textSecondary,
+                size: 28,
+              ),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Required',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        uploaded ? 'Photo added' : 'No photo yet',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: uploaded
+                                  ? AppColors.success
+                                  : AppColors.textSecondary,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onUpload,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(uploaded ? 'Replace' : 'Upload'),
+          ),
+        ],
+      ),
     );
   }
 }

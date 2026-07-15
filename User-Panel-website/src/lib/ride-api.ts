@@ -107,6 +107,8 @@ export async function estimateRideFares(payload: {
   pickup_lng: number;
   dropoff_lat: number;
   dropoff_lng: number;
+  distance_km?: number;
+  duration_min?: number;
 }): Promise<{
   discount_percent: number | null;
   quotes: Record<string, VehicleFareQuote>;
@@ -125,7 +127,7 @@ export async function estimateRideFares(payload: {
 
   const quotes: Record<string, VehicleFareQuote> = {};
   for (const item of res.vehicle_types ?? []) {
-    quotes[item.vehicle_type_id] = item;
+    quotes[item.vehicle_type_id.toLowerCase()] = item;
   }
 
   return {
@@ -167,6 +169,7 @@ export function bookRide(payload: {
   pickup_address: string;
   dropoff_address: string;
   vehicle_category_id?: string;
+  women_safety_enabled?: boolean;
 }): Promise<Ride> {
   return authFetch<BackendRide>(
     "/book-ride",

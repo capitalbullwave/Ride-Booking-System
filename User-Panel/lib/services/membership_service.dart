@@ -3,6 +3,8 @@ import 'package:wavego_user/core/constants/api_endpoints.dart';
 import 'package:wavego_user/core/network/dio_client.dart';
 import 'package:wavego_user/models/membership_models.dart';
 import 'package:wavego_user/services/base_api_service.dart';
+import 'package:wavego_user/services/cashfree/cashfree_checkout.dart';
+import 'package:wavego_user/services/cashfree/cashfree_checkout_models.dart';
 
 class StudentPassService extends BaseApiService {
   StudentPassService(super.dio);
@@ -148,15 +150,17 @@ class MembershipSubscriptionService extends BaseApiService {
     return SubscriptionPlanModel.fromJson(plan);
   }
 
-  Future<SubscriptionCheckoutSession> createCheckout(String planSlug) async {
+  Future<CashfreeCheckoutSession> createCheckout(String planSlug) async {
     if (useMock) {
-      return SubscriptionCheckoutSession(
+      return const CashfreeCheckoutSession(
         orderId: 'order_mock',
+        paymentSessionId: 'session_mock',
+        environment: 'sandbox',
         amount: 9900,
         currency: 'INR',
-        keyId: 'rzp_test_mock',
-        planSlug: planSlug,
-        planName: planSlug,
+        description: 'Subscription',
+        planSlug: 'plus',
+        planName: 'Plus',
       );
     }
 
@@ -166,8 +170,8 @@ class MembershipSubscriptionService extends BaseApiService {
       parser: (raw) => raw as Map<String, dynamic>,
     );
     final checkout = _extractCheckoutMap(data);
-    final session = SubscriptionCheckoutSession.fromJson(checkout);
-    if (session.orderId.isEmpty || session.keyId.isEmpty) {
+    final session = CashfreeCheckoutSession.fromJson(checkout);
+    if (!session.isReady) {
       throw StateError('Payment gateway is not ready. Please try again.');
     }
     return session;
@@ -176,8 +180,6 @@ class MembershipSubscriptionService extends BaseApiService {
   Future<SubscriptionPlanModel> verifyPayment({
     required String planSlug,
     required String orderId,
-    required String paymentId,
-    required String signature,
   }) async {
     if (useMock) {
       return selectPlan(planSlug);
@@ -187,9 +189,7 @@ class MembershipSubscriptionService extends BaseApiService {
       ApiEndpoints.subscriptionVerifyPayment,
       data: {
         'plan_slug': planSlug,
-        'razorpay_order_id': orderId,
-        'razorpay_payment_id': paymentId,
-        'razorpay_signature': signature,
+        'order_id': orderId,
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );

@@ -58,9 +58,10 @@ export function selectSubscriptionPlan(planSlug: string) {
 
 export interface SubscriptionCheckout {
   order_id: string;
+  payment_session_id: string;
+  environment?: string;
   amount: number;
   currency: string;
-  key_id: string;
   plan: { slug: string; name: string };
   prefill?: { name?: string; email?: string; contact?: string };
 }
@@ -74,9 +75,7 @@ export function createSubscriptionCheckout(planSlug: string) {
 
 export function verifySubscriptionPayment(payload: {
   plan_slug: string;
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
+  order_id: string;
 }) {
   return authFetch<{
     subscription: {

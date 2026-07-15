@@ -39,7 +39,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
   _TxnFilter _txnFilter = _TxnFilter.all;
   _EarningsPeriod _earningsPeriod = _EarningsPeriod.week;
   bool _loading = true;
-  int _referBannerIndex = 0;
 
   @override
   void initState() {
@@ -101,18 +100,54 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
 
   Future<void> _withdraw() async {
     if (_wallet == null) return;
-    final confirmed = await AppDialog.showConfirm(
-      context: context,
-      title: 'Withdraw Funds',
-      message:
-          'Withdraw ${DateFormatter.currency(_wallet!.currentBalance)} to your linked account?',
-    );
-    if (confirmed != true) return;
+    final balance = _wallet!.currentBalance;
+    if (balance <= 0) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.account_balance_wallet_outlined,
+            color: AppColors.textSecondary,
+            size: 48,
+          ),
+          title: const Text('Balance not available'),
+          content: const Text(
+            'You have no available balance to withdraw right now.',
+          ),
+          actions: [
+            AppButton(
+              label: 'OK',
+              expand: false,
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // No bank linked — prompt to add account first.
+    if (_wallet!.bank == null) {
+      final goAdd = await AppDialog.showConfirm(
+        context: context,
+        title: 'Add bank account',
+        message:
+            'Add your bank account to withdraw earnings. After saving, tap Withdraw again.',
+        confirmLabel: 'Add Bank',
+      );
+      if (goAdd == true && mounted) {
+        await _onAddAccount();
+      }
+      return;
+    }
+
+    final amount = await _askWithdrawAmount(balance);
+    if (amount == null || !mounted) return;
 
     try {
       await ref.read(walletRepositoryProvider).withdraw(
             WithdrawRequest(
-              amount: _wallet!.currentBalance,
+              amount: amount,
               paymentMethod: 'bank',
             ),
           );
@@ -120,7 +155,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
         AppDialog.showSuccess(
           context: context,
           title: 'Withdrawal initiated',
-          message: 'Funds will reach your account in 1–3 business days.',
+          message:
+              '${DateFormatter.currency(amount)} will reach your account in 1–3 business days.',
         );
         _load();
       }
@@ -129,6 +165,85 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
         AppDialog.showError(context: context, message: e.toString());
       }
     }
+  }
+
+  Future<double?> _askWithdrawAmount(double maxBalance) async {
+    final controller = TextEditingController(
+      text: maxBalance.toStringAsFixed(2),
+    );
+    String? errorText;
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: const Text('Withdraw'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Available: ${DateFormatter.currency(maxBalance)}',
+                    style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Amount',
+                      prefixText: '₹ ',
+                      errorText: errorText,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setLocal(() => errorText = null);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                AppButton(
+                  label: 'Withdraw',
+                  expand: false,
+                  onPressed: () {
+                    final raw = controller.text.trim().replaceAll(',', '');
+                    final value = double.tryParse(raw);
+                    if (value == null || value <= 0) {
+                      setLocal(() => errorText = 'Enter a valid amount');
+                      return;
+                    }
+                    if (value > maxBalance + 0.001) {
+                      setLocal(
+                        () => errorText =
+                            'Max ${DateFormatter.currency(maxBalance)}',
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx, double.parse(value.toStringAsFixed(2)));
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    return result;
   }
 
   Future<void> _onAddAccount() async {
@@ -206,14 +321,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen>
                   wallet: _wallet,
                   transactions: _filteredTransactions,
                   txnFilter: _txnFilter,
-                  referBannerIndex: _referBannerIndex,
                   onRefresh: _load,
                   onAddAccount: _onAddAccount,
-                  onWithdraw: _wallet?.bank != null ? _withdraw : null,
+                  onWithdraw: _withdraw,
                   onFilterChanged: (filter) =>
                       setState(() => _txnFilter = filter),
-                  onReferBannerChanged: (index) =>
-                      setState(() => _referBannerIndex = index),
                 ),
               ],
             ),
@@ -811,23 +923,19 @@ class _WalletTab extends StatelessWidget {
     required this.wallet,
     required this.transactions,
     required this.txnFilter,
-    required this.referBannerIndex,
     required this.onRefresh,
     required this.onAddAccount,
     required this.onWithdraw,
     required this.onFilterChanged,
-    required this.onReferBannerChanged,
   });
 
   final WalletInfo? wallet;
   final List<WalletTransaction> transactions;
   final _TxnFilter txnFilter;
-  final int referBannerIndex;
   final Future<void> Function() onRefresh;
   final VoidCallback onAddAccount;
   final VoidCallback? onWithdraw;
   final ValueChanged<_TxnFilter> onFilterChanged;
-  final ValueChanged<int> onReferBannerChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -847,13 +955,6 @@ class _WalletTab extends StatelessWidget {
             wallet: wallet!,
             onAddAccount: onAddAccount,
             onWithdraw: onWithdraw,
-          ),
-          const SizedBox(height: 12),
-          _SettlementInfoBanner(),
-          const SizedBox(height: 14),
-          _ReferBannerCarousel(
-            index: referBannerIndex,
-            onChanged: onReferBannerChanged,
           ),
           const SizedBox(height: 20),
           Row(
@@ -1032,29 +1133,20 @@ class _WalletBalanceCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        label: bank != null ? 'Account' : 'Add Bank',
-                        icon: Icons.account_balance_outlined,
-                        variant: AppButtonVariant.secondary,
-                        height: 46,
-                        onPressed: onAddAccount,
-                      ),
-                    ),
-                    if (onWithdraw != null && wallet.currentBalance > 0) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: AppButton(
-                          label: 'Withdraw',
-                          variant: AppButtonVariant.primary,
-                          height: 46,
-                          onPressed: onWithdraw,
-                        ),
-                      ),
-                    ],
-                  ],
+                AppButton(
+                  label: 'Withdraw',
+                  icon: Icons.account_balance_wallet_outlined,
+                  variant: AppButtonVariant.primary,
+                  height: 46,
+                  onPressed: onWithdraw,
+                ),
+                const SizedBox(height: 8),
+                AppButton(
+                  label: bank != null ? 'Account' : 'Add Bank',
+                  icon: Icons.account_balance_outlined,
+                  variant: AppButtonVariant.secondary,
+                  height: 46,
+                  onPressed: onAddAccount,
                 ),
               ],
             ),
@@ -1128,189 +1220,6 @@ class _MiniStat extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SettlementInfoBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, size: 18, color: AppColors.info),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Weekly settlement every Monday. Transfers take 1–3 business days.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                    height: 1.35,
-                  ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.push(RouteNames.support),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: const Text('Learn more'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReferBannerCarousel extends StatefulWidget {
-  const _ReferBannerCarousel({
-    required this.index,
-    required this.onChanged,
-  });
-
-  final int index;
-  final ValueChanged<int> onChanged;
-
-  @override
-  State<_ReferBannerCarousel> createState() => _ReferBannerCarouselState();
-}
-
-class _ReferBannerCarouselState extends State<_ReferBannerCarousel> {
-  late PageController _pageController;
-
-  List<(String, String, String, Color, Color)> get _banners => [
-        (
-          'Refer and Earn',
-          'Up to ₹500',
-          'Invite captains and earn when they complete rides.',
-          AppColors.secondary.withValues(alpha: 0.35),
-          AppColors.primary,
-        ),
-        (
-          'Ride streak bonus',
-          'Earn more',
-          'Complete more trips this week for extra incentives.',
-          AppColors.info.withValues(alpha: 0.12),
-          AppColors.primary,
-        ),
-      ];
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(initialPage: widget.index);
-  }
-
-  @override
-  void didUpdateWidget(covariant _ReferBannerCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.index != widget.index) {
-      _pageController.animateToPage(
-        widget.index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 108,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _banners.length,
-            onPageChanged: widget.onChanged,
-            itemBuilder: (context, i) {
-              final (title, subtitle, desc, bg, accent) = _banners[i];
-              return Container(
-                margin: const EdgeInsets.only(right: 4),
-                padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(AppRadius.card),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            title,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            subtitle,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: accent,
-                                  height: 1.1,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            desc,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  height: 1.3,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(
-                      Icons.payments_outlined,
-                      size: 44,
-                      color: accent.withValues(alpha: 0.65),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_banners.length, (i) {
-            final active = i == widget.index;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: active ? 18 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: active ? AppColors.primary : AppColors.muted,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            );
-          }),
-        ),
-      ],
     );
   }
 }

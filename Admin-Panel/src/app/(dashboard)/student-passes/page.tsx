@@ -106,7 +106,7 @@ export default function StudentPassesPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <SearchBar value={search} onChange={setSearch} placeholder="Search student, college, phone..." />
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={(value) => setStatus(value ?? "all")}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>

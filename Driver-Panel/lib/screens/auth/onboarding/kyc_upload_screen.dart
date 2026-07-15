@@ -37,6 +37,7 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
   void initState() {
     super.initState();
     _numberController = TextEditingController();
+    _numberController.addListener(() => setState(() {}));
     WidgetsBinding.instance.addPostFrameCallback((_) => _hydrate());
   }
 
@@ -78,6 +79,18 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
     super.dispose();
   }
 
+  bool get _hasFront => hasUploadedMedia(_frontPath);
+
+  bool get _hasBack => hasUploadedMedia(_backPath);
+
+  bool get _hasValidNumber => _numberController.text.trim().length >= 4;
+
+  bool get _canSubmit {
+    if (!_hasFront || !_hasValidNumber) return false;
+    if (_idType == KycIdType.aadhaar && !_hasBack) return false;
+    return true;
+  }
+
   Future<void> _pick(bool front) async {
     final path = await MediaCaptureLauncher.showImageSourceSheet(
       context,
@@ -85,24 +98,29 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
       lens: CameraLensPreference.back,
     );
     if (path == null) return;
+
+    final preview = await imagePathToDataUrl(path) ?? path;
+    if (!mounted) return;
     setState(() {
       if (front) {
-        _frontPath = path;
+        _frontPath = preview;
       } else {
-        _backPath = path;
+        _backPath = preview;
       }
     });
   }
 
   Future<String?> _payloadFor(String? path) async {
     if (!hasUploadedMedia(path)) return null;
-    if (isLocalFilePath(path)) return imagePathToDataUrl(path);
+    if (isLocalFilePath(path) || (path?.startsWith('data:image') ?? false)) {
+      return imagePathToDataUrl(path);
+    }
     return path;
   }
 
   Future<void> _submit() async {
     final number = _numberController.text.trim();
-    if (!hasUploadedMedia(_frontPath)) {
+    if (!_hasFront) {
       context.showSnackBar('Upload document photo', isError: true);
       return;
     }
@@ -110,7 +128,7 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
       context.showSnackBar('Enter document number', isError: true);
       return;
     }
-    if (_idType == KycIdType.aadhaar && !hasUploadedMedia(_backPath)) {
+    if (_idType == KycIdType.aadhaar && !_hasBack) {
       context.showSnackBar('Upload back side of Aadhaar', isError: true);
       return;
     }
@@ -156,9 +174,10 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
     final isAadhaar = _idType == KycIdType.aadhaar;
     final forcedType = onboardingDocType(context);
     final editing = isProfileEditMode(context);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(isAadhaar ? 'Aadhaar Card' : 'PAN Card'),
         actions: [
@@ -171,79 +190,92 @@ class _KycUploadScreenState extends ConsumerState<KycUploadScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (forcedType == null && editing) ...[
-                    const Text(
-                      'Select ID to upload',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: _IdChoiceCard(
-                            label: 'Aadhaar',
-                            selected: isAadhaar,
-                            onTap: () => _switchType(KycIdType.aadhaar),
+                        if (forcedType == null && editing) ...[
+                          const Text(
+                            'Select ID to upload',
+                            style: TextStyle(fontWeight: FontWeight.w600),
                           ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _IdChoiceCard(
+                                  label: 'Aadhaar',
+                                  selected: isAadhaar,
+                                  onTap: () => _switchType(KycIdType.aadhaar),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _IdChoiceCard(
+                                  label: 'PAN Card',
+                                  selected: !isAadhaar,
+                                  onTap: () => _switchType(KycIdType.pan),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        Text(
+                          isAadhaar
+                              ? 'Upload front and back of your Aadhaar card.'
+                              : 'Upload front side of your PAN card.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _IdChoiceCard(
-                            label: 'PAN Card',
-                            selected: !isAadhaar,
-                            onTap: () => _switchType(KycIdType.pan),
+                        const SizedBox(height: 12),
+                        _KycUploadSection(
+                          title: 'Front side',
+                          required: true,
+                          path: _frontPath,
+                          uploaded: _hasFront,
+                          onUpload: () => _pick(true),
+                        ),
+                        if (isAadhaar) ...[
+                          const SizedBox(height: 10),
+                          _KycUploadSection(
+                            title: 'Back side',
+                            required: true,
+                            path: _backPath,
+                            uploaded: _hasBack,
+                            onUpload: () => _pick(false),
                           ),
+                        ],
+                        const SizedBox(height: 16),
+                        AppTextField(
+                          controller: _numberController,
+                          label: isAadhaar ? 'Aadhaar number' : 'PAN number',
+                          hint: isAadhaar
+                              ? 'Enter 12-digit Aadhaar number'
+                              : 'Enter PAN number',
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (_) => setState(() {}),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                  ],
-                  SavedDocumentPreview(
-                    path: _frontPath,
-                    label: 'Front side',
                   ),
-                  const SizedBox(height: 12),
-                  _UploadCard(
-                    title: hasUploadedMedia(_frontPath)
-                        ? 'Replace front photo'
-                        : 'Front side of your ${isAadhaar ? 'Aadhaar' : 'PAN'}',
-                    done: hasUploadedMedia(_frontPath),
-                    primary: true,
-                    onTap: () => _pick(true),
-                  ),
-                  if (isAadhaar) ...[
-                    const SizedBox(height: 16),
-                    SavedDocumentPreview(path: _backPath, label: 'Back side'),
-                    const SizedBox(height: 12),
-                    _UploadCard(
-                      title: hasUploadedMedia(_backPath)
-                          ? 'Replace back photo'
-                          : 'Back side of your Aadhaar',
-                      done: hasUploadedMedia(_backPath),
-                      primary: false,
-                      onTap: () => _pick(false),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  AppTextField(
-                    controller: _numberController,
-                    label: isAadhaar ? 'Aadhaar number' : 'PAN number',
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 24),
-                  AppButton(
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + bottomInset),
+                  child: AppButton(
                     label: editing ? 'Save changes' : 'Submit',
-                    variant: AppButtonVariant.secondary,
+                    height: 54,
                     isLoading: _saving,
-                    onPressed: _submit,
+                    onPressed: _canSubmit ? _submit : null,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
@@ -297,39 +329,106 @@ class _IdChoiceCard extends StatelessWidget {
   }
 }
 
-class _UploadCard extends StatelessWidget {
-  const _UploadCard({
+class _KycUploadSection extends StatelessWidget {
+  const _KycUploadSection({
     required this.title,
-    required this.done,
-    required this.primary,
-    required this.onTap,
+    required this.required,
+    required this.path,
+    required this.uploaded,
+    required this.onUpload,
   });
 
   final String title;
-  final bool done;
-  final bool primary;
-  final VoidCallback onTap;
+  final bool required;
+  final String? path;
+  final bool uploaded;
+  final VoidCallback onUpload;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.card),
+        color: AppColors.muted.withValues(alpha: 0.35),
         border: Border.all(
-          color: done ? AppColors.success : AppColors.border,
+          color: uploaded ? AppColors.success : AppColors.border,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(title, style: Theme.of(context).textTheme.bodyMedium),
-          const SizedBox(height: 12),
-          AppButton(
-            label: done ? 'Replace photo' : 'Upload photo',
-            icon: Icons.add_photo_alternate_outlined,
-            variant: primary ? AppButtonVariant.secondary : AppButtonVariant.outline,
-            onPressed: onTap,
+          if (uploaded && path != null)
+            DocumentThumbnail(path: path!)
+          else
+            Container(
+              width: 88,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(
+                Icons.credit_card_outlined,
+                color: AppColors.textSecondary,
+                size: 28,
+              ),
+            ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: required
+                            ? AppColors.primary.withValues(alpha: 0.1)
+                            : AppColors.muted,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        required ? 'Required' : 'Optional',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: required
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  uploaded ? 'Photo added' : 'No photo yet',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: uploaded ? AppColors.success : AppColors.textSecondary,
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onUpload,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(uploaded ? 'Replace' : 'Upload'),
           ),
         ],
       ),

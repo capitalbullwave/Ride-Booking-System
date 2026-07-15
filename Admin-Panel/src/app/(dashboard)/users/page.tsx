@@ -34,7 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/types";
-import { formatCurrency, formatDate, formatShortId } from "@/lib/format";
+import { formatCurrency, formatDate, formatPublicId } from "@/lib/format";
 import {
   activateUser,
   blockUser,
@@ -50,7 +50,7 @@ type UserFormData = {
   name: string;
   mobile: string;
   email: string;
-  city: string;
+  gender: string;
 };
 
 type ConfirmAction = "activate" | "unblock" | "suspend" | "block" | "delete";
@@ -98,7 +98,7 @@ function userToForm(user: User): UserFormData {
     name: user.name,
     mobile: user.mobile,
     email: user.email,
-    city: user.city,
+    gender: user.gender ?? "",
   };
 }
 
@@ -107,7 +107,7 @@ function buildUserUpdatePayload(form: UserFormData) {
     name: form.name.trim(),
     mobile: form.mobile.trim(),
     email: form.email.trim(),
-    city: form.city.trim(),
+    gender: form.gender.trim(),
   };
 }
 
@@ -123,7 +123,7 @@ export default function UsersPage() {
     name: "",
     mobile: "",
     email: "",
-    city: "",
+    gender: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
@@ -271,7 +271,7 @@ export default function UsersPage() {
 
   const columns: Column<User>[] = [
     { key: "id", header: "User ID", cell: (u) => (
-      <span className="font-mono text-xs" title={u.id}>{formatShortId(u.id)}</span>
+      <span className="font-mono text-xs" title={u.id}>{formatPublicId(u.publicId, u.id)}</span>
     ), sortable: true },
     { key: "name", header: "Name", cell: (u) => (
       <Link href={`/users/${u.id}`} className="font-medium text-primary hover:underline">
@@ -446,14 +446,26 @@ export default function UsersPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-city">City</Label>
-              <Input
-                id="edit-city"
-                value={editForm.city}
-                onChange={(e) =>
-                  setEditForm((form) => ({ ...form, city: e.target.value }))
+              <Label>Gender</Label>
+              <Select
+                value={editForm.gender || "unset"}
+                onValueChange={(value) =>
+                  setEditForm((form) => ({
+                    ...form,
+                    gender: value === "unset" ? "" : value,
+                  }))
                 }
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unset">Not set</SelectItem>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

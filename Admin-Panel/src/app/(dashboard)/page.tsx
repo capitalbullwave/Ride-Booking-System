@@ -13,6 +13,7 @@ import {
   Percent,
   Wallet,
   Building2,
+  Loader2,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -24,21 +25,48 @@ import {
 } from "@/components/dashboard/charts";
 import { LiveActivity, QuickActions, OnlineDriversCard } from "@/components/dashboard/live-activity";
 import { useAuth } from "@/components/providers/auth-provider";
-import { fetchDashboardStats } from "@/lib/dashboard-api";
+import {
+  EMPTY_DASHBOARD_STATS,
+  fetchDashboardActivities,
+  fetchDashboardCharts,
+  fetchDashboardStats,
+  fetchOnlineDrivers,
+  type DashboardCharts,
+  type OnlineDriverItem,
+} from "@/lib/dashboard-api";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import type { DashboardStats } from "@/types";
-import { dashboardStats as fallbackStats } from "@/data/mock-data";
+import type { ActivityItem, DashboardStats } from "@/types";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const { isAuthenticated } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>(fallbackStats);
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_DASHBOARD_STATS);
+  const [charts, setCharts] = useState<DashboardCharts | null>(null);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [onlineDrivers, setOnlineDrivers] = useState<OnlineDriverItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const data = await fetchDashboardStats();
-      setStats(data);
-    } catch {
-      setStats(fallbackStats);
+      const [statsData, chartData, activityData, driverData] = await Promise.all([
+        fetchDashboardStats(),
+        fetchDashboardCharts(),
+        fetchDashboardActivities(),
+        fetchOnlineDrivers(),
+      ]);
+      setStats(statsData);
+      setCharts(chartData);
+      setActivities(activityData);
+      setOnlineDrivers(driverData);
+    } catch (error) {
+      setStats(EMPTY_DASHBOARD_STATS);
+      setCharts(null);
+      setActivities([]);
+      setOnlineDrivers([]);
+      toast.error(error instanceof Error ? error.message : "Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -48,6 +76,8 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, load]);
 
+  const displayValue = (value: string) => (isLoading ? "—" : value);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -55,24 +85,31 @@ export default function DashboardPage() {
         description="Welcome back! Here's what's happening with Bull Wave Rides today."
       />
 
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading live dashboard data...
+        </div>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Users"
-          value={formatNumber(stats.totalUsers)}
+          value={displayValue(formatNumber(stats.totalUsers))}
           change="Registered riders"
           changeType="neutral"
           icon={Users}
         />
         <StatCard
           title="Total Drivers"
-          value={formatNumber(stats.totalDrivers)}
+          value={displayValue(formatNumber(stats.totalDrivers))}
           change="On platform"
           changeType="neutral"
           icon={Car}
         />
         <StatCard
           title="Active Drivers"
-          value={formatNumber(stats.activeDrivers)}
+          value={displayValue(formatNumber(stats.activeDrivers))}
           change="Currently online"
           changeType="neutral"
           icon={UserCheck}
@@ -80,7 +117,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Active Rides"
-          value={formatNumber(stats.activeRides)}
+          value={displayValue(formatNumber(stats.activeRides))}
           change="Live now"
           changeType="neutral"
           icon={MapPin}
@@ -91,7 +128,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           title="Completed Rides"
-          value={formatNumber(stats.completedRides)}
+          value={displayValue(formatNumber(stats.completedRides))}
           change="All time"
           changeType="neutral"
           icon={CheckCircle}
@@ -99,35 +136,35 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Today's Revenue"
-          value={formatCurrency(stats.todayRevenue)}
+          value={displayValue(formatCurrency(stats.todayRevenue))}
           change="Ride fare collected"
           changeType="neutral"
           icon={IndianRupee}
         />
         <StatCard
           title="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
+          value={displayValue(formatCurrency(stats.totalRevenue))}
           change="All completed rides"
           changeType="neutral"
           icon={TrendingUp}
         />
         <StatCard
           title="Driver Earnings Today"
-          value={formatCurrency(stats.driverEarningsToday)}
+          value={displayValue(formatCurrency(stats.driverEarningsToday))}
           change={`Per-vehicle commission (default ${stats.driverCommissionPercentage}%)`}
           changeType="neutral"
           icon={Wallet}
         />
         <StatCard
           title="Company Earnings Today"
-          value={formatCurrency(stats.companyEarningsToday)}
+          value={displayValue(formatCurrency(stats.companyEarningsToday))}
           change="Platform share today"
           changeType="neutral"
           icon={Building2}
         />
         <StatCard
           title="Total Commission Paid"
-          value={formatCurrency(stats.totalCommissionPaid)}
+          value={displayValue(formatCurrency(stats.totalCommissionPaid))}
           change="Paid to drivers"
           changeType="neutral"
           icon={Percent}
@@ -137,7 +174,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
         <StatCard
           title="Cancelled Rides"
-          value={formatNumber(stats.cancelledRides)}
+          value={displayValue(formatNumber(stats.cancelledRides))}
           change="All time"
           changeType="neutral"
           icon={XCircle}
@@ -145,7 +182,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Revenue"
-          value={formatCurrency(stats.monthlyRevenue)}
+          value={displayValue(formatCurrency(stats.monthlyRevenue))}
           change="This month"
           changeType="neutral"
           icon={IndianRupee}
@@ -153,22 +190,26 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <RideBookingChart />
-        <RevenueChart />
+        <RideBookingChart data={charts?.rideBooking ?? []} isLoading={isLoading} />
+        <RevenueChart data={charts?.revenue ?? []} isLoading={isLoading} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <UserGrowthChart />
-        <DriverGrowthChart />
+        <UserGrowthChart data={charts?.userGrowth ?? []} isLoading={isLoading} />
+        <DriverGrowthChart data={charts?.driverGrowth ?? []} isLoading={isLoading} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <LiveActivity />
+          <LiveActivity activities={activities} isLoading={isLoading} />
         </div>
         <div className="space-y-6">
           <QuickActions />
-          <OnlineDriversCard />
+          <OnlineDriversCard
+            drivers={onlineDrivers}
+            activeCount={stats.activeDrivers}
+            isLoading={isLoading}
+          />
         </div>
       </div>
     </div>

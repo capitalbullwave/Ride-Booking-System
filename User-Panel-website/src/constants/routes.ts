@@ -17,6 +17,7 @@ export const ROUTES = {
   profileAbout: "/profile/about",
   profileSubscription: "/profile/subscription",
   profileStudentPass: "/profile/student-pass",
+  profileReferEarn: "/profile/refer-earn",
   login: "/login",
   signup: "/signup",
   createProfile: "/create-profile",

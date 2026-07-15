@@ -21,6 +21,7 @@ from app.core.security import decode_token
 from app.middleware.error_handlers import register_exception_handlers
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
+import app.core.public_ids  # noqa: F401 — register BWR public ID generators
 
 setup_logging()
 logger = get_logger(__name__)
@@ -55,17 +56,6 @@ ALLOWED_PREFIXES = (
 async def lifespan(app: FastAPI):
     app.openapi_schema = None
     logger.info("application_starting", env=settings.app_env, version="2.0.0")
-    try:
-        from app.bootstrap.default_data import ensure_default_vehicle_types
-        from app.database.session import AsyncSessionLocal
-
-        async with AsyncSessionLocal() as db:
-            added = await ensure_default_vehicle_types(db)
-            await db.commit()
-            if added:
-                logger.info("bootstrap_vehicle_types_seeded", count=added)
-    except Exception as exc:
-        logger.warning("bootstrap_vehicle_types_skipped", error=str(exc))
     try:
         from app.core.firebase import initialize_firebase
 

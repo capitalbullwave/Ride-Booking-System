@@ -27,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { User } from "@/types";
-import { formatCurrency, formatDate, formatDateTime, capitalize } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime, formatGender, formatPublicId } from "@/lib/format";
 import {
   activateUser,
   blockUser,
@@ -102,7 +102,7 @@ function buildUserUpdatePayload(form: UserFormData) {
     name: form.name.trim(),
     mobile: form.mobile.trim(),
     email: form.email.trim(),
-    city: form.city.trim(),
+    gender: form.gender.trim(),
     registrationDate: form.registrationDate,
     status: form.status,
   };
@@ -128,7 +128,7 @@ export default function UserDetailPage({
     name: "",
     mobile: "",
     email: "",
-    city: "",
+    gender: "",
     registrationDate: "",
     status: "active",
   });
@@ -289,7 +289,7 @@ export default function UserDetailPage({
         <ButtonLink variant="ghost" size="icon" href="/users">
           <ArrowLeft className="h-4 w-4" />
         </ButtonLink>
-        <PageHeader title={user.name} description={`User ID: ${user.id}`}>
+        <PageHeader title={user.name} description={`User ID: ${formatPublicId(user.publicId, user.id)}`}>
           <Button variant="outline" size="sm" onClick={openEdit} disabled={isActionLoading}>
             <Pencil className="mr-2 h-4 w-4" /> Edit
           </Button>
@@ -373,8 +373,8 @@ export default function UserDetailPage({
             <p className="text-xs text-muted-foreground">Wallet Balance</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">{user.city || "—"}</p>
-            <p className="text-xs text-muted-foreground">City</p>
+            <p className="text-2xl font-bold">{formatGender(user.gender)}</p>
+            <p className="text-xs text-muted-foreground">Gender</p>
           </div>
         </div>
       </div>
@@ -400,18 +400,32 @@ export default function UserDetailPage({
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               {[
-                ["Full Name", user.name],
-                ["Email", user.email],
-                ["Mobile", user.mobile],
-                ["Emergency Contact Name", user.emergencyContactName || "—"],
-                ["Emergency Contact Phone", user.emergencyContactPhone || "—"],
-                ["City", user.city],
-                ["Registration Date", formatDate(user.registrationDate)],
-                ["Status", capitalize(user.status)],
-              ].map(([label, value]) => (
+                { label: "Full Name", value: user.name },
+                { label: "Email", value: user.email },
+                { label: "Mobile", value: user.mobile },
+                {
+                  label: "Emergency Contact Name",
+                  value: user.emergencyContactName || "—",
+                },
+                {
+                  label: "Emergency Contact Phone",
+                  value: user.emergencyContactPhone || "—",
+                },
+                { label: "Gender", value: formatGender(user.gender) },
+                {
+                  label: "Registration Date",
+                  value: formatDate(user.registrationDate),
+                },
+                {
+                  label: "Status",
+                  value: <StatusBadge status={user.status} />,
+                },
+              ].map(({ label, value }) => (
                 <div key={label} className="rounded-lg border p-4">
                   <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="mt-1 font-medium">{value}</p>
+                  <div className="mt-1 font-medium">
+                    {typeof value === "string" ? <p>{value}</p> : value}
+                  </div>
                 </div>
               ))}
             </CardContent>

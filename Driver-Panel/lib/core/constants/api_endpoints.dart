@@ -53,6 +53,8 @@ class ApiEndpoints {
   // Wallet & earnings
   static const String dashboard = '/driver/dashboard';
   static const String wallet = '/driver/wallet';
+  static const String referEarn = '/driver/refer-earn';
+  static const String referEarnApply = '/driver/refer-earn/apply';
   static const String earnings = '/driver/earnings';
 
   // Notifications
@@ -70,7 +72,7 @@ class ApiEndpoints {
 
   // Bank
   static const String bankDetails = '/driver/bank';
-  static const String withdraw = '/wallet/withdraw';
+  static const String withdraw = '/driver/wallet/withdraw';
   static const String walletTransactions = '/driver/wallet/transactions';
   static const String transactions = '/driver/transactions';
 }

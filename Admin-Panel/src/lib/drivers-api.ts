@@ -204,3 +204,72 @@ export async function fetchDriverDocuments(
     url: resolveMediaUrl(doc.url) ?? undefined,
   }));
 }
+
+export interface DriverWalletTransaction {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  balanceAfter: number;
+  date: string | null;
+}
+
+export interface DriverWalletSummary {
+  availableBalance: number;
+  pendingBalance: number;
+  lifetimeEarnings: number;
+  total: number;
+  transactions: DriverWalletTransaction[];
+}
+
+export async function fetchDriverWallet(
+  driverId: string,
+): Promise<DriverWalletSummary> {
+  const data = await apiFetch<DriverWalletSummary>(
+    `/api/v1/admin/drivers/${driverId}/wallet`,
+  );
+  return {
+    ...data,
+    availableBalance: Number(data.availableBalance),
+    pendingBalance: Number(data.pendingBalance),
+    lifetimeEarnings: Number(data.lifetimeEarnings),
+    transactions: (data.transactions || []).map((tx) => ({
+      ...tx,
+      amount: Number(tx.amount),
+      balanceAfter: Number(tx.balanceAfter),
+    })),
+  };
+}
+
+export async function creditDriverWallet(
+  driverId: string,
+  amount: number,
+  note?: string,
+): Promise<DriverWalletSummary> {
+  const data = await apiFetch<{
+    availableBalance: number;
+    pendingBalance: number;
+    lifetimeEarnings: number;
+    transaction: DriverWalletTransaction;
+  }>(`/api/v1/admin/drivers/${driverId}/wallet/credit`, {
+    method: "POST",
+    body: JSON.stringify({ amount, note }),
+  });
+  return fetchDriverWallet(driverId);
+}
+
+export async function updateDriverBank(
+  driverId: string,
+  payload: {
+    accountHolder: string;
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+    upiId?: string;
+  },
+): Promise<Driver["bankDetails"]> {
+  return apiFetch(`/api/v1/admin/drivers/${driverId}/bank`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}

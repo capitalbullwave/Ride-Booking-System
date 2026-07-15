@@ -17,6 +17,7 @@ import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/services/membership_service.dart';
 import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
+import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/screens/booking/map_picker_screen.dart';
 import 'package:wavego_user/services/location_service.dart';
 import 'package:wavego_user/services/places_service.dart';
@@ -32,6 +33,7 @@ import 'package:wavego_user/widgets/home/ride_schedule_section.dart';
 import 'package:wavego_user/widgets/booking/live_tracking_map.dart';
 import 'package:wavego_user/widgets/booking/rate_ride_dialog.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
+import 'package:wavego_user/widgets/booking/women_safety_dialog.dart';
 import 'package:wavego_user/core/utils/navigation_launcher.dart';
 import 'package:wavego_user/providers/ride_chat_provider.dart';
 import 'package:wavego_user/widgets/ride/ride_chat_notification.dart';
@@ -429,7 +431,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   bool _loadingRoute = true;
   String? _routeError;
   int? _selectedVehicleIndex;
-  List<BookableVehicle> _vehicles = fallbackBookableVehicles();
+  List<BookableVehicle> _vehicles = [];
   bool _loadingVehicles = true;
   Map<String, VehicleFareQuote> _fareQuotes = {};
   bool _loadingFares = false;
@@ -443,6 +445,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(vehicleCategoriesProvider);
       _loadRoute();
       _loadVehicles();
       _loadCoupons();
@@ -460,14 +463,8 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   double _orderAmountForSelectedVehicle() {
     if (_selectedVehicleIndex == null) return 0;
     final vehicle = _vehicles[_selectedVehicleIndex!];
-    final distanceKm = _route?.distanceKm ?? 5.0;
-    final quote = _fareQuotes[vehicle.id];
-    if (quote != null) return quote.estimatedFare;
-    final raw = vehicle.baseFare + vehicle.perKmRate * distanceKm;
-    if (_memberDiscountPercent > 0) {
-      return raw * (1 - _memberDiscountPercent / 100);
-    }
-    return raw;
+    final quote = _fareQuotes[vehicle.id.toLowerCase()];
+    return quote?.estimatedFare ?? 0;
   }
 
   Future<void> _openOffersSheet() async {
@@ -550,37 +547,27 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   Future<void> _loadVehicles() async {
     final mode = ref.read(tripBookingProvider).mode;
     try {
-      final categories = await ref.read(vehicleCategoriesProvider.future);
+      final categories = mode == HomeBookingMode.rental
+          ? await ref.read(rentalCategoriesProvider.future)
+          : await ref.read(vehicleCategoriesProvider.future);
       if (!mounted) return;
       final filtered = filterCategoriesForMode(categories, mode);
       setState(() {
-        if (filtered.isNotEmpty) {
-          _vehicles = filtered
-              .asMap()
-              .entries
-              .map((entry) => bookableVehicleFromCategory(entry.value, entry.key))
-              .toList();
-        } else if (mode == HomeBookingMode.parcel) {
-          _vehicles = fallbackParcelVehicles();
-        } else {
-          _vehicles = filterBookableVehiclesForMode(
-            fallbackBookableVehicles(),
-            mode,
-          );
-        }
+        _vehicles = filtered
+            .asMap()
+            .entries
+            .map((entry) => bookableVehicleFromCategory(entry.value, entry.key))
+            .toList();
         _loadingVehicles = false;
       });
+      final trip = ref.read(tripBookingProvider);
+      if (trip.pickup != null && trip.dropoff != null) {
+        await _loadFareEstimates();
+      }
     } catch (_) {
       if (mounted) {
         setState(() {
-          if (mode == HomeBookingMode.parcel) {
-            _vehicles = fallbackParcelVehicles();
-          } else {
-            _vehicles = filterBookableVehiclesForMode(
-              fallbackBookableVehicles(),
-              mode,
-            );
-          }
+          _vehicles = [];
           _loadingVehicles = false;
         });
       }
@@ -625,22 +612,51 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
           _loadingRoute = false;
           _routeError = e.userMessage;
         });
+        await _loadFareEstimates();
       }
     }
   }
 
   Future<void> _loadFareEstimates() async {
-    final route = _route;
-    if (route == null) return;
+    final trip = ref.read(tripBookingProvider);
+    final route = _route ?? trip.route;
+
+    final double? pickupLat;
+    final double? pickupLng;
+    final double? dropoffLat;
+    final double? dropoffLng;
+
+    if (route != null) {
+      pickupLat = route.pickup.lat;
+      pickupLng = route.pickup.lng;
+      dropoffLat = route.dropoff.lat;
+      dropoffLng = route.dropoff.lng;
+    } else {
+      pickupLat = trip.pickup?.latitude;
+      pickupLng = trip.pickup?.longitude;
+      dropoffLat = trip.dropoff?.latitude;
+      dropoffLng = trip.dropoff?.longitude;
+    }
+
+    if (pickupLat == null ||
+        pickupLng == null ||
+        dropoffLat == null ||
+        dropoffLng == null) {
+      return;
+    }
 
     setState(() => _loadingFares = true);
 
     try {
+      final mode = ref.read(tripBookingProvider).mode;
       final result = await ref.read(rideBookingServiceProvider).estimateRide(
-            pickupLat: route.pickup.lat,
-            pickupLng: route.pickup.lng,
-            dropoffLat: route.dropoff.lat,
-            dropoffLng: route.dropoff.lng,
+            pickupLat: pickupLat,
+            pickupLng: pickupLng,
+            dropoffLat: dropoffLat,
+            dropoffLng: dropoffLng,
+            serviceGroup: mode == HomeBookingMode.rental ? 'rental' : 'ride',
+            distanceKm: route?.distanceKm,
+            durationMin: route?.durationMin,
           );
       if (!mounted) return;
       setState(() {
@@ -649,72 +665,45 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
         _loadingFares = false;
       });
     } catch (_) {
-      try {
-        final discount = await ref.read(rideDiscountPercentProvider.future);
-        if (!mounted) return;
+      if (mounted) {
         setState(() {
-          _memberDiscountPercent = discount;
           _fareQuotes = {};
           _loadingFares = false;
         });
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _loadingFares = false;
-          });
-        }
       }
     }
   }
 
-  Widget _buildFareLabel(BookableVehicle vehicle, double distanceKm) {
-    final quote = _fareQuotes[vehicle.id];
+  Widget _buildFareLabel(BookableVehicle vehicle) {
+    if (_loadingFares) {
+      return const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
 
-    if (quote != null) {
-      if (quote.hasDiscount) {
-        final original = quote.originalFare ??
-            (quote.estimatedFare + quote.memberDiscount);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '₹${original.round()}',
-              style: TextStyle(
-                decoration: TextDecoration.lineThrough,
-                fontSize: 13,
-                color: AppColors.mutedForeground,
-              ),
-            ),
-            Text(
-              '₹${quote.estimatedFare.round()}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        );
-      }
+    final quote = _fareQuotes[vehicle.id.toLowerCase()];
 
+    if (quote == null) {
       return Text(
-        '₹${quote.estimatedFare.round()}',
-        style: const TextStyle(
+        '—',
+        style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 18,
-          color: AppColors.primary,
+          color: AppColors.mutedForeground,
         ),
       );
     }
 
-    final rawFare = vehicle.baseFare + vehicle.perKmRate * distanceKm;
-    if (_memberDiscountPercent > 0) {
-      final discounted = rawFare * (1 - _memberDiscountPercent / 100);
+    if (quote.hasDiscount) {
+      final original = quote.originalFare ??
+          (quote.estimatedFare + quote.memberDiscount);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Text(
-            '₹${rawFare.round()}',
+            '₹${original.round()}',
             style: TextStyle(
               decoration: TextDecoration.lineThrough,
               fontSize: 13,
@@ -722,7 +711,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             ),
           ),
           Text(
-            '₹${discounted.round()}',
+            '₹${quote.estimatedFare.round()}',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -734,7 +723,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
     }
 
     return Text(
-      vehicle.fareForDistanceKm(distanceKm),
+      '₹${quote.estimatedFare.round()}',
       style: const TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: 18,
@@ -783,6 +772,22 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
         ? _vehicles[_selectedVehicleIndex!]
         : null;
 
+    var womenSafetyEnabled = false;
+    try {
+      final profile = await ref.read(authRepositoryProvider).getProfile();
+      if (profile?.isFemale == true && mounted) {
+        final choice = await showWomenSafetyDialog(
+          context,
+          emergencyPhone: profile?.emergencyContactPhone,
+        );
+        if (!mounted) return;
+        if (choice == null) return;
+        womenSafetyEnabled = choice;
+      }
+    } catch (_) {
+      // Continue booking if profile cannot be loaded.
+    }
+
     setState(() => _booking = true);
     try {
       final result = await ref.read(rideBookingServiceProvider).bookRide(
@@ -796,6 +801,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             paymentMethod: _paymentMethod,
             promoCode: _appliedCoupon?.coupon.code,
             scheduledAt: trip.scheduledAt,
+            womenSafetyEnabled: womenSafetyEnabled,
+            distanceKm: route.distanceKm,
+            durationMin: route.durationMin,
           );
       final rideId = result['id']?.toString();
       if (rideId != null && rideId.isNotEmpty) {
@@ -937,9 +945,20 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                       ),
           ),
           Expanded(
-            child: _loadingVehicles || _loadingFares
+            child: _loadingVehicles
                 ? const Center(child: CircularProgressIndicator())
-                : ListView(
+                : _vehicles.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'No vehicles available. Enable them in Admin Panel.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.mutedForeground),
+                          ),
+                        ),
+                      )
+                    : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
                       ..._vehicles.asMap().entries.map((entry) {
@@ -971,23 +990,33 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  if (vehicle.imageUrl != null)
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Image.network(
-                                        vehicle.imageUrl!,
-                                        width: 48,
-                                        height: 48,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Icon(
-                                          vehicle.icon,
-                                          size: 32,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    )
-                                  else
-                                    Icon(vehicle.icon, size: 32, color: AppColors.primary),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: vehicle.imageUrl != null
+                                        ? Image.network(
+                                            vehicle.imageUrl!,
+                                            width: 48,
+                                            height: 48,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Image.asset(
+                                              vehicle.imageAsset,
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : Image.asset(
+                                            vehicle.imageAsset,
+                                            width: 48,
+                                            height: 48,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Icon(
+                                              vehicle.icon,
+                                              size: 32,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                  ),
                                   const SizedBox(width: 16),
                                   Expanded(
                                     child: Column(
@@ -1026,7 +1055,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                                       ],
                                     ),
                                   ),
-                                  _buildFareLabel(vehicle, distanceKm),
+                                  _buildFareLabel(vehicle),
                                   if (isSelected) ...[
                                     const SizedBox(width: 8),
                                     const Icon(

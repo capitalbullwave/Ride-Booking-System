@@ -25,6 +25,7 @@ const statusStyles: Record<string, string> = {
   closed: "bg-muted text-muted-foreground",
   expired: "bg-muted text-muted-foreground",
   disabled: "bg-destructive/15 text-destructive",
+  paid: "bg-success/15 text-success",
   approved: "bg-success/15 text-success",
   high: "bg-destructive/15 text-destructive",
   medium: "bg-warning/15 text-warning",

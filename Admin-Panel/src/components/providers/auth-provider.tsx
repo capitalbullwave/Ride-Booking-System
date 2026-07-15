@@ -78,6 +78,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, remember = true) => {
     try {
+      // Drop stale tokens so login is not affected by expired sessions.
+      clearSession();
+
       const data = await apiFetch<{
         user: AuthUser;
         accessToken: string;
@@ -86,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }>("/api/v1/admin/login", {
         method: "POST",
         body: JSON.stringify({ email, password }),
+        skipAuth: true,
+        skipRefresh: true,
       });
 
       const session: AuthSession = {

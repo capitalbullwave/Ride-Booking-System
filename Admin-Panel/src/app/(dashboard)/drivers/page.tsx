@@ -46,7 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Driver, DriverStatus } from "@/types";
-import { formatCurrency, capitalize } from "@/lib/format";
+import { formatCurrency, capitalize, formatPublicId } from "@/lib/format";
 import {
   approveDriver,
   deleteDriver,
@@ -347,7 +347,9 @@ export default function DriversPage() {
   };
 
   const columns: Column<Driver>[] = [
-    { key: "id", header: "Driver ID", cell: (d) => <span className="font-mono text-xs">{d.id}</span>, sortable: true },
+    { key: "id", header: "Driver ID", cell: (d) => (
+      <span className="font-mono text-xs" title={d.id}>{formatPublicId(d.publicId, d.id)}</span>
+    ), sortable: true },
     {
       key: "name",
       header: "Name",

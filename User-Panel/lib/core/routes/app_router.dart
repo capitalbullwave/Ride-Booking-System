@@ -17,6 +17,7 @@ import 'package:wavego_user/screens/notifications/notifications_screen.dart';
 import 'package:wavego_user/screens/onboarding/onboarding_screen.dart';
 import 'package:wavego_user/screens/rental/rental_flow_screens.dart';
 import 'package:wavego_user/screens/profile/student_pass_screen.dart';
+import 'package:wavego_user/screens/profile/refer_earn_screen.dart';
 import 'package:wavego_user/screens/profile/subscription_screen.dart';
 import 'package:wavego_user/screens/profile/profile_screen.dart';
 import 'package:wavego_user/screens/profile/profile_sub_screens.dart';
@@ -26,6 +27,7 @@ import 'package:wavego_user/screens/splash/splash_screen.dart';
 import 'package:wavego_user/models/user_models.dart';
 import 'package:wavego_user/screens/wallet/wallet_screen.dart';
 import 'package:wavego_user/screens/wallet/wallet_sub_screens.dart';
+import 'package:wavego_user/screens/wallet/wallet_withdraw_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'home');
@@ -234,8 +236,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.profileReferEarn,
+        builder: (_, __) => const ReferEarnScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: RouteNames.walletBalance,
         builder: (_, __) => const WalletBalanceScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.walletWithdraw,
+        builder: (_, __) => const WalletWithdrawScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

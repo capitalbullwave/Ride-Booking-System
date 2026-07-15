@@ -9,7 +9,7 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Ride, RideStatus } from "@/types";
-import { formatCurrency, formatDateTime, formatShortId, capitalize } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatPublicId, capitalize } from "@/lib/format";
 import { fetchRideById, fetchRideMessages, RideChatMessage } from "@/lib/rides-api";
 import { toast } from "sonner";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -98,7 +98,7 @@ export default function RideDetailPage({
           <ArrowLeft className="h-4 w-4" />
         </ButtonLink>
         <PageHeader
-          title={`Ride ${formatShortId(ride.id)}`}
+          title={`Ride ${formatPublicId(ride.publicId, ride.id)}`}
           description={formatDateTime(ride.date)}
         >
           <StatusBadge status={ride.status} />
@@ -250,7 +250,7 @@ export default function RideDetailPage({
             <CardHeader><CardTitle>Ride Information</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {[
-                ["Ride ID", formatShortId(ride.id)],
+                ["Ride ID", formatPublicId(ride.publicId, ride.id)],
                 ["Vehicle Type", capitalize(ride.vehicleType)],
                 ["Payment", capitalize(ride.paymentMethod)],
                 ["Status", capitalize(ride.status)],
@@ -275,7 +275,7 @@ export default function RideDetailPage({
               <div className="flex justify-between gap-4">
                 <span className="text-sm text-muted-foreground">User ID</span>
                 <span className="text-sm font-mono" title={ride.userId}>
-                  {formatShortId(ride.userId)}
+                  {formatPublicId(ride.userPublicId, ride.userId)}
                 </span>
               </div>
             </CardContent>
@@ -293,7 +293,7 @@ export default function RideDetailPage({
                   <div className="flex justify-between gap-4">
                     <span className="text-sm text-muted-foreground">Driver ID</span>
                     <span className="text-sm font-mono" title={ride.driverId}>
-                      {formatShortId(ride.driverId)}
+                      {formatPublicId(ride.driverPublicId, ride.driverId)}
                     </span>
                   </div>
                 )}

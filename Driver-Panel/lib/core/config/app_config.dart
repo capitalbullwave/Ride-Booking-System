@@ -31,10 +31,11 @@ class AppConfig {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: false);
-    if (useLocal) return localApiBaseUrl;
+    const useProduction =
+        bool.fromEnvironment('USE_PRODUCTION_API', defaultValue: false);
+    if (useProduction) return productionApiBaseUrl;
 
-    return productionApiBaseUrl;
+    return localApiBaseUrl;
   }
 
   static String get websocketBaseUrl {

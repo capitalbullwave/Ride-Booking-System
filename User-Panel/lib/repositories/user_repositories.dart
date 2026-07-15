@@ -102,14 +102,18 @@ class AuthRepository {
   Future<UserProfile> updateProfile({
     String? fullName,
     String? email,
+    String? gender,
     String? emergencyContactName,
     String? emergencyContactPhone,
+    String? referralCode,
   }) async {
     final profile = await _profileService.updateProfile(
       fullName: fullName,
       email: email,
+      gender: gender,
       emergencyContactName: emergencyContactName,
       emergencyContactPhone: emergencyContactPhone,
+      referralCode: referralCode,
     );
     await _cacheProfile(profile);
     return profile;
@@ -210,6 +214,23 @@ class WalletRepository {
   final WalletService _service;
   Future<WalletSummary> getWallet() => _service.getWallet();
   Future<List<Map<String, dynamic>>> getTransactions() => _service.getTransactions();
+  Future<UserBankInfo> saveBank({
+    required String paymentType,
+    required String accountHolderName,
+    String? accountNumber,
+    String? ifscCode,
+    String? bankName,
+    String? upiId,
+  }) =>
+      _service.saveBank(
+        paymentType: paymentType,
+        accountHolderName: accountHolderName,
+        accountNumber: accountNumber,
+        ifscCode: ifscCode,
+        bankName: bankName,
+        upiId: upiId,
+      );
+  Future<Map<String, dynamic>> withdraw(double amount) => _service.withdraw(amount);
 }
 
 class NotificationRepository {

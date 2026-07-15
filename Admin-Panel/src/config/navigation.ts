@@ -13,6 +13,7 @@ import {
   Settings,
   GraduationCap,
   Crown,
+  Gift,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,8 +41,8 @@ export const navigation: NavGroup[] = [
     items: [
       { title: "Users", href: "/users", icon: Users },
       { title: "Student Passes", href: "/student-passes", icon: GraduationCap },
-      { title: "Drivers", href: "/drivers", icon: Car, badge: "12" },
-      { title: "Rides", href: "/rides", icon: MapPin, badge: "892" },
+      { title: "Drivers", href: "/drivers", icon: Car },
+      { title: "Rides", href: "/rides", icon: MapPin },
       { title: "Vehicles", href: "/vehicles", icon: Truck },
     ],
   },
@@ -51,8 +52,9 @@ export const navigation: NavGroup[] = [
       { title: "Finance", href: "/finance", icon: Wallet },
       { title: "Subscriptions", href: "/subscriptions", icon: Crown },
       { title: "Coupons", href: "/coupons", icon: Ticket },
-      { title: "Support", href: "/support", icon: HeadphonesIcon, badge: "3" },
-      { title: "Alert Inbox", href: "/alerts", icon: Inbox, badge: "3" },
+      { title: "Refer & Earn", href: "/refer-earn", icon: Gift },
+      { title: "Support", href: "/support", icon: HeadphonesIcon },
+      { title: "Alert Inbox", href: "/alerts", icon: Inbox },
       { title: "Send Notifications", href: "/notifications", icon: Bell },
     ],
   },
@@ -68,9 +70,7 @@ export const navigation: NavGroup[] = [
 
 export const financeSubNav: NavItem[] = [
   { title: "Overview", href: "/finance", icon: Wallet },
-  { title: "Transactions", href: "/finance/transactions", icon: Wallet },
-  { title: "Driver Payouts", href: "/finance/payouts", icon: Wallet },
-  { title: "Refund Requests", href: "/finance/refunds", icon: Wallet },
-  { title: "Wallet", href: "/finance/wallet", icon: Wallet },
+  { title: "All Activity", href: "/finance/activity", icon: Wallet },
+  { title: "Approvals & Payments", href: "/finance/approvals", icon: Wallet },
   { title: "Commission", href: "/finance/commission", icon: Wallet },
 ];

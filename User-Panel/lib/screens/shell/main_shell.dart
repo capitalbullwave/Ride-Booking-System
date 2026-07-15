@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
+import 'package:wavego_user/core/utils/profile_refresh.dart';
 
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  void _onTap(int index) {
+  void _onTap(WidgetRef ref, int index) {
+    if (index == 0) {
+      refreshVehicleCatalog(ref);
+    }
     navigationShell.goBranch(
       index,
       initialLocation: index == navigationShell.currentIndex,
@@ -15,7 +20,7 @@ class MainShell extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: Container(
@@ -39,25 +44,25 @@ class MainShell extends StatelessWidget {
                   icon: Icons.home_rounded,
                   label: 'Home',
                   isActive: navigationShell.currentIndex == 0,
-                  onTap: () => _onTap(0),
+                  onTap: () => _onTap(ref, 0),
                 ),
                 _NavItem(
                   icon: Icons.calendar_month_rounded,
                   label: 'Bookings',
                   isActive: navigationShell.currentIndex == 1,
-                  onTap: () => _onTap(1),
+                  onTap: () => _onTap(ref, 1),
                 ),
                 _NavItem(
                   icon: Icons.account_balance_wallet_rounded,
                   label: 'Wallet',
                   isActive: navigationShell.currentIndex == 2,
-                  onTap: () => _onTap(2),
+                  onTap: () => _onTap(ref, 2),
                 ),
                 _NavItem(
                   icon: Icons.person_rounded,
                   label: 'Profile',
                   isActive: navigationShell.currentIndex == 3,
-                  onTap: () => _onTap(3),
+                  onTap: () => _onTap(ref, 3),
                 ),
               ],
             ),

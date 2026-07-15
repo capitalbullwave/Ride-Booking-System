@@ -35,7 +35,7 @@ class AppConfig {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: false);
+    const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: true);
     if (useLocal) return localApiBaseUrl;
 
     return productionApiBaseUrl;

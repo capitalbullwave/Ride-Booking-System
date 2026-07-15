@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AppShell, HeroHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { paymentMethods } from "@/constants/wallet";
-import { getWalletSummary, getPaymentMethods } from "@/lib/wallet-api";
+import { getWalletSummary, getPaymentMethods, type WalletSummary } from "@/lib/wallet-api";
 import { formatFare } from "@/lib/ride-booking";
 import {
   Building2,
@@ -16,11 +16,7 @@ import {
 } from "lucide-react";
 
 export function WalletView() {
-  const [summary, setSummary] = useState<{
-    balance: number;
-    bonus_balance: number;
-    total: number;
-  } | null>(null);
+  const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [savedMethods, setSavedMethods] = useState<
     { id: string; type: string; label: string; last_four: string | null }[]
   >([]);
@@ -73,11 +69,18 @@ export function WalletView() {
                   {formatFare(summary?.balance ?? 0)}
                 </p>
                 <p className="mt-3 flex-1 text-sm leading-relaxed text-muted-foreground">
-                  Add the bank account where you want to receive payouts
+                  {summary?.has_bank_account
+                    ? `Payout to ${summary.bank?.bank_name ?? "saved account"} (${summary.bank?.account_number ?? ""})`
+                    : "Add a bank / UPI account, then request withdrawal to your account"}
                 </p>
-                <Button className="mt-5 w-fit rounded-full px-5 py-2.5 shadow-md shadow-primary/15 transition-transform group-hover:scale-[1.02]">
+                <Button
+                  className="mt-5 w-fit rounded-full px-5 py-2.5 shadow-md shadow-primary/15 transition-transform group-hover:scale-[1.02]"
+                  onClick={() => {
+                    window.location.href = "/wallet/withdraw";
+                  }}
+                >
                   <Plus className="h-4 w-4" />
-                  Add bank account
+                  {summary?.has_bank_account ? "Withdraw" : "Add account & withdraw"}
                 </Button>
               </div>
 

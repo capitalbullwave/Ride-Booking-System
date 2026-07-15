@@ -1,3 +1,0 @@
-export 'razorpay_checkout_stub.dart'
-    if (dart.library.html) 'razorpay_checkout_web.dart'
-    if (dart.library.io) 'razorpay_checkout_mobile.dart';

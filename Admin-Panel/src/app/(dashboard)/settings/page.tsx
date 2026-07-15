@@ -226,24 +226,35 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="razorpay-key">Razorpay API Key</Label>
+                <Label htmlFor="cashfree-app-id">Cashfree App ID</Label>
                 <FieldHint>
-                  Razorpay gateway key for payments in India — UPI, cards, and wallets when users pay for
-                  rides.
+                  Cashfree Payment Gateway App ID for UPI QR, wallet top-ups, and subscriptions.
                 </FieldHint>
                 <Input
-                  id="razorpay-key"
+                  id="cashfree-app-id"
                   type="password"
-                  value={settings.razorpayKey}
-                  onChange={(e) => updateSetting("razorpayKey", e.target.value)}
-                  placeholder="rzp_live_..."
+                  value={settings.cashfreeAppId}
+                  onChange={(e) => updateSetting("cashfreeAppId", e.target.value)}
+                  placeholder="App ID"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cashfree-secret">Cashfree Secret Key</Label>
+                <FieldHint>
+                  Cashfree secret key. Keep this private — never expose it in client apps.
+                </FieldHint>
+                <Input
+                  id="cashfree-secret"
+                  type="password"
+                  value={settings.cashfreeSecretKey}
+                  onChange={(e) => updateSetting("cashfreeSecretKey", e.target.value)}
+                  placeholder="cfsk_..."
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="stripe-key">Stripe Secret Key</Label>
                 <FieldHint>
-                  Stripe secret key for card or international payments, if you support Stripe alongside
-                  Razorpay.
+                  Optional Stripe secret key for international card payments.
                 </FieldHint>
                 <Input
                   id="stripe-key"

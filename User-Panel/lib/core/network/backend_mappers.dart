@@ -49,6 +49,7 @@ class BackendMappers {
       name: name,
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String?,
+      gender: json['gender'] as String?,
       emergencyContactName: json['emergency_contact_name'] as String?,
       emergencyContactPhone: json['emergency_contact_phone'] as String?,
       rating: rating,

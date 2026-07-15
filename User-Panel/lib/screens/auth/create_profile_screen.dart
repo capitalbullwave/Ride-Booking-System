@@ -24,8 +24,22 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _referralController = TextEditingController();
   bool _isSubmitting = false;
   String? _verifiedPhone;
+  String? _selectedGender;
+  bool _showReferralField = false;
+
+  static const _genderOptions = [
+    ('male', 'Male'),
+    ('female', 'Female'),
+    ('other', 'Other'),
+  ];
+
+  bool _isPlaceholderEmail(String? email) {
+    if (email == null || email.trim().isEmpty) return true;
+    return email.trim().toLowerCase().endsWith('@ridebook.app');
+  }
 
   @override
   void initState() {
@@ -55,8 +69,8 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       if (profile != null && !profile.isPlaceholderName) {
         _nameController.text = profile.name.trim();
       }
-      if (profile?.email != null && profile!.email!.isNotEmpty) {
-        _emailController.text = profile.email!;
+      if (!_isPlaceholderEmail(profile?.email)) {
+        _emailController.text = profile!.email!.trim();
       }
     });
   }
@@ -65,6 +79,7 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _referralController.dispose();
     super.dispose();
   }
 
@@ -75,6 +90,10 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_selectedGender == null) {
+      context.showSnackBar('Please select your gender', isError: true);
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -85,6 +104,10 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
       await ref.read(authRepositoryProvider).updateProfile(
             fullName: name,
             email: email.isEmpty ? null : email,
+            gender: _selectedGender,
+            referralCode: _referralController.text.trim().isEmpty
+                ? null
+                : _referralController.text.trim(),
           );
       refreshUserProfile(ref);
 
@@ -196,6 +219,62 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                   keyboardType: TextInputType.emailAddress,
                   validator: _optionalEmail,
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  'Gender',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _genderOptions.map((option) {
+                    final selected = _selectedGender == option.$1;
+                    return ChoiceChip(
+                      label: Text(option.$2),
+                      selected: selected,
+                      onSelected: (_) => setState(() => _selectedGender = option.$1),
+                      selectedColor: AppColors.primary.withValues(alpha: 0.15),
+                      labelStyle: TextStyle(
+                        color: selected ? AppColors.primary : AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () =>
+                      setState(() => _showReferralField = !_showReferralField),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    foregroundColor: AppColors.primary,
+                    alignment: Alignment.centerLeft,
+                  ),
+                  child: Text(
+                    _showReferralField
+                        ? 'Hide referral code'
+                        : 'Have a referral code? (optional)',
+                  ),
+                ),
+                if (_showReferralField) ...[
+                  const SizedBox(height: 8),
+                  AppTextField(
+                    controller: _referralController,
+                    hint: 'Enter referral code',
+                    label: 'Referral code (optional)',
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'You can also apply a code later from Refer & Earn.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 AppButton(
                   label: 'Continue to home',

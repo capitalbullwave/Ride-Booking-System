@@ -208,15 +208,17 @@ class RentalVehiclesScreen extends ConsumerWidget {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => _RentalErrorBody(message: e.toString()),
               data: (categories) {
-                final items = categories.isNotEmpty
-                    ? categories
-                    : _fallbackCategories();
+                if (categories.isEmpty) {
+                  return const _RentalErrorBody(
+                    message: 'No rental vehicles available. Enable them in Admin Panel.',
+                  );
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: items.length,
+                  itemCount: categories.length,
                   itemBuilder: (context, index) {
-                    final category = items[index];
+                    final category = categories[index];
                     final fare = rentalFareForHours(category, hours);
                     final imageUrl = isMediaUrl(category.iconUrl)
                         ? resolveMediaUrl(category.iconUrl)
@@ -248,31 +250,6 @@ class RentalVehiclesScreen extends ConsumerWidget {
       ),
     );
   }
-
-  List<VehicleCategory> _fallbackCategories() => const [
-        VehicleCategory(
-          id: 'rental-bike',
-          slug: 'rental-bike',
-          name: 'Rental Bike',
-          description: 'Rent a bike by the hour',
-          baseFare: 199,
-          perKmRate: 0,
-          includedHours: 4,
-          perHourRate: 50,
-          serviceGroup: 'rental',
-        ),
-        VehicleCategory(
-          id: 'rental-car',
-          slug: 'rental-car',
-          name: 'Rental Car',
-          description: 'Flexible car rental',
-          baseFare: 999,
-          perKmRate: 0,
-          includedHours: 4,
-          perHourRate: 50,
-          serviceGroup: 'rental',
-        ),
-      ];
 }
 
 class RentalPickupScreen extends ConsumerWidget {

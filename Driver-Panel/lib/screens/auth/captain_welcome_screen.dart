@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wavego_driver/core/auth/post_auth_navigation.dart';
+import 'package:wavego_driver/core/constants/app_constants.dart';
 import 'package:wavego_driver/core/routes/route_names.dart';
+import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/theme/app_radius.dart';
+import 'package:wavego_driver/core/utils/extensions.dart';
 import 'package:wavego_driver/core/utils/responsive.dart';
 import 'package:wavego_driver/core/utils/view_state.dart';
 import 'package:wavego_driver/models/api_response.dart';
-import 'package:wavego_driver/core/storage/local_storage_service.dart';
 import 'package:wavego_driver/providers/auth_provider.dart';
 import 'package:wavego_driver/providers/registration_provider.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
+import 'package:wavego_driver/screens/profile/refer_earn_screen.dart';
 import 'package:wavego_driver/widgets/common/app_button.dart';
 import 'package:wavego_driver/widgets/forms/app_text_field.dart';
 
@@ -26,12 +29,27 @@ class CaptainWelcomeScreen extends ConsumerStatefulWidget {
 class _CaptainWelcomeScreenState extends ConsumerState<CaptainWelcomeScreen> {
   bool _whatsappUpdates = true;
   bool _showReferralField = false;
+  bool _submitting = false;
   final _referralController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _redirectIfAlreadyRegistered());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restorePendingReferral();
+      _redirectIfAlreadyRegistered();
+    });
+  }
+
+  void _restorePendingReferral() {
+    final pending = ref
+        .read(localStorageProvider)
+        .getString(AppConstants.pendingReferralCodeKey);
+    final fromState = ref.read(registrationViewModelProvider).referralCode;
+    final code = (fromState ?? pending ?? '').trim();
+    if (code.isEmpty) return;
+    _referralController.text = code;
+    setState(() => _showReferralField = true);
   }
 
   Future<void> _redirectIfAlreadyRegistered() async {
@@ -69,13 +87,50 @@ class _CaptainWelcomeScreenState extends ConsumerState<CaptainWelcomeScreen> {
     return '${auth.countryCode} $local';
   }
 
-  void _startRegistration() {
+  Future<void> _startRegistration() async {
+    if (_submitting) return;
     final referral = _referralController.text.trim();
+    final storage = ref.read(localStorageProvider);
+
     if (referral.isNotEmpty) {
       ref.read(registrationViewModelProvider.notifier).updateRegistration(
             (r) => r.copyWith(referralCode: referral),
           );
+      await storage.setString(AppConstants.pendingReferralCodeKey, referral);
+
+      setState(() => _submitting = true);
+      try {
+        await ref.read(referEarnServiceProvider).applyCode(referral);
+        await storage.remove(AppConstants.pendingReferralCodeKey);
+      } catch (e) {
+        final message = e.userMessage.toLowerCase();
+        final alreadyApplied = message.contains('already applied');
+        if (!alreadyApplied) {
+          if (!mounted) return;
+          if (message.contains('invalid') ||
+              message.contains('user referral') ||
+              message.contains('own referral') ||
+              message.contains('not active')) {
+            context.showSnackBar(e.userMessage, isError: true);
+            setState(() => _submitting = false);
+            return;
+          }
+          // Network / transient — continue; photo step will retry
+        } else {
+          await storage.remove(AppConstants.pendingReferralCodeKey);
+        }
+      } finally {
+        if (mounted) setState(() => _submitting = false);
+      }
+    } else {
+      await storage.remove(AppConstants.pendingReferralCodeKey);
+      ref.read(registrationViewModelProvider.notifier).updateRegistration(
+            (r) => r.copyWith(referralCode: null),
+          );
     }
+
+    if (!mounted) return;
+    context.go(RouteNames.captainCitySelection);
   }
 
   @override
@@ -91,7 +146,7 @@ class _CaptainWelcomeScreenState extends ConsumerState<CaptainWelcomeScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-          onPressed: () => context.go(RouteNames.phoneLogin),
+          onPressed: _submitting ? null : () => context.go(RouteNames.phoneLogin),
         ),
         actions: [
           TextButton.icon(
@@ -227,10 +282,8 @@ class _CaptainWelcomeScreenState extends ConsumerState<CaptainWelcomeScreen> {
                 label: 'Register as a Captain',
                 variant: AppButtonVariant.secondary,
                 height: 56,
-                onPressed: () {
-                  _startRegistration();
-                  context.go(RouteNames.captainCitySelection);
-                },
+                isLoading: _submitting,
+                onPressed: _submitting ? null : _startRegistration,
               ),
             ),
           ],

@@ -20,23 +20,38 @@ import { updateProfile } from "@/lib/profile-api";
 import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 const inputClass = (hasError: boolean) =>
   cn(
     "h-11 rounded-[18px] border-border bg-background text-base text-foreground transition-all placeholder:text-muted-foreground/60 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/15 sm:h-12",
     hasError && "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20"
   );
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isPlaceholderEmail(value: string | null | undefined) {
+  if (!value?.trim()) return true;
+  return value.trim().toLowerCase().endsWith("@ridebook.app");
+}
+
+const GENDER_OPTIONS = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
+  { value: "other", label: "Other" },
+] as const;
+
 export function CreateProfileView() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [gender, setGender] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [showReferral, setShowReferral] = useState(false);
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [genderError, setGenderError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,7 +71,7 @@ export function CreateProfileView() {
     }
     if (session.profileComplete || !needsProfileSetup(session.name)) {
       if (!session.profileComplete) {
-        markProfileComplete({ name: session.name, email: session.email });
+        markProfileComplete({ name: session.name });
       }
       router.replace(resolvePostAuthDestination());
       return;
@@ -65,7 +80,9 @@ export function CreateProfileView() {
     if (session.name && session.name.trim().toLowerCase() !== "user") {
       setFullName(session.name.trim());
     }
-    if (session.email) setEmail(session.email);
+    if (!isPlaceholderEmail(session.email)) {
+      setEmail(session.email!.trim());
+    }
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,6 +90,7 @@ export function CreateProfileView() {
     setSubmitError("");
     setNameError("");
     setEmailError("");
+    setGenderError("");
 
     const trimmedName = fullName.trim();
     if (!trimmedName) {
@@ -87,13 +105,19 @@ export function CreateProfileView() {
       setEmailError("Please enter a valid email address");
       return;
     }
+    if (!gender) {
+      setGenderError("Please select your gender");
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
       await updateProfile({
         full_name: trimmedName,
+        gender,
         ...(email.trim() ? { email: email.trim() } : {}),
+        ...(referralCode.trim() ? { referral_code: referralCode.trim() } : {}),
       });
 
       markProfileComplete({
@@ -208,6 +232,68 @@ export function CreateProfileView() {
                   </motion.p>
                 )}
               </AnimatePresence>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-sm font-semibold text-foreground">Gender</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {GENDER_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setGender(option.value);
+                      if (genderError) setGenderError("");
+                    }}
+                    className={cn(
+                      "h-11 rounded-[16px] border text-sm font-medium transition-colors",
+                      gender === option.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-foreground hover:border-primary/30"
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              <AnimatePresence>
+                {genderError && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="text-sm font-medium text-destructive"
+                  >
+                    {genderError}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowReferral((v) => !v)}
+                className="text-left text-sm font-semibold text-primary"
+              >
+                {showReferral ? "Hide referral code" : "Have a referral code? (optional)"}
+              </button>
+              {showReferral ? (
+                <>
+                  <Input
+                    id="referralCode"
+                    type="text"
+                    autoCapitalize="characters"
+                    placeholder="Enter referral code"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    className={inputClass(false)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    You can also apply a code later from Refer & Earn.
+                  </p>
+                </>
+              ) : null}
             </div>
 
             {submitError && (

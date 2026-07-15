@@ -13,7 +13,7 @@ import {
   verifySubscriptionPayment,
 } from "@/lib/membership-api";
 import { cacheActiveMembershipPlan } from "@/lib/membership-sync";
-import { openSubscriptionCheckout } from "@/lib/razorpay-checkout";
+import { openSubscriptionCheckout } from "@/lib/cashfree-checkout";
 import { cn } from "@/lib/utils";
 
 interface Plan {

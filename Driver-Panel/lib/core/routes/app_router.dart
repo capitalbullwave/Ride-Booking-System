@@ -7,7 +7,6 @@ import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/models/wallet_model.dart';
 import 'package:wavego_driver/providers/auth_session_provider.dart';
 import 'package:wavego_driver/screens/auth/onboarding/kyc_upload_screen.dart';
-import 'package:wavego_driver/screens/auth/onboarding/license_number_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/license_upload_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/photo_name_screen.dart';
 import 'package:wavego_driver/screens/auth/onboarding/vehicle_documents_screen.dart';
@@ -26,6 +25,7 @@ import 'package:wavego_driver/screens/onboarding/onboarding_screen.dart';
 import 'package:wavego_driver/screens/profile/edit_profile_screen.dart';
 import 'package:wavego_driver/screens/profile/emergency_contacts_screen.dart';
 import 'package:wavego_driver/screens/profile/profile_screen.dart';
+import 'package:wavego_driver/screens/profile/refer_earn_screen.dart';
 import 'package:wavego_driver/screens/profile/ride_statistics_screen.dart';
 import 'package:wavego_driver/screens/registration/registration_screen.dart';
 import 'package:wavego_driver/screens/ride/active_trip_screen.dart';
@@ -116,7 +116,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RouteNames.onboardingLicenseNumber,
-        builder: (_, __) => const LicenseNumberScreen(),
+        redirect: (_, __) => RouteNames.onboardingLicenseUpload,
       ),
       GoRoute(
         path: RouteNames.onboardingPhotoName,
@@ -216,6 +216,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.rideStatistics,
         builder: (_, __) => const RideStatisticsScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.referEarn,
+        builder: (_, __) => const ReferEarnScreen(),
       ),
       GoRoute(
         path: RouteNames.documents,

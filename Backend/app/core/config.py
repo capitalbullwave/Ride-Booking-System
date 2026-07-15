@@ -68,17 +68,14 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "noreply@ridebooking.com"
 
-    # Stripe
+    # Stripe (optional international cards)
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
 
-    # Razorpay
-    razorpay_key_id: str = ""
-    razorpay_key_secret: str = ""
-
-    # Cashfree
+    # Cashfree (ride UPI QR, wallet top-up, subscriptions)
     cashfree_app_id: str = ""
     cashfree_secret_key: str = ""
+    cashfree_env: str = "sandbox"  # sandbox | production
 
     # PhonePe
     phonepe_merchant_id: str = ""

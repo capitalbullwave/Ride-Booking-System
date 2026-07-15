@@ -12,6 +12,7 @@ import {
   RIDE_VEHICLE_OPTIONS,
 } from "@/data/ride-options";
 import { getVehicleCategories } from "@/lib/home-api";
+import { getProfile } from "@/lib/profile-api";
 import { estimateRideFares, getRideDirections } from "@/lib/ride-api";
 import { buildLocationSearchUrl } from "@/lib/location-search";
 import { buildBookUrl, buildSearchingUrl, formatFare } from "@/lib/ride-booking";
@@ -20,6 +21,7 @@ import {
   vehicleImageForCategory,
 } from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
+import { WomenSafetyDialog } from "@/components/booking/WomenSafetyDialog";
 
 const MAP_EMBED_URL =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14008.114827184203!2d77.216721!3d28.6328!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390cfd37b741d057%3A0xc46ce4427b231eb5!2sConnaught%20Place%2C%20New%20Delhi%2C%20Delhi%20110001!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
@@ -49,6 +51,22 @@ export function RideBookingView() {
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [payment] = useState(PAYMENT_METHODS[0]);
   const [memberDiscountPercent, setMemberDiscountPercent] = useState(0);
+  const [userGender, setUserGender] = useState<string | null>(null);
+  const [emergencyPhone, setEmergencyPhone] = useState<string | null>(null);
+  const [safetyDialogOpen, setSafetyDialogOpen] = useState(false);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const profile = await getProfile();
+        setUserGender(profile.gender);
+        setEmergencyPhone(profile.emergency_contact_phone);
+      } catch {
+        // Booking can continue without profile metadata.
+      }
+    }
+    void loadProfile();
+  }, []);
 
   useEffect(() => {
     if (!pickup || !dropoff) {
@@ -68,6 +86,8 @@ export function RideBookingView() {
           pickup_lng: directions.pickup_lng,
           dropoff_lat: directions.dropoff_lat,
           dropoff_lng: directions.dropoff_lng,
+          distance_km: directions.distance_km,
+          duration_min: directions.duration_min,
         });
 
         setMemberDiscountPercent(fareResult.discount_percent ?? 0);
@@ -75,8 +95,12 @@ export function RideBookingView() {
         const apiOptions: BookableOption[] = [];
 
         for (const [index, category] of categories.entries()) {
-          const quote = fareResult.quotes[category.id];
-          let price = category.base_fare + category.per_km_rate * directions.distance_km;
+          const quote = fareResult.quotes[category.id.toLowerCase()];
+          let price = category.base_fare;
+          const billableKm = Math.max(0, directions.distance_km - (category.included_distance_km ?? 0));
+          if (!quote) {
+            price = category.base_fare + category.per_km_rate * billableKm;
+          }
           let originalPrice: number | null = null;
 
           if (quote) {
@@ -162,16 +186,25 @@ export function RideBookingView() {
     );
   };
 
-  const handleBook = () => {
+  const proceedToSearching = (womenSafetyEnabled = false) => {
     router.push(
       buildSearchingUrl(
         pickup,
         dropoff,
         selectedVehicle,
         tab,
-        selectedOption.categoryId
+        selectedOption.categoryId,
+        womenSafetyEnabled
       )
     );
+  };
+
+  const handleBook = () => {
+    if ((userGender ?? "").toLowerCase() === "female") {
+      setSafetyDialogOpen(true);
+      return;
+    }
+    proceedToSearching(false);
   };
 
   return (
@@ -311,6 +344,19 @@ export function RideBookingView() {
           Book {selectedOption.name}
         </Button>
       </div>
+
+      <WomenSafetyDialog
+        open={safetyDialogOpen}
+        emergencyPhone={emergencyPhone}
+        onEnable={() => {
+          setSafetyDialogOpen(false);
+          proceedToSearching(true);
+        }}
+        onSkip={() => {
+          setSafetyDialogOpen(false);
+          proceedToSearching(false);
+        }}
+      />
     </motion.div>
   );
 }

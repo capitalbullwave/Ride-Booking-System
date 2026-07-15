@@ -9,6 +9,7 @@ import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/core/utils/extensions.dart';
+import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/models/user_models.dart';
@@ -44,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _prefillPickupIfNeeded();
+      ref.invalidate(vehicleCategoriesProvider);
       ref.invalidate(activeRideProvider);
       _startActiveRidePolling();
       _startRideRealtime();
@@ -202,12 +204,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  List<HomeServiceItem> _servicesForMode(
-    List<HomeServiceItem> services,
+  List<HomeServiceItem> _servicesFromCategories(
+    List<VehicleCategory> categories,
     HomeBookingMode mode,
   ) {
-    final filtered = homeServicesForMode(services, mode);
-    return filtered.isNotEmpty ? filtered : services;
+    final filtered = filterCategoriesForMode(categories, mode);
+    return homeServicesForMode(
+      filtered.map(homeServiceFromCategory).toList(),
+      mode,
+    );
+  }
+
+  Widget _buildServicesSection(
+    BuildContext context,
+    AsyncValue<List<VehicleCategory>> categoriesAsync,
+    HomeBookingMode mode,
+  ) {
+    return categoriesAsync.when(
+      loading: () => const _ServiceListShimmer(),
+      error: (error, _) => _ServicesMessage(
+        message: 'Unable to load services. Pull down to retry.',
+        icon: Icons.cloud_off_outlined,
+      ),
+      data: (categories) {
+        final services = _servicesFromCategories(categories, mode);
+        if (services.isEmpty) {
+          return const _ServicesMessage(
+            message: 'No services available. Enable vehicles in Admin Panel.',
+            icon: Icons.directions_car_outlined,
+          );
+        }
+
+        return Column(
+          children: services
+              .map(
+                (service) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ServiceTile(
+                    service: service,
+                    onTap: () => context.push(service.route),
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
   }
 
   @override
@@ -219,6 +261,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final dropoff = trip.dropoff?.label ?? '';
     final dashboardAsync = ref.watch(homeDashboardProvider);
     final vehicleCategoriesAsync = ref.watch(vehicleCategoriesProvider);
+    final rentalCategoriesAsync = ref.watch(rentalCategoriesProvider);
+    final serviceCategoriesAsync = trip.mode == HomeBookingMode.rental
+        ? rentalCategoriesAsync
+        : vehicleCategoriesAsync;
     final profileAsync = ref.watch(userProfileProvider);
     final notificationsAsync = ref.watch(notificationsProvider);
     final activeRideAsync = ref.watch(activeRideProvider);
@@ -243,8 +289,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
+        child: RefreshIndicator(
+          onRefresh: () async {
+            refreshVehicleCatalog(ref);
+            ref.invalidate(homeDashboardProvider);
+            ref.invalidate(activeRideProvider);
+            if (trip.mode == HomeBookingMode.rental) {
+              await ref.read(rentalCategoriesProvider.future);
+            } else {
+              await ref.read(vehicleCategoriesProvider.future);
+            }
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
             SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -368,71 +426,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  vehicleCategoriesAsync.when(
-                    loading: () {
-                      final services = _servicesForMode(
-                        fallbackHomeServices(),
-                        trip.mode,
-                      );
-                      return Column(
-                        children: services
-                            .map(
-                              (service) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: ServiceTile(
-                                  service: service,
-                                  onTap: () => context.push(service.route),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                    error: (e, st) {
-                      final services = _servicesForMode(
-                        fallbackHomeServices(),
-                        trip.mode,
-                      );
-                      return Column(
-                        children: services
-                            .map(
-                              (service) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: ServiceTile(
-                                  service: service,
-                                  onTap: () => context.push(service.route),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                    data: (categories) {
-                      final allServices = categories.isNotEmpty
-                          ? categories.map(homeServiceFromCategory).toList()
-                          : fallbackHomeServices();
-                      final services = _servicesForMode(allServices, trip.mode);
-
-                      return Column(
-                        children: services
-                            .map(
-                              (service) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: ServiceTile(
-                                  service: service,
-                                  onTap: () => context.push(service.route),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      );
-                    },
-                  ),
+                  _buildServicesSection(context, serviceCategoriesAsync, trip.mode),
                   const SizedBox(height: 12),
                 ]),
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -616,6 +616,65 @@ class _BannerShimmer extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.muted,
         borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+    );
+  }
+}
+
+class _ServiceListShimmer extends StatelessWidget {
+  const _ServiceListShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        3,
+        (_) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Container(
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.muted,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServicesMessage extends StatelessWidget {
+  const _ServicesMessage({
+    required this.message,
+    required this.icon,
+  });
+
+  final String message;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.muted,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.mutedForeground, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.mutedForeground,
+                ),
+          ),
+        ],
       ),
     );
   }

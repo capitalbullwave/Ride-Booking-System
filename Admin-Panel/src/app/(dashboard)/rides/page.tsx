@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Ride } from "@/types";
-import { formatCurrency, formatDateTime, formatShortId, capitalize } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatPublicId, capitalize } from "@/lib/format";
 import { fetchRides } from "@/lib/rides-api";
 import { toast } from "sonner";
 import { useAutoRefresh } from "@/hooks/use-auto-refresh";
@@ -91,7 +91,7 @@ export default function RidesPage() {
       header: "Ride ID",
       cell: (r) => (
         <span className="font-mono text-xs" title={r.id}>
-          {formatShortId(r.id)}
+          {formatPublicId(r.publicId, r.id)}
         </span>
       ),
       sortable: true,

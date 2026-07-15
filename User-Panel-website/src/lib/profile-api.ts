@@ -15,6 +15,7 @@ export interface Profile {
   full_name: string | null;
   email: string | null;
   profile_image_url: string | null;
+  gender: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
   default_pickup_address: string | null;
@@ -30,9 +31,11 @@ export function getProfile(): Promise<Profile> {
 export function updateProfile(payload: {
   full_name?: string;
   email?: string;
+  gender?: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   default_pickup_address?: string;
+  referral_code?: string;
 }): Promise<Profile> {
   return authFetch<Profile>(
     "/profile",

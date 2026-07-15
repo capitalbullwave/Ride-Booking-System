@@ -45,6 +45,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       route: RouteNames.profileSubscription,
     ),
     _ProfileMenuItem(
+      icon: Icons.card_giftcard_outlined,
+      label: 'Refer & Earn',
+      route: RouteNames.profileReferEarn,
+    ),
+    _ProfileMenuItem(
       icon: Icons.school_outlined,
       label: 'Student Pass',
       route: RouteNames.profileStudentPass,

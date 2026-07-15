@@ -335,6 +335,10 @@ class RideBookingService extends BaseApiService {
     required double pickupLng,
     required double dropoffLat,
     required double dropoffLng,
+    String serviceGroup = 'ride',
+    double? rentalHours,
+    double? distanceKm,
+    double? durationMin,
   }) async {
     if (useMock) {
       return const RideFareEstimateResult(
@@ -350,6 +354,10 @@ class RideBookingService extends BaseApiService {
         'pickup_lng': pickupLng,
         'dropoff_lat': dropoffLat,
         'dropoff_lng': dropoffLng,
+        'service_group': serviceGroup,
+        if (rentalHours != null) 'rental_hours': rentalHours,
+        if (distanceKm != null) 'distance_km': distanceKm,
+        if (durationMin != null) 'duration_min': durationMin,
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );
@@ -360,7 +368,7 @@ class RideBookingService extends BaseApiService {
       if (item is Map<String, dynamic>) {
         final quote = VehicleFareQuote.fromJson(item);
         if (quote.vehicleTypeId.isNotEmpty) {
-          quotes[quote.vehicleTypeId] = quote;
+          quotes[quote.vehicleTypeId.toLowerCase()] = quote;
         }
       }
     }
@@ -383,6 +391,9 @@ class RideBookingService extends BaseApiService {
     String? vehicleCategoryId,
     double? rentalHours,
     DateTime? scheduledAt,
+    bool womenSafetyEnabled = false,
+    double? distanceKm,
+    double? durationMin,
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -409,6 +420,9 @@ class RideBookingService extends BaseApiService {
         if (vehicleCategoryId != null) 'vehicle_category_id': vehicleCategoryId,
         if (rentalHours != null) 'rental_hours': rentalHours,
         if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
+        'women_safety_enabled': womenSafetyEnabled,
+        if (distanceKm != null) 'distance_km': distanceKm,
+        if (durationMin != null) 'duration_min': durationMin,
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );
