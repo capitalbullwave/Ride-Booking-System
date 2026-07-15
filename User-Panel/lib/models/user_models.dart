@@ -367,10 +367,12 @@ class UserActiveRide {
     required this.pickupAddress,
     required this.dropoffAddress,
     required this.status,
+    this.publicId,
     this.fareEstimate,
     this.driverName,
     this.driverPhone,
     this.driverRating,
+    this.driverPhotoUrl,
     this.vehicleNumber,
     this.vehicleTypeSlug,
     this.vehicleTypeName,
@@ -381,9 +383,13 @@ class UserActiveRide {
     this.dropoffLng,
     this.driverLat,
     this.driverLng,
+    this.womenSafetyEnabled = false,
+    this.preferWomenRiders = false,
+    this.isEmergency = false,
   });
 
   final String id;
+  final String? publicId;
   final String pickupAddress;
   final String dropoffAddress;
   final String status;
@@ -391,6 +397,7 @@ class UserActiveRide {
   final String? driverName;
   final String? driverPhone;
   final double? driverRating;
+  final String? driverPhotoUrl;
   final String? vehicleNumber;
   final String? vehicleTypeSlug;
   final String? vehicleTypeName;
@@ -401,12 +408,23 @@ class UserActiveRide {
   final double? dropoffLng;
   final double? driverLat;
   final double? driverLng;
+  final bool womenSafetyEnabled;
+  final bool preferWomenRiders;
+  final bool isEmergency;
+
+  /// Share Ride + SOS — available for every passenger during an active trip.
+  bool get showEmergencySafetyControls => true;
+
+  /// Extra women safety UX (badge + periodic "Are you safe?" check-in).
+  bool get showWomenSafetyControls =>
+      womenSafetyEnabled || preferWomenRiders;
 
   factory UserActiveRide.fromJson(Map<String, dynamic> json) {
     final driver = json['driver'] as Map<String, dynamic>?;
     final vehicleType = json['vehicle_type'] as Map<String, dynamic>?;
     return UserActiveRide(
       id: json['id']?.toString() ?? '',
+      publicId: json['public_id']?.toString(),
       pickupAddress: json['pickup_address'] as String? ?? '',
       dropoffAddress: json['dropoff_address'] as String? ?? '',
       status: json['status'] as String? ?? '',
@@ -414,6 +432,8 @@ class UserActiveRide {
       driverName: driver?['name'] as String?,
       driverPhone: driver?['phone'] as String?,
       driverRating: (driver?['rating'] as num?)?.toDouble(),
+      driverPhotoUrl: driver?['photo_url'] as String? ??
+          json['driver_photo_url'] as String?,
       vehicleNumber: json['vehicle_number'] as String?,
       vehicleTypeSlug: vehicleType?['slug'] as String? ??
           json['vehicle_type_slug'] as String?,
@@ -426,12 +446,16 @@ class UserActiveRide {
       dropoffLng: (json['dropoff_lng'] as num?)?.toDouble(),
       driverLat: (json['driver_lat'] as num?)?.toDouble(),
       driverLng: (json['driver_lng'] as num?)?.toDouble(),
+      womenSafetyEnabled: json['women_safety_enabled'] == true,
+      preferWomenRiders: json['prefer_women_riders'] == true,
+      isEmergency: json['is_emergency'] == true,
     );
   }
 
   UserActiveRide copyWithDriverLocation({double? lat, double? lng}) {
     return UserActiveRide(
       id: id,
+      publicId: publicId,
       pickupAddress: pickupAddress,
       dropoffAddress: dropoffAddress,
       status: status,
@@ -439,6 +463,7 @@ class UserActiveRide {
       driverName: driverName,
       driverPhone: driverPhone,
       driverRating: driverRating,
+      driverPhotoUrl: driverPhotoUrl,
       vehicleNumber: vehicleNumber,
       vehicleTypeSlug: vehicleTypeSlug,
       vehicleTypeName: vehicleTypeName,
@@ -449,12 +474,22 @@ class UserActiveRide {
       dropoffLng: dropoffLng,
       driverLat: lat ?? driverLat,
       driverLng: lng ?? driverLng,
+      womenSafetyEnabled: womenSafetyEnabled,
+      preferWomenRiders: preferWomenRiders,
+      isEmergency: isEmergency,
     );
   }
 
-  UserActiveRide copyWith({String? status, String? startCode}) {
+  UserActiveRide copyWith({
+    String? status,
+    String? startCode,
+    bool? womenSafetyEnabled,
+    bool? preferWomenRiders,
+    bool? isEmergency,
+  }) {
     return UserActiveRide(
       id: id,
+      publicId: publicId,
       pickupAddress: pickupAddress,
       dropoffAddress: dropoffAddress,
       status: status ?? this.status,
@@ -462,6 +497,7 @@ class UserActiveRide {
       driverName: driverName,
       driverPhone: driverPhone,
       driverRating: driverRating,
+      driverPhotoUrl: driverPhotoUrl,
       vehicleNumber: vehicleNumber,
       vehicleTypeSlug: vehicleTypeSlug,
       vehicleTypeName: vehicleTypeName,
@@ -472,6 +508,9 @@ class UserActiveRide {
       dropoffLng: dropoffLng,
       driverLat: driverLat,
       driverLng: driverLng,
+      womenSafetyEnabled: womenSafetyEnabled ?? this.womenSafetyEnabled,
+      preferWomenRiders: preferWomenRiders ?? this.preferWomenRiders,
+      isEmergency: isEmergency ?? this.isEmergency,
     );
   }
 

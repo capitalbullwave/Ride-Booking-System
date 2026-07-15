@@ -32,10 +32,12 @@ class ApiEndpoints {
   static const String bookRide = '/user/book-ride';
   static const String rideEstimate = '/rides/estimate';
   static const String cancelRide = '/user/cancel-ride';
+  static const String continueWithAllRiders = '/user/continue-with-all-riders';
   static const String userCoupons = '/user/coupons';
   static const String validateCoupon = '/user/coupons/validate';
   static String rateRide(String rideId) => '/user/ride/$rideId/rate';
   static String rideMessages(String rideId) => '/user/ride/$rideId/messages';
+  static String rideSos(String rideId) => '/user/ride/$rideId/sos';
 
   // Public / maps (no auth)
   static const String placesSearch = '/public/places/search';

@@ -392,6 +392,7 @@ class RideBookingService extends BaseApiService {
     double? rentalHours,
     DateTime? scheduledAt,
     bool womenSafetyEnabled = false,
+    bool preferWomenRiders = false,
     double? distanceKm,
     double? durationMin,
   }) async {
@@ -421,6 +422,7 @@ class RideBookingService extends BaseApiService {
         if (rentalHours != null) 'rental_hours': rentalHours,
         if (scheduledAt != null) 'scheduled_at': scheduledAt.toUtc().toIso8601String(),
         'women_safety_enabled': womenSafetyEnabled,
+        'prefer_women_riders': preferWomenRiders,
         if (distanceKm != null) 'distance_km': distanceKm,
         if (durationMin != null) 'duration_min': durationMin,
       },
@@ -455,6 +457,49 @@ class RideBookingService extends BaseApiService {
         'ride_id': rideId,
         'reason': reason,
       },
+    );
+  }
+
+  Future<Map<String, dynamic>> continueWithAllRiders(String rideId) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      return {
+        'id': rideId,
+        'status': 'SEARCHING_DRIVER',
+        'allow_all_riders': true,
+      };
+    }
+
+    return post<Map<String, dynamic>>(
+      ApiEndpoints.continueWithAllRiders,
+      data: {'ride_id': rideId},
+      parser: (raw) => raw as Map<String, dynamic>,
+    );
+  }
+
+  Future<Map<String, dynamic>> triggerRideSos(
+    String rideId, {
+    double? lat,
+    double? lng,
+    String? message,
+  }) async {
+    if (useMock) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      return {
+        'success': true,
+        'is_emergency': true,
+        'message': 'Emergency contacts and support have been notified.',
+      };
+    }
+
+    return post<Map<String, dynamic>>(
+      ApiEndpoints.rideSos(rideId),
+      data: {
+        if (lat != null) 'lat': lat,
+        if (lng != null) 'lng': lng,
+        if (message != null && message.isNotEmpty) 'message': message,
+      },
+      parser: (raw) => raw as Map<String, dynamic>,
     );
   }
 

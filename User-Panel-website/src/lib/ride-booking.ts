@@ -29,11 +29,11 @@ export function buildSearchingUrl(
   vehicle: string,
   tab = "rides",
   categoryId?: string,
-  womenSafetyEnabled = false
+  preferWomenRiders = false
 ) {
   const params = buildRideQueryParams(pickup, dropoff, vehicle, tab);
   if (categoryId) params.set("categoryId", categoryId);
-  if (womenSafetyEnabled) params.set("womenSafety", "1");
+  if (preferWomenRiders) params.set("preferWomen", "1");
   return `${ROUTES.bookSearching}?${params.toString()}`;
 }
 

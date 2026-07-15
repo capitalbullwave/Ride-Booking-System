@@ -238,15 +238,21 @@ class RideViewModel extends StateNotifier<RideState> {
     state = state.copyWith(activeRide: ride.copyWith(status: status));
   }
 
-  /// Returns null when ride is no longer active (e.g. cancelled). Keeps state on network errors.
+  /// Returns null when ride is no longer active (e.g. cancelled).
+  /// Keeps local state on network errors and while accept is still in flight.
   Future<ActiveRide?> refreshActiveRideStatus() async {
     try {
       final ride = await _repository.getActiveRide();
       if (ride == null || ride.status == 'cancelled') {
+        // Accept flow primes a local ride and navigates before the API finishes.
+        // A null active-ride response during that window is not a cancellation.
+        if (state.isAccepting && state.activeRide != null) {
+          return state.activeRide;
+        }
         state = state.copyWith(clearActiveRide: true, clearIncomingRequest: true);
         return null;
       }
-      state = state.copyWith(activeRide: ride);
+      state = state.copyWith(activeRide: ride, isAccepting: false);
       return ride;
     } catch (_) {
       return state.activeRide;

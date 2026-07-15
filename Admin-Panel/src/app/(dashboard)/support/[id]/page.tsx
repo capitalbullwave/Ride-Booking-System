@@ -1,8 +1,8 @@
 "use client";
 
 import { notFound } from "next/navigation";
-import { use, useEffect, useState } from "react";
-import { ArrowLeft, Send, Paperclip } from "lucide-react";
+import { use, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ExternalLink, MapPin, Navigation, Paperclip, Send } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,42 @@ import {
   updateSupportTicketStatus,
 } from "@/lib/support-api";
 import { toast } from "sonner";
+
+const MAPS_URL_RE = /https?:\/\/(?:www\.)?google\.com\/maps[^\s]+/gi;
+
+function extractLabeledMapLinks(text: string) {
+  const currentMatch = text.match(/Current location:\s*(https?:\/\/[^\s]+)/i);
+  const liveMatch = text.match(/Live location:\s*(https?:\/\/[^\s]+)/i);
+  const anyLinks = text.match(MAPS_URL_RE) ?? [];
+  return {
+    current: currentMatch?.[1] ?? null,
+    live: liveMatch?.[1] ?? (anyLinks.length > 0 ? anyLinks[anyLinks.length - 1] : null),
+  };
+}
+
+function MessageWithLinks({ text }: { text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+      {parts.map((part, index) =>
+        /^https?:\/\//i.test(part) ? (
+          <a
+            key={`${part}-${index}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 break-all font-medium text-primary underline underline-offset-2"
+          >
+            {part}
+            <ExternalLink className="h-3 w-3 shrink-0" />
+          </a>
+        ) : (
+          <span key={`${index}-${part.slice(0, 12)}`}>{part}</span>
+        )
+      )}
+    </p>
+  );
+}
 
 export default function TicketDetailPage({
   params,
@@ -58,6 +94,14 @@ export default function TicketDetailPage({
       cancelled = true;
     };
   }, [id]);
+
+  const locationLinks = useMemo(() => {
+    if (!ticket) return { current: null, live: null };
+    const source = [ticket.description, ...(ticket.messages?.map((m) => m.message) ?? [])]
+      .filter(Boolean)
+      .join("\n");
+    return extractLabeledMapLinks(source);
+  }, [ticket]);
 
   if (loading) {
     return (
@@ -95,6 +139,10 @@ export default function TicketDetailPage({
     }
   };
 
+  const isSosTicket =
+    ticket.subject.toLowerCase().includes("sos") ||
+    Boolean(locationLinks.current || locationLinks.live);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -110,24 +158,26 @@ export default function TicketDetailPage({
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <Card>
-            <CardHeader><CardTitle>Chat Thread</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Chat Thread</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               {ticket.messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`rounded-lg p-4 ${
                     msg.senderType === "admin"
-                      ? "ml-8 bg-primary/5 border border-primary/20"
+                      ? "ml-8 border border-primary/20 bg-primary/5"
                       : "mr-8 bg-muted"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-medium">{msg.sender}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatDateTime(msg.timestamp)}
                     </span>
                   </div>
-                  <p className="text-sm">{msg.message}</p>
+                  <MessageWithLinks text={msg.message} />
                 </div>
               ))}
 
@@ -154,8 +204,54 @@ export default function TicketDetailPage({
         </div>
 
         <div className="space-y-6">
+          {isSosTicket && (locationLinks.current || locationLinks.live) ? (
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-destructive">
+                  <MapPin className="h-4 w-4" />
+                  Track Locations
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Open Google Maps to track passenger current location and captain live location.
+                </p>
+                {locationLinks.current ? (
+                  <a
+                    href={locationLinks.current}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-primary" />
+                      Current location
+                    </span>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </a>
+                ) : null}
+                {locationLinks.live ? (
+                  <a
+                    href={locationLinks.live}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Navigation className="h-4 w-4 text-destructive" />
+                      Live location
+                    </span>
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </a>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
-            <CardHeader><CardTitle>Ticket Details</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Ticket Details</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-3">
               {[
                 ["Ticket ID", ticket.id],
@@ -167,22 +263,26 @@ export default function TicketDetailPage({
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-4">
                   <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-medium text-right break-all">{value}</span>
+                  <span className="break-all text-right text-sm font-medium">{value}</span>
                 </div>
               ))}
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Status Update</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>Status Update</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-3">
               <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="resolved">Resolved</SelectItem>
-                  <SelectItem value="closed">Closed</SelectItem>
+                  <SelectItem value="open">open</SelectItem>
+                  <SelectItem value="in_progress">in_progress</SelectItem>
+                  <SelectItem value="resolved">resolved</SelectItem>
+                  <SelectItem value="closed">closed</SelectItem>
                 </SelectContent>
               </Select>
               <Button className="w-full" onClick={handleStatusUpdate}>
@@ -192,17 +292,16 @@ export default function TicketDetailPage({
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Internal Notes</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+            <CardHeader>
+              <CardTitle>Internal Notes</CardTitle>
+            </CardHeader>
+            <CardContent>
               <Textarea
-                placeholder="Add internal note (not visible to user)..."
+                placeholder="Add internal notes (not visible to user)..."
                 value={internalNote}
                 onChange={(e) => setInternalNote(e.target.value)}
-                rows={3}
+                rows={4}
               />
-              <Button variant="outline" className="w-full" disabled>
-                Save Note
-              </Button>
             </CardContent>
           </Card>
         </div>

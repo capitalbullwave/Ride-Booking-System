@@ -296,9 +296,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     if (ref.read(autoAcceptProvider)) {
       try {
         ref.read(rideViewModelProvider.notifier).setIncomingRequest(request);
-        ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(request);
-        if (mounted) context.go(RouteNames.activeTrip);
         await ref.read(rideViewModelProvider.notifier).acceptRide(request.id);
+        if (mounted) context.go(RouteNames.activeTrip);
       } catch (e) {
         if (mounted) context.showSnackBar(e.userMessage, isError: true);
       }

@@ -33,6 +33,7 @@ dependencies:
   country_picker: ^2.0.27
   pin_code_fields: ^8.0.1
   equatable: ^2.0.7
+  share_plus: ^10.1.4
   url_launcher: ^6.3.1
   image_picker: ^1.1.2
   permission_handler: ^11.4.0

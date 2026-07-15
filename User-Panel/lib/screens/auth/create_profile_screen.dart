@@ -28,7 +28,6 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   bool _isSubmitting = false;
   String? _verifiedPhone;
   String? _selectedGender;
-  bool _showReferralField = false;
 
   static const _genderOptions = [
     ('male', 'Male'),
@@ -245,36 +244,19 @@ class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
                   }).toList(),
                 ),
                 const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () =>
-                      setState(() => _showReferralField = !_showReferralField),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    foregroundColor: AppColors.primary,
-                    alignment: Alignment.centerLeft,
-                  ),
-                  child: Text(
-                    _showReferralField
-                        ? 'Hide referral code'
-                        : 'Have a referral code? (optional)',
-                  ),
+                AppTextField(
+                  controller: _referralController,
+                  hint: 'Enter referral code',
+                  label: 'Referral code',
+                  textCapitalization: TextCapitalization.characters,
                 ),
-                if (_showReferralField) ...[
-                  const SizedBox(height: 8),
-                  AppTextField(
-                    controller: _referralController,
-                    hint: 'Enter referral code',
-                    label: 'Referral code (optional)',
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'You can also apply a code later from Refer & Earn.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  'You can also apply a code later from Refer & Earn.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                ),
                 const SizedBox(height: 32),
                 AppButton(
                   label: 'Continue to home',

@@ -3,7 +3,9 @@ import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/geo_distance.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/widgets/booking/driver_avatar_rating.dart';
 import 'package:wavego_user/widgets/booking/ride_accepted_panel.dart';
+import 'package:wavego_user/widgets/booking/women_safety_ride_actions.dart';
 
 class RideInProgressPanel extends StatelessWidget {
   const RideInProgressPanel({
@@ -41,25 +43,34 @@ class RideInProgressPanel extends StatelessWidget {
     final driverDisplay = (ride.driverName ?? 'Captain').trim();
     final driverUpper = driverDisplay.toUpperCase();
     final vehicleSlug = ride.vehicleTypeSlug ?? 'cab';
+    final womenSafetyOn = ride.showWomenSafetyControls;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text(
-            'Ride in progress',
-            style: TextStyle(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Ride in progress',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
             ),
-          ),
+            if (womenSafetyOn || ride.isEmergency)
+              SafetyModeBadge(isEmergency: ride.isEmergency),
+          ],
         ),
         const SizedBox(height: 8),
         Row(
@@ -112,16 +123,13 @@ class RideInProgressPanel extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                child: Text(
-                  driverUpper.isNotEmpty ? driverUpper[0] : 'C',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: DriverAvatarWithRating(
+                  name: driverDisplay,
+                  photoUrl: ride.driverPhotoUrl,
+                  rating: ride.driverRating,
+                  radius: 22,
                 ),
               ),
               const SizedBox(width: 10),
@@ -169,6 +177,10 @@ class RideInProgressPanel extends StatelessWidget {
             ],
           ),
         ),
+        if (ride.showEmergencySafetyControls) ...[
+          const SizedBox(height: 10),
+          WomenSafetyActionButtons(ride: ride, etaMinutes: etaMinutes),
+        ],
         const SizedBox(height: 10),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -207,7 +219,8 @@ class RideInProgressPanel extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary, width: 1.2),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 minimumSize: const Size(0, 40),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 shape: RoundedRectangleBorder(

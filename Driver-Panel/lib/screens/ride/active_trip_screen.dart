@@ -44,6 +44,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   bool _statusUpdating = false;
   bool _loading = true;
   bool _cancelHandled = false;
+  int _missingActiveRideCount = 0;
   int? _tripEtaMinutes;
   String? _tripDistanceLabel;
   Timer? _statusPollTimer;
@@ -126,8 +127,16 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     _realtimeSub?.cancel();
     _realtimeSub = realtime.messages.listen((msg) {
       if (!mounted) return;
-      if (msg['event']?.toString() != 'chat_message') return;
-      if (msg['ride_id']?.toString() != ride.id) return;
+      final event = msg['event']?.toString() ?? '';
+      final msgRideId = msg['ride_id']?.toString();
+      if (msgRideId != null && msgRideId != ride.id) return;
+
+      if (event == 'ride_cancelled') {
+        unawaited(_handleRideCancelled());
+        return;
+      }
+
+      if (event != 'chat_message') return;
       if ((msg['sender_type']?.toString() ?? '') == 'driver') return;
       if (ref.read(rideChatSheetOpenProvider)) return;
 
@@ -153,7 +162,11 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
 
   Future<void> _pollRideStatus() async {
     if (_cancelHandled || !mounted) return;
-    final current = ref.read(rideViewModelProvider).activeRide;
+    final rideState = ref.read(rideViewModelProvider);
+    // Accept navigates here before POST /accept-ride finishes — skip cancel checks.
+    if (rideState.isAccepting) return;
+
+    final current = rideState.activeRide;
     if (current == null) return;
     if (current.status != 'heading_to_pickup' && current.status != 'arrived') {
       return;
@@ -162,7 +175,14 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     final ride =
         await ref.read(rideViewModelProvider.notifier).refreshActiveRideStatus();
     if (!mounted || _cancelHandled) return;
-    if (ride == null) {
+    if (ride != null) {
+      _missingActiveRideCount = 0;
+      return;
+    }
+
+    // Require a few consecutive misses so a race with accept can't fake-cancel.
+    _missingActiveRideCount += 1;
+    if (_missingActiveRideCount >= 2) {
       await _handleRideCancelled();
     }
   }

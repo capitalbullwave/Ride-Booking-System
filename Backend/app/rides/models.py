@@ -80,6 +80,12 @@ class Ride(UUIDMixin, TimestampMixin, Base):
     cancelled_by: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     cancellation_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     route_polyline: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Female passengers: prefer women captains first; expand only after user confirms.
+    prefer_women_riders: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    allow_all_riders: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Women Safety Ride mode (SOS / share / safety check UI).
+    women_safety_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="rides", foreign_keys=[user_id])
     driver: Mapped[Optional["Driver"]] = relationship("Driver", back_populates="rides", foreign_keys=[driver_id])

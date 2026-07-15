@@ -48,7 +48,6 @@ export function CreateProfileView() {
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [referralCode, setReferralCode] = useState("");
-  const [showReferral, setShowReferral] = useState(false);
   const [nameError, setNameError] = useState("");
   const [emailError, setEmailError] = useState("");
   const [genderError, setGenderError] = useState("");
@@ -271,29 +270,21 @@ export function CreateProfileView() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <button
-                type="button"
-                onClick={() => setShowReferral((v) => !v)}
-                className="text-left text-sm font-semibold text-primary"
-              >
-                {showReferral ? "Hide referral code" : "Have a referral code? (optional)"}
-              </button>
-              {showReferral ? (
-                <>
-                  <Input
-                    id="referralCode"
-                    type="text"
-                    autoCapitalize="characters"
-                    placeholder="Enter referral code"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className={inputClass(false)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    You can also apply a code later from Refer & Earn.
-                  </p>
-                </>
-              ) : null}
+              <label htmlFor="referralCode" className="text-sm font-semibold text-primary">
+                Referral code
+              </label>
+              <Input
+                id="referralCode"
+                type="text"
+                autoCapitalize="characters"
+                placeholder="Enter referral code"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                className={inputClass(false)}
+              />
+              <p className="text-xs text-muted-foreground">
+                You can also apply a code later from Refer & Earn.
+              </p>
             </div>
 
             {submitError && (

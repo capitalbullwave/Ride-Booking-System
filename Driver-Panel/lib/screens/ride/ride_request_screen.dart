@@ -50,9 +50,8 @@ class _RideRequestScreenState extends ConsumerState<RideRequestScreen> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       ref.read(rideViewModelProvider.notifier).setIncomingRequest(_request!);
-      ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(_request!);
-      router.go(RouteNames.activeTrip);
       await ref.read(rideViewModelProvider.notifier).acceptRide(_request!.id);
+      router.go(RouteNames.activeTrip);
     } catch (e) {
       ref.read(rideViewModelProvider.notifier).clearRide();
       router.go(RouteNames.dashboard);

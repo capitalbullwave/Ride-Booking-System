@@ -64,12 +64,14 @@ class _RideRequestSheetState extends ConsumerState<_RideRequestSheet> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       ref.read(rideViewModelProvider.notifier).setIncomingRequest(widget.request);
-      ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(widget.request);
+      // Wait for accept to commit before opening the trip screen — otherwise
+      // active-ride polling can see null and show a false "ride cancelled" popup.
+      await ref.read(rideViewModelProvider.notifier).acceptRide(rideId);
       if (mounted) Navigator.of(context).pop();
       router.go(RouteNames.activeTrip);
-      await ref.read(rideViewModelProvider.notifier).acceptRide(rideId);
     } catch (e) {
       ref.read(rideViewModelProvider.notifier).clearRide();
+      if (mounted) Navigator.of(context).pop();
       router.go(RouteNames.dashboard);
       messenger.showSnackBar(
         SnackBar(

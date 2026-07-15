@@ -89,16 +89,40 @@ async def _load_driver_ride(db: AsyncSession, ride_id: UUID) -> Ride:
 def _payment_breakdown_payload(ride: Ride, payment_method: str | None = None) -> dict:
     fare = float(ride.final_fare or ride.estimated_fare or 0)
     commission_pct = float(ride.driver_commission_percentage or 0)
-    driver_earning = float(ride.driver_earning or 0)
-    company_earning = float(ride.company_earning or 0)
+    driver_earning = ride.driver_earning
+    company_earning = ride.company_earning
+
+    # Backfill display values when settlement fields were never written.
+    if fare > 0 and (driver_earning is None or company_earning is None):
+        from app.services.ride_settlement_service import compute_ride_split
+        from app.services.commission_service import CommissionService
+
+        pct = commission_pct if commission_pct > 0 else CommissionService.DEFAULT_COMMISSION_PERCENTAGE
+        driver_earning, company_earning = compute_ride_split(fare, pct)
+        commission_pct = pct
+    else:
+        driver_earning = float(driver_earning or 0)
+        company_earning = float(company_earning or 0)
+        # Inconsistent 0/0 with a positive fare — derive from percentage.
+        if fare > 0 and driver_earning <= 0 and company_earning <= 0:
+            from app.services.ride_settlement_service import compute_ride_split
+            from app.services.commission_service import CommissionService
+
+            pct = commission_pct if commission_pct > 0 else CommissionService.DEFAULT_COMMISSION_PERCENTAGE
+            driver_earning, company_earning = compute_ride_split(fare, pct)
+            commission_pct = pct
+
     return {
-        "trip_fare": fare,
-        "commission": company_earning,
-        "commission_percentage": commission_pct,
+        "trip_fare": round(fare, 2),
+        "commission": round(company_earning, 2),
+        "commission_percentage": round(commission_pct, 2),
+        "platform_commission_percentage": round(max(0.0, 100.0 - commission_pct), 2),
+        "driver_earning": round(driver_earning, 2),
+        "company_earning": round(company_earning, 2),
         "bonus": 0.0,
-        "total_earnings": driver_earning,
+        "total_earnings": round(driver_earning, 2),
         "payment_mode": payment_method or ride.payment_method or "CASH",
-        "final_fare": fare,
+        "final_fare": round(fare, 2),
         "estimated_fare": ride.estimated_fare,
         "payment_method": payment_method or ride.payment_method or "CASH",
     }
@@ -106,7 +130,7 @@ def _payment_breakdown_payload(ride: Ride, payment_method: str | None = None) ->
 
 async def _ensure_ride_settled(db: AsyncSession, ride: Ride) -> Ride:
     """Idempotent settlement if ride completed before settlement ran."""
-    if ride.driver_earning is not None:
+    if ride.driver_earning is not None and ride.company_earning is not None:
         return ride
     from app.services.ride_settlement_service import RideSettlementService
 
@@ -485,6 +509,19 @@ async def accept_ride(
     matching = DriverMatchingService(db)
     vehicle_id = data.vehicle_id
     vehicle = None
+
+    # Block non-women captains from women-preferred searches.
+    from app.services.women_rider_preference import (
+        is_female_gender,
+        ride_requires_women_captains,
+    )
+
+    pending_ride = await RideService(db).get_ride(data.ride_id)
+    if ride_requires_women_captains(pending_ride) and not is_female_gender(driver.gender):
+        raise ValidationException(
+            "This ride is reserved for women captains. Please wait for other requests."
+        )
+
     if vehicle_id is None:
         vehicle_result = await db.execute(
             select(Vehicle).where(
@@ -528,6 +565,8 @@ async def accept_ride(
         "driver_id": str(driver.id),
         "driver_name": driver_name,
         "driver_phone": driver.phone,
+        "driver_rating": float(getattr(driver, "rating_avg", 0) or 0),
+        "driver_photo_url": getattr(driver, "profile_photo", None),
         "vehicle_number": vehicle.license_plate if vehicle else None,
         "start_code": ride.ride_otp,
         "status": ride.status,

@@ -21,7 +21,7 @@ import {
   vehicleImageForCategory,
 } from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
-import { WomenSafetyDialog } from "@/components/booking/WomenSafetyDialog";
+import { PreferWomenCaptainsDialog } from "@/components/booking/PreferWomenCaptainsDialog";
 
 const MAP_EMBED_URL =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d14008.114827184203!2d77.216721!3d28.6328!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390cfd37b741d057%3A0xc46ce4427b231eb5!2sConnaught%20Place%2C%20New%20Delhi%2C%20Delhi%20110001!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin";
@@ -52,15 +52,13 @@ export function RideBookingView() {
   const [payment] = useState(PAYMENT_METHODS[0]);
   const [memberDiscountPercent, setMemberDiscountPercent] = useState(0);
   const [userGender, setUserGender] = useState<string | null>(null);
-  const [emergencyPhone, setEmergencyPhone] = useState<string | null>(null);
-  const [safetyDialogOpen, setSafetyDialogOpen] = useState(false);
+  const [preferWomenOpen, setPreferWomenOpen] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
       try {
         const profile = await getProfile();
         setUserGender(profile.gender);
-        setEmergencyPhone(profile.emergency_contact_phone);
       } catch {
         // Booking can continue without profile metadata.
       }
@@ -186,7 +184,7 @@ export function RideBookingView() {
     );
   };
 
-  const proceedToSearching = (womenSafetyEnabled = false) => {
+  const proceedToSearching = (preferWomenRiders = false) => {
     router.push(
       buildSearchingUrl(
         pickup,
@@ -194,14 +192,14 @@ export function RideBookingView() {
         selectedVehicle,
         tab,
         selectedOption.categoryId,
-        womenSafetyEnabled
+        preferWomenRiders
       )
     );
   };
 
   const handleBook = () => {
     if ((userGender ?? "").toLowerCase() === "female") {
-      setSafetyDialogOpen(true);
+      setPreferWomenOpen(true);
       return;
     }
     proceedToSearching(false);
@@ -345,15 +343,14 @@ export function RideBookingView() {
         </Button>
       </div>
 
-      <WomenSafetyDialog
-        open={safetyDialogOpen}
-        emergencyPhone={emergencyPhone}
+      <PreferWomenCaptainsDialog
+        open={preferWomenOpen}
         onEnable={() => {
-          setSafetyDialogOpen(false);
+          setPreferWomenOpen(false);
           proceedToSearching(true);
         }}
         onSkip={() => {
-          setSafetyDialogOpen(false);
+          setPreferWomenOpen(false);
           proceedToSearching(false);
         }}
       />

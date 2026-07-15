@@ -244,7 +244,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             const SizedBox(height: 20),
             _Row('Trip Fare', DateFormatter.currency(payment.tripFare)),
             _Row(
-              'Commission',
+              'Platform commission',
               '- ${DateFormatter.currency(payment.commission)}',
               color: AppColors.error,
             ),
@@ -259,6 +259,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               'Your Earnings',
               DateFormatter.currency(payment.totalEarnings),
               bold: true,
+              color: AppColors.primary,
             ),
             if (!_paymentCollected) ...[
               const SizedBox(height: 28),

@@ -56,10 +56,9 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_verify_service_sid: str = ""
     twilio_phone_number: str = ""  # optional; Verify API does not require it
-    # OTP delivery: auto | twilio | local
-    # - auto/twilio: send real SMS via Twilio to the entered phone number
-    # - local: only for emergency offline testing (hardcoded 123456, no SMS)
-    otp_delivery_mode: str = "auto"
+    # TWILIO_ENABLED=true  → send real SMS OTP via Twilio (user + driver)
+    # TWILIO_ENABLED=false → no SMS; verify with hardcoded OTP 123456
+    twilio_enabled: bool = False
 
     # Email
     smtp_host: str = "smtp.gmail.com"

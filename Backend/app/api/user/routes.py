@@ -33,7 +33,14 @@ from app.services.subscription_payment_service import (
     activate_user_subscription,
 )
 from app.services.wallet_payment_service import WalletPaymentService
-from app.services.women_safety_service import notify_women_safety_enabled
+from app.services.women_safety_service import (
+    notify_women_safety_enabled,
+    trigger_ride_sos,
+)
+from app.services.women_rider_preference import (
+    WOMEN_RIDERS_UNAVAILABLE_MESSAGE,
+    is_female_gender,
+)
 from app.api.websocket.manager import manager
 
 logger = get_logger(__name__)
@@ -72,6 +79,7 @@ class BookRideRequest(BaseModel):
     rental_hours: float | None = Field(default=None, ge=0)
     scheduled_at: datetime | None = None
     women_safety_enabled: bool = False
+    prefer_women_riders: bool = False
     distance_km: float | None = Field(default=None, ge=0)
     duration_min: float | None = Field(default=None, ge=0)
 
@@ -133,6 +141,16 @@ class CancelRideRequest(BaseModel):
     reason: str | None = None
 
 
+class ContinueWithAllRidersRequest(BaseModel):
+    ride_id: UUID
+
+
+class RideSosRequest(BaseModel):
+    lat: float | None = None
+    lng: float | None = None
+    message: str | None = None
+
+
 class PaymentRequest(BaseModel):
     amount: float = Field(gt=0)
     description: str = "Wallet top-up"
@@ -174,6 +192,9 @@ def _user_to_profile(user: User, addresses: list[SavedAddress], total_rides: int
 
 
 def _ride_summary(ride: Ride) -> dict:
+    prefer_women = bool(getattr(ride, "prefer_women_riders", False))
+    allow_all = bool(getattr(ride, "allow_all_riders", True))
+    women_safety = bool(getattr(ride, "women_safety_enabled", False))
     return {
         "id": str(ride.id),
         "public_id": ride.public_id,
@@ -183,6 +204,10 @@ def _ride_summary(ride: Ride) -> dict:
         "fare_estimate": ride.estimated_fare,
         "fare_final": ride.final_fare,
         "created_at": ride.created_at.isoformat(),
+        "prefer_women_riders": prefer_women,
+        "allow_all_riders": allow_all,
+        "women_safety_enabled": women_safety,
+        "is_emergency": bool(getattr(ride, "is_emergency", False)),
     }
 
 
@@ -209,6 +234,7 @@ def _active_ride_summary(ride: Ride) -> dict:
             "name": f"{ride.driver.first_name} {ride.driver.last_name}".strip(),
             "phone": format_phone_display(ride.driver.phone),
             "rating": ride.driver.rating_avg,
+            "photo_url": ride.driver.profile_photo,
         }
     if ride.vehicle:
         summary["vehicle_number"] = ride.vehicle.license_plate
@@ -217,16 +243,29 @@ def _active_ride_summary(ride: Ride) -> dict:
         summary["vehicle_type"] = vehicle_type
         summary["vehicle_type_slug"] = vehicle_type["slug"]
         summary["vehicle_type_name"] = vehicle_type["name"]
-    if ride.ride_otp and ride.status in (
-        RideStatus.DRIVER_ASSIGNED.value,
-        RideStatus.DRIVER_ARRIVED.value,
+    # Expose PIN before start; keep available during Women Safety rides.
+    if ride.ride_otp and (
+        ride.status
+        in (
+            RideStatus.DRIVER_ASSIGNED.value,
+            RideStatus.DRIVER_ARRIVED.value,
+        )
+        or bool(getattr(ride, "women_safety_enabled", False))
     ):
         summary["start_code"] = ride.ride_otp
     return summary
 
 
-async def _active_ride_summary_enriched(db: AsyncSession, ride: Ride) -> dict:
+async def _active_ride_summary_enriched(
+    db: AsyncSession, ride: Ride, user: User | None = None
+) -> dict:
     from app.models import DriverLocation
+
+    # Female passengers always get women-safety flags on active trips,
+    # even if they skipped women-captain matching when booking.
+    if user is not None and is_female_gender(user.gender) and not ride.women_safety_enabled:
+        ride.women_safety_enabled = True
+        await db.flush()
 
     summary = _active_ride_summary(ride)
     if ride.driver_id:
@@ -447,15 +486,31 @@ async def book_ride(
         duration_min=data.duration_min,
     )
     ride = await RideService(db).create_ride(user.id, ride_data)
-    if data.women_safety_enabled:
-        gender = (user.gender or "").strip().lower()
-        if gender == "female":
+
+    # Women-captain matching only when a female passenger explicitly opts in.
+    prefer_women = bool(data.prefer_women_riders) and is_female_gender(user.gender)
+    if prefer_women:
+        ride.prefer_women_riders = True
+        ride.allow_all_riders = False
+    elif data.prefer_women_riders:
+        logger.info(
+            "women_preference_skipped_non_female_user",
+            user_id=str(user.id),
+            gender=(user.gender or "").strip().lower() or None,
+        )
+
+    # Safety tools (badge / check-in) always on for female passengers,
+    # independent of women-captain matching preference.
+    if is_female_gender(user.gender):
+        ride.women_safety_enabled = True
+        await db.flush()
+        try:
             await notify_women_safety_enabled(db, ride, user)
-        else:
-            logger.info(
-                "women_safety_skipped_non_female_user",
-                user_id=str(user.id),
-                gender=gender or None,
+        except Exception as exc:
+            logger.warning(
+                "women_safety_enable_failed",
+                ride_id=str(ride.id),
+                error=str(exc),
             )
     logger.info(
         "ride_book_requested",
@@ -465,9 +520,47 @@ async def book_ride(
         pickup_address=data.pickup_address,
         dropoff_address=data.dropoff_address,
         status=ride.status,
+        prefer_women_riders=bool(ride.prefer_women_riders),
     )
+
+    matching = DriverMatchingService(db)
+    notified = 0
+    women_riders_available = True
+    requires_choice = False
+
+    if ride.prefer_women_riders and not ride.allow_all_riders:
+        women_count = await matching.count_online_drivers_for_ride(ride)
+        women_riders_available = women_count > 0
+        if not women_riders_available:
+            requires_choice = True
+            logger.info(
+                "women_riders_unavailable",
+                ride_id=str(ride.id),
+                user_id=str(user.id),
+            )
+            # Notify the passenger so the client can show a confirmation prompt.
+            from app.notifications.service import NotificationService
+
+            await NotificationService(db).notify_and_push(
+                user_id=user.id,
+                title="Women captains unavailable",
+                message=WOMEN_RIDERS_UNAVAILABLE_MESSAGE,
+                notification_type="RIDE",
+                data={
+                    "event": "women_riders_unavailable",
+                    "ride_id": str(ride.id),
+                    "requires_rider_preference_choice": True,
+                },
+            )
+            summary = _ride_summary(ride)
+            summary["drivers_notified"] = 0
+            summary["women_riders_available"] = False
+            summary["requires_rider_preference_choice"] = True
+            summary["message"] = WOMEN_RIDERS_UNAVAILABLE_MESSAGE
+            return summary
+
     try:
-        notified = await DriverMatchingService(db).dispatch_ride_to_online_drivers(ride, manager)
+        notified = await matching.dispatch_ride_to_online_drivers(ride, manager)
     except Exception as exc:
         logger.error(
             "ride_dispatch_failed",
@@ -479,6 +572,7 @@ async def book_ride(
         "ride_driver_search_dispatched",
         ride_id=str(ride.id),
         drivers_notified=notified,
+        women_only=bool(ride.prefer_women_riders and not ride.allow_all_riders),
     )
     await manager.broadcast_ride(str(ride.id), {
         "event": "ride_requested",
@@ -488,8 +582,67 @@ async def book_ride(
     })
     summary = _ride_summary(ride)
     summary["drivers_notified"] = notified
+    summary["women_riders_available"] = women_riders_available
+    summary["requires_rider_preference_choice"] = requires_choice
     return summary
 
+
+@router.post("/continue-with-all-riders")
+async def continue_with_all_riders(
+    data: ContinueWithAllRidersRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Expand a women-preferred search to all captains after the passenger confirms."""
+    ride_service = RideService(db)
+    ride = await ride_service.get_ride(data.ride_id)
+    if ride.user_id != user.id:
+        raise ForbiddenException("Access denied")
+    if ride.status != RideStatus.SEARCHING_DRIVER.value:
+        raise ValidationException("Ride is no longer searching for a captain")
+    if not ride.prefer_women_riders:
+        raise ValidationException("This ride does not require a rider preference choice")
+    if ride.allow_all_riders:
+        summary = _ride_summary(ride)
+        summary["drivers_notified"] = 0
+        summary["already_expanded"] = True
+        return summary
+
+    ride.allow_all_riders = True
+    await db.flush()
+
+    matching = DriverMatchingService(db)
+    try:
+        notified = await matching.dispatch_ride_to_online_drivers(ride, manager)
+    except Exception as exc:
+        logger.error(
+            "ride_expand_dispatch_failed",
+            ride_id=str(ride.id),
+            error=str(exc),
+        )
+        notified = 0
+
+    logger.info(
+        "ride_expanded_to_all_riders",
+        ride_id=str(ride.id),
+        user_id=str(user.id),
+        drivers_notified=notified,
+    )
+    await manager.broadcast_ride(
+        str(ride.id),
+        {
+            "event": "ride_expanded_to_all_riders",
+            "ride_id": str(ride.id),
+            "status": ride.status,
+            "drivers_notified": notified,
+        },
+    )
+    summary = _ride_summary(ride)
+    summary["drivers_notified"] = notified
+    summary["women_riders_available"] = False
+    summary["requires_rider_preference_choice"] = False
+    summary["message"] = "Searching for nearby captains"
+    return summary
 
 @router.get("/rides")
 async def list_rides(
@@ -532,7 +685,7 @@ async def list_rides(
                         ride_id=str(active_ride.id),
                         error=str(exc),
                     )
-            active_summary = await _active_ride_summary_enriched(db, active_ride)
+            active_summary = await _active_ride_summary_enriched(db, active_ride, user)
     return {
         "active": active_summary,
         "items": [_ride_summary(r) for r in rides],
@@ -557,6 +710,7 @@ async def get_ride(
             "name": f"{ride.driver.first_name} {ride.driver.last_name}",
             "phone": ride.driver.phone,
             "rating": ride.driver.rating_avg,
+            "photo_url": ride.driver.profile_photo,
         }
     return response
 
@@ -613,6 +767,78 @@ async def cancel_ride(
     except Exception:
         pass
     return RideResponse.model_validate(ride)
+
+
+@router.post("/ride/{ride_id}/sos")
+async def trigger_sos(
+    ride_id: UUID,
+    data: RideSosRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Passenger SOS — mark ride emergency and alert contacts + admin."""
+    ride = await RideService(db).get_ride(ride_id)
+    if ride.user_id != user.id:
+        raise ForbiddenException("Access denied")
+    if ride.status in (RideStatus.COMPLETED.value, RideStatus.CANCELLED.value):
+        raise ValidationException("SOS is only available during an active ride")
+
+    ticket, sms_result = await trigger_ride_sos(
+        db,
+        ride,
+        user,
+        lat=data.lat,
+        lng=data.lng,
+        message=data.message,
+    )
+    await manager.broadcast_ride(
+        str(ride.id),
+        {
+            "event": "ride_sos",
+            "ride_id": str(ride.id),
+            "is_emergency": True,
+            "ticket_id": str(ticket.id),
+            "emergency_sms_sent": sms_result.sent,
+        },
+    )
+    if ride.driver_id:
+        await manager.send_personal(
+            str(ride.driver_id),
+            {
+                "event": "ride_sos",
+                "ride_id": str(ride.id),
+                "is_emergency": True,
+            },
+        )
+
+    if sms_result.sent:
+        message = (
+            "SOS sent. Your emergency contact and support have been notified."
+        )
+    elif sms_result.reason == "no_emergency_phone":
+        message = (
+            "SOS sent to support. Add an emergency contact in Profile to SMS them."
+        )
+    else:
+        message = (
+            "SOS sent to support. SMS to emergency contact could not be delivered "
+            f"({sms_result.reason})."
+        )
+
+    return {
+        "success": True,
+        "ticket_id": str(ticket.id),
+        "is_emergency": True,
+        "women_safety_enabled": True,
+        "emergency_sms_sent": sms_result.sent,
+        "emergency_sms_status": sms_result.status,
+        "emergency_contact_masked": (
+            f"******{''.join(c for c in (sms_result.to_phone or '') if c.isdigit())[-4:]}"
+            if sms_result.to_phone
+            else None
+        ),
+        "message": message,
+    }
 
 
 @router.get("/wallet")

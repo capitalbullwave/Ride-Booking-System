@@ -15,6 +15,7 @@ import 'package:wavego_user/providers/app_providers.dart';
 import 'package:wavego_user/providers/rental_booking_provider.dart';
 import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/widgets/booking/women_riders_unavailable_dialog.dart';
 import 'package:wavego_user/widgets/common/app_button.dart';
 
 Future<void> syncTripBookingFromRental(
@@ -421,6 +422,36 @@ class _RentalConfirmScreenState extends ConsumerState<RentalConfirmScreen> {
       if (rideId != null && rideId.isNotEmpty) {
         ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
       }
+
+      final needsPreferenceChoice =
+          result['requires_rider_preference_choice'] == true;
+      if (needsPreferenceChoice && rideId != null && rideId.isNotEmpty) {
+        if (!mounted) return;
+        setState(() => _isBooking = false);
+        final continueWithOthers =
+            await showWomenRidersUnavailableDialog(context);
+        if (!mounted) return;
+        if (continueWithOthers != true) {
+          try {
+            await ref.read(rideBookingServiceProvider).cancelRide(
+                  rideId,
+                  reason: 'Cancelled — women captains unavailable',
+                );
+          } catch (_) {}
+          ref.read(tripBookingProvider.notifier).clearActiveRideId();
+          return;
+        }
+        setState(() => _isBooking = true);
+        try {
+          await ref
+              .read(rideBookingServiceProvider)
+              .continueWithAllRiders(rideId);
+        } catch (e) {
+          if (mounted) context.showSnackBar(e.toString(), isError: true);
+          return;
+        }
+      }
+
       ref.read(rentalBookingProvider.notifier).reset();
       if (mounted) context.go(RouteNames.bookSearching);
     } catch (e) {

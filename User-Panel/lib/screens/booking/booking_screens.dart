@@ -29,11 +29,13 @@ import 'package:wavego_user/widgets/booking/booking_offers_sheet.dart';
 import 'package:wavego_user/widgets/booking/cancel_ride_helper.dart';
 import 'package:wavego_user/widgets/booking/ride_accepted_panel.dart';
 import 'package:wavego_user/widgets/booking/ride_in_progress_panel.dart';
+import 'package:wavego_user/widgets/booking/women_safety_ride_actions.dart';
 import 'package:wavego_user/widgets/home/ride_schedule_section.dart';
 import 'package:wavego_user/widgets/booking/live_tracking_map.dart';
 import 'package:wavego_user/widgets/booking/rate_ride_dialog.dart';
 import 'package:wavego_user/widgets/booking/route_map_preview.dart';
-import 'package:wavego_user/widgets/booking/women_safety_dialog.dart';
+import 'package:wavego_user/widgets/booking/women_riders_unavailable_dialog.dart';
+import 'package:wavego_user/widgets/booking/prefer_women_captains_dialog.dart';
 import 'package:wavego_user/core/utils/navigation_launcher.dart';
 import 'package:wavego_user/providers/ride_chat_provider.dart';
 import 'package:wavego_user/widgets/ride/ride_chat_notification.dart';
@@ -772,17 +774,14 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
         ? _vehicles[_selectedVehicleIndex!]
         : null;
 
-    var womenSafetyEnabled = false;
+    var preferWomenRiders = false;
     try {
       final profile = await ref.read(authRepositoryProvider).getProfile();
       if (profile?.isFemale == true && mounted) {
-        final choice = await showWomenSafetyDialog(
-          context,
-          emergencyPhone: profile?.emergencyContactPhone,
-        );
+        final choice = await showPreferWomenCaptainsDialog(context);
         if (!mounted) return;
         if (choice == null) return;
-        womenSafetyEnabled = choice;
+        preferWomenRiders = choice;
       }
     } catch (_) {
       // Continue booking if profile cannot be loaded.
@@ -801,7 +800,8 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             paymentMethod: _paymentMethod,
             promoCode: _appliedCoupon?.coupon.code,
             scheduledAt: trip.scheduledAt,
-            womenSafetyEnabled: womenSafetyEnabled,
+            preferWomenRiders: preferWomenRiders,
+            womenSafetyEnabled: preferWomenRiders,
             distanceKm: route.distanceKm,
             durationMin: route.durationMin,
           );
@@ -809,6 +809,40 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       if (rideId != null && rideId.isNotEmpty) {
         ref.read(tripBookingProvider.notifier).setActiveRideId(rideId);
       }
+
+      // Female passenger + no women captains → ask before expanding search.
+      final needsPreferenceChoice =
+          result['requires_rider_preference_choice'] == true;
+      if (needsPreferenceChoice && rideId != null && rideId.isNotEmpty) {
+        if (!mounted) return;
+        setState(() => _booking = false);
+        final continueWithOthers =
+            await showWomenRidersUnavailableDialog(context);
+        if (!mounted) return;
+        if (continueWithOthers != true) {
+          try {
+            await ref.read(rideBookingServiceProvider).cancelRide(
+                  rideId,
+                  reason: 'Cancelled — women captains unavailable',
+                );
+          } catch (_) {}
+          ref.read(tripBookingProvider.notifier).clearActiveRideId();
+          ref.invalidate(activeRideProvider);
+          return;
+        }
+        setState(() => _booking = true);
+        try {
+          await ref
+              .read(rideBookingServiceProvider)
+              .continueWithAllRiders(rideId);
+        } catch (e) {
+          if (mounted) {
+            context.showSnackBar(e.userMessage, isError: true);
+          }
+          return;
+        }
+      }
+
       if (selectedVehicle != null) {
         ref
             .read(tripBookingProvider.notifier)
@@ -1460,12 +1494,14 @@ class RideTrackingScreen extends ConsumerStatefulWidget {
 class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   String? _rideId;
   Timer? _pollTimer;
+  Timer? _safetyCheckTimer;
   StreamSubscription<Map<String, dynamic>>? _realtimeSub;
   UserActiveRide? _optimisticRide;
   double? _liveDriverLat;
   double? _liveDriverLng;
   bool _ratingShown = false;
   bool _rideCompleted = false;
+  bool _safetyCheckOpen = false;
 
   @override
   void initState() {
@@ -1476,7 +1512,37 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
     });
     _pollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       ref.invalidate(activeRideProvider);
+      _maybeStartSafetyCheckTimer();
     });
+  }
+
+  void _maybeStartSafetyCheckTimer() {
+    final ride = ref.read(activeRideProvider).valueOrNull ?? _optimisticRide;
+    final shouldRun = ride != null &&
+        ride.showWomenSafetyControls &&
+        ride.isInProgress &&
+        !_rideCompleted;
+    if (!shouldRun) {
+      _safetyCheckTimer?.cancel();
+      _safetyCheckTimer = null;
+      return;
+    }
+    if (_safetyCheckTimer != null) return;
+    _safetyCheckTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _promptSafetyCheck();
+    });
+  }
+
+  Future<void> _promptSafetyCheck() async {
+    if (!mounted || _safetyCheckOpen || _rideCompleted) return;
+    final ride = ref.read(activeRideProvider).valueOrNull ?? _optimisticRide;
+    if (ride == null || !ride.showWomenSafetyControls || !ride.isInProgress) return;
+    _safetyCheckOpen = true;
+    try {
+      await showSafetyCheckDialog(context: context, ref: ref, ride: ride);
+    } finally {
+      _safetyCheckOpen = false;
+    }
   }
 
   void _startRideRealtime() {
@@ -1496,6 +1562,8 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
             fareEstimate: (msg['estimated_fare'] as num?)?.toDouble(),
             driverName: msg['driver_name'] as String?,
             driverPhone: msg['driver_phone'] as String?,
+            driverRating: (msg['driver_rating'] as num?)?.toDouble(),
+            driverPhotoUrl: msg['driver_photo_url'] as String?,
             vehicleNumber: msg['vehicle_number'] as String?,
             vehicleTypeSlug: (msg['vehicle_type'] as Map?)?['slug'] as String? ??
                 msg['vehicle_type_slug'] as String?,
@@ -1573,6 +1641,7 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
     if (_ratingShown || !mounted) return;
     _ratingShown = true;
     _pollTimer?.cancel();
+    _safetyCheckTimer?.cancel();
     setState(() => _rideCompleted = true);
 
     final rideId = msg['ride_id']?.toString() ?? _rideId ?? '';
@@ -1615,6 +1684,7 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _safetyCheckTimer?.cancel();
     _realtimeSub?.cancel();
     super.dispose();
   }
@@ -1848,9 +1918,12 @@ class _TrackingBottomSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final screenHeight = MediaQuery.sizeOf(context).height;
+    final inProgress = ride?.isInProgress == true;
     final sheetHeight = searching
         ? screenHeight * 0.22
-        : (ride?.isInProgress == true ? screenHeight * 0.38 : screenHeight * 0.45);
+        : inProgress
+            ? screenHeight * 0.48
+            : screenHeight * 0.45;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return SizedBox(
@@ -1929,17 +2002,20 @@ class _TrackingBottomSheet extends ConsumerWidget {
                           ],
                         ],
                       )
-                    : ride!.isInProgress
-                        ? RideInProgressPanel(
-                            ride: ride!,
-                            onMessage: () => _openChat(context, ref),
-                            onCall: () => _callDriver(context),
-                          )
-                        : RideAcceptedPanel(
-                            ride: ride!,
-                            onMessage: () => _openChat(context, ref),
-                            onCall: () => _callDriver(context),
-                          ),
+                    : SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: ride!.isInProgress
+                            ? RideInProgressPanel(
+                                ride: ride!,
+                                onMessage: () => _openChat(context, ref),
+                                onCall: () => _callDriver(context),
+                              )
+                            : RideAcceptedPanel(
+                                ride: ride!,
+                                onMessage: () => _openChat(context, ref),
+                                onCall: () => _callDriver(context),
+                              ),
+                      ),
               ),
             ),
           ],

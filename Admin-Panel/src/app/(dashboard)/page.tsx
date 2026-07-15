@@ -49,22 +49,29 @@ export default function DashboardPage() {
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [statsData, chartData, activityData, driverData] = await Promise.all([
+      const [statsResult, chartsResult, activitiesResult, driversResult] = await Promise.allSettled([
         fetchDashboardStats(),
         fetchDashboardCharts(),
         fetchDashboardActivities(),
         fetchOnlineDrivers(),
       ]);
-      setStats(statsData);
-      setCharts(chartData);
-      setActivities(activityData);
-      setOnlineDrivers(driverData);
-    } catch (error) {
-      setStats(EMPTY_DASHBOARD_STATS);
-      setCharts(null);
-      setActivities([]);
-      setOnlineDrivers([]);
-      toast.error(error instanceof Error ? error.message : "Failed to load dashboard data");
+
+      if (statsResult.status === "fulfilled") {
+        setStats(statsResult.value);
+      } else {
+        setStats(EMPTY_DASHBOARD_STATS);
+      }
+      setCharts(chartsResult.status === "fulfilled" ? chartsResult.value : null);
+      setActivities(activitiesResult.status === "fulfilled" ? activitiesResult.value : []);
+      setOnlineDrivers(driversResult.status === "fulfilled" ? driversResult.value : []);
+
+      const firstError = [statsResult, chartsResult, activitiesResult, driversResult].find(
+        (result) => result.status === "rejected"
+      );
+      if (firstError?.status === "rejected") {
+        const reason = firstError.reason;
+        toast.error(reason instanceof Error ? reason.message : "Failed to load dashboard data");
+      }
     } finally {
       setIsLoading(false);
     }

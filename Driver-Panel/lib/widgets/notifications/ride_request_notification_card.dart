@@ -41,9 +41,8 @@ class _RideRequestNotificationCardState
     final messenger = ScaffoldMessenger.of(context);
     try {
       ref.read(rideViewModelProvider.notifier).setIncomingRequest(request);
-      ref.read(rideViewModelProvider.notifier).primeActiveTripFromRequest(request);
-      router.go(RouteNames.activeTrip);
       await ref.read(rideViewModelProvider.notifier).acceptRide(request.id);
+      router.go(RouteNames.activeTrip);
       if (!mounted) return;
       widget.onHandled();
     } catch (e) {

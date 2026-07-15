@@ -545,7 +545,12 @@ async def online_drivers(
     drivers = result.scalars().all()
     items = []
     for d in drivers:
-        vehicle_result = await db.execute(select(Vehicle).where(Vehicle.driver_id == d.id).limit(1))
+        vehicle_result = await db.execute(
+            select(Vehicle)
+            .options(selectinload(Vehicle.vehicle_type))
+            .where(Vehicle.driver_id == d.id, Vehicle.is_deleted == False)
+            .limit(1)
+        )
         vehicle = vehicle_result.scalar_one_or_none()
         mapped = _map_driver(d, vehicle)
         items.append({"id": mapped["id"], "name": mapped["name"], "vehicleType": mapped["vehicleType"], "status": mapped["status"]})

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/geo_distance.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/widgets/booking/driver_avatar_rating.dart';
 
 class RideAcceptedPanel extends StatelessWidget {
   const RideAcceptedPanel({
@@ -38,7 +39,6 @@ class RideAcceptedPanel extends StatelessWidget {
         : 'Captain is on the way';
     final driverDisplay = (ride.driverName ?? 'Captain').trim();
     final driverUpper = driverDisplay.toUpperCase();
-    final rating = ride.driverRating ?? 4.7;
     final showPin = !ride.isInProgress &&
         ride.startCode != null &&
         ride.startCode!.isNotEmpty;
@@ -162,55 +162,11 @@ class RideAcceptedPanel extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor:
-                            AppColors.primary.withValues(alpha: 0.12),
-                        child: Text(
-                          driverUpper.isNotEmpty ? driverUpper[0] : 'C',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: -3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                rating.toStringAsFixed(1),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 9,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.star,
-                                size: 9,
-                                color: AppColors.warning,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  DriverAvatarWithRating(
+                    name: driverDisplay,
+                    photoUrl: ride.driverPhotoUrl,
+                    rating: ride.driverRating,
+                    radius: 20,
                   ),
                 ],
               ),
@@ -390,88 +346,145 @@ void showRideTripDetailsSheet({
 }) {
   showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: Colors.white,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(99),
+    builder: (context) {
+      final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
+      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      return SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Trip details',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 16),
+                Text(
+                  'Trip details',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                _TripDetailRow(
+                  label: 'Pickup',
+                  value: ride.pickupAddress,
+                  dotColor: const Color(0xFFE53935),
+                ),
+                const SizedBox(height: 12),
+                _TripDetailRow(
+                  label: 'Drop',
+                  value: ride.dropoffAddress,
+                  dotColor: AppColors.success,
+                ),
+                if (ride.fareEstimate != null) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Estimated fare',
+                        style: TextStyle(color: AppColors.mutedForeground),
+                      ),
+                      Text(
+                        '₹${ride.fareEstimate!.round()}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
                   ),
-            ),
-            const SizedBox(height: 16),
-            _TripDetailRow(
-              label: 'Pickup',
-              value: ride.pickupAddress,
-              dotColor: const Color(0xFFE53935),
-            ),
-            const SizedBox(height: 12),
-            _TripDetailRow(
-              label: 'Drop',
-              value: ride.dropoffAddress,
-              dotColor: AppColors.success,
-            ),
-            if (ride.fareEstimate != null) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
+                ],
+                if (ride.vehicleTypeName != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Vehicle',
+                        style: TextStyle(color: AppColors.mutedForeground),
+                      ),
+                      Text(
+                        ride.vehicleTypeName!,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+                if (ride.startCode != null &&
+                    ride.startCode!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Estimated fare',
-                    style: TextStyle(color: AppColors.mutedForeground),
+                    'Ride PIN',
+                    style: TextStyle(
+                      color: AppColors.mutedForeground,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  Text(
-                    '₹${ride.fareEstimate!.round()}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: AppColors.primary,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: ride.startCode!
+                        .trim()
+                        .split('')
+                        .map(
+                          (digit) => Container(
+                            width: 40,
+                            height: 44,
+                            margin: const EdgeInsets.only(right: 8),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.muted,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              digit,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Share this PIN with your captain only when you start the ride.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.mutedForeground,
                     ),
                   ),
                 ],
-              ),
-            ],
-            if (ride.vehicleTypeName != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Vehicle',
-                    style: TextStyle(color: AppColors.mutedForeground),
-                  ),
-                  Text(
-                    ride.vehicleTypeName!,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ],
-          ],
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
+      );
+    },
   );
 }
 

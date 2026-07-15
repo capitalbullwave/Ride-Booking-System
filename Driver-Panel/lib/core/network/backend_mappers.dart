@@ -186,8 +186,32 @@ class BackendMappers {
         (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final commission = (json['commission'] as num?)?.toDouble() ?? 0;
-    final totalEarnings = (json['total_earnings'] as num?)?.toDouble() ?? 0;
+    var commission = (json['commission'] as num?)?.toDouble() ??
+        (json['company_earning'] as num?)?.toDouble() ??
+        0;
+    var totalEarnings = (json['total_earnings'] as num?)?.toDouble() ??
+        (json['driver_earning'] as num?)?.toDouble() ??
+        0;
+
+    // Coherent fallback: earnings + commission must add up to fare.
+    if (fare > 0 && totalEarnings <= 0 && commission <= 0) {
+      final pct = (json['commission_percentage'] as num?)?.toDouble();
+      if (pct != null && pct > 0) {
+        totalEarnings = double.parse((fare * pct / 100).toStringAsFixed(2));
+        commission = double.parse((fare - totalEarnings).toStringAsFixed(2));
+      } else {
+        // Default driver share 80% when backend did not send a split.
+        totalEarnings = double.parse((fare * 0.8).toStringAsFixed(2));
+        commission = double.parse((fare - totalEarnings).toStringAsFixed(2));
+      }
+    } else if (fare > 0 && totalEarnings <= 0 && commission > 0) {
+      totalEarnings = double.parse((fare - commission).toStringAsFixed(2));
+      if (totalEarnings < 0) totalEarnings = 0;
+    } else if (fare > 0 && commission <= 0 && totalEarnings > 0) {
+      commission = double.parse((fare - totalEarnings).toStringAsFixed(2));
+      if (commission < 0) commission = 0;
+    }
+
     return PaymentBreakdown(
       tripFare: fare,
       commission: commission,

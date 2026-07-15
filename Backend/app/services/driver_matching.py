@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
@@ -14,6 +14,10 @@ from app.core.logging import get_logger
 from app.database.redis import get_redis
 from app.models import Driver, DriverLocation, Ride, Vehicle
 from app.repositories.driver_repository import DriverRepository
+from app.services.women_rider_preference import (
+    is_female_gender,
+    ride_requires_women_captains,
+)
 
 logger = get_logger(__name__)
 
@@ -122,6 +126,14 @@ class DriverMatchingService:
         fresh = {row[0] for row in result.all()}
         return [ride_id for ride_id in ride_ids if ride_id in fresh]
 
+    async def _persist_driver_location(
+        self,
+        driver_id: UUID,
+        lat: float,
+        lng: float,
+        heading: Optional[float] = None,
+        speed: Optional[float] = None,
+    ) -> None:
         result = await self.db.execute(
             select(DriverLocation).where(DriverLocation.driver_id == driver_id)
         )
@@ -512,6 +524,11 @@ class DriverMatchingService:
             pass
 
     async def _online_drivers_for_ride(self, ride: Ride) -> List[Driver]:
+        women_only = ride_requires_women_captains(ride)
+        gender_clause = ()
+        if women_only:
+            gender_clause = (func.lower(Driver.gender).in_(("female", "f", "woman", "women")),)
+
         matched = await self.db.execute(
             select(Driver)
             .join(Vehicle, Vehicle.driver_id == Driver.id)
@@ -521,6 +538,7 @@ class DriverMatchingService:
                 Driver.is_active.is_(True),
                 Driver.is_deleted.is_(False),
                 Vehicle.vehicle_type_id == ride.vehicle_type_id,
+                *gender_clause,
             )
             .distinct()
         )
@@ -534,9 +552,17 @@ class DriverMatchingService:
                 Driver.kyc_status == KYCStatus.APPROVED.value,
                 Driver.is_active.is_(True),
                 Driver.is_deleted.is_(False),
+                *gender_clause,
             )
         )
-        return list(fallback.scalars().all())
+        drivers = list(fallback.scalars().all())
+        if women_only:
+            # Extra safety if legacy gender spellings slip through SQL.
+            drivers = [d for d in drivers if is_female_gender(d.gender)]
+        return drivers
+
+    async def count_online_drivers_for_ride(self, ride: Ride) -> int:
+        return len(await self._online_drivers_for_ride(ride))
 
     async def list_open_searching_rides_for_driver(
         self, driver: Driver, *, limit: int = 5
@@ -573,8 +599,15 @@ class DriverMatchingService:
         if vehicle_type_ids:
             matched = [r for r in rides if r.vehicle_type_id in vehicle_type_ids]
             if matched:
-                return matched
-        return rides
+                rides = matched
+
+        visible: List[Ride] = []
+        driver_is_female = is_female_gender(driver.gender)
+        for ride in rides:
+            if ride_requires_women_captains(ride) and not driver_is_female:
+                continue
+            visible.append(ride)
+        return visible
 
     async def dispatch_ride_to_online_drivers(self, ride: Ride, ws_manager=None) -> int:
         from app.notifications.service import NotificationService
