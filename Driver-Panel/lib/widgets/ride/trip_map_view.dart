@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:wavego_driver/core/theme/app_colors.dart';
 import 'package:wavego_driver/core/utils/geo_distance.dart';
+import 'package:wavego_driver/core/utils/map_marker_icons.dart';
 import 'package:wavego_driver/models/ride_model.dart';
 import 'package:wavego_driver/providers/app_providers.dart';
 import 'package:wavego_driver/providers/dashboard_provider.dart';
@@ -19,15 +20,33 @@ typedef TripMetricsCallback = void Function({
   double? distanceMeters,
 });
 
+/// Lets ActiveTripScreen host the my-location FAB above the bottom sheet.
+class TripMapController {
+  Future<void> Function()? _goToMyLocation;
+
+  void _bind(Future<void> Function() fn) => _goToMyLocation = fn;
+
+  void _unbind(Future<void> Function() fn) {
+    if (_goToMyLocation == fn) _goToMyLocation = null;
+  }
+
+  Future<void> goToMyLocation() async {
+    final fn = _goToMyLocation;
+    if (fn != null) await fn();
+  }
+}
+
 class TripMapView extends ConsumerStatefulWidget {
   const TripMapView({
     super.key,
     required this.ride,
     this.onTripMetrics,
+    this.controller,
   });
 
   final ActiveRide ride;
   final TripMetricsCallback? onTripMetrics;
+  final TripMapController? controller;
 
   @override
   ConsumerState<TripMapView> createState() => _TripMapViewState();
@@ -45,6 +64,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   int? _etaMinutes;
   double? _distanceMeters;
   StreamSubscription<Position>? _positionSub;
+  BitmapDescriptor? _pickupIcon;
+  BitmapDescriptor? _dropIcon;
+  BitmapDescriptor? _selfIcon;
 
   void _emitMetrics() {
     widget.onTripMetrics?.call(
@@ -72,7 +94,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   @override
   void initState() {
     super.initState();
+    widget.controller?._bind(goToMyLocation);
     Future.microtask(() async {
+      await _loadMarkerIcons();
       await _initDriverLocation();
       await _loadRoutes();
     });
@@ -101,6 +125,10 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   @override
   void didUpdateWidget(covariant TripMapView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._unbind(goToMyLocation);
+      widget.controller?._bind(goToMyLocation);
+    }
     if (oldWidget.ride.pickupLat != widget.ride.pickupLat ||
         oldWidget.ride.pickupLng != widget.ride.pickupLng ||
         oldWidget.ride.destinationLat != widget.ride.destinationLat ||
@@ -110,13 +138,27 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
     }
   }
 
+  Future<void> _loadMarkerIcons() async {
+    final pickup = await MapMarkerIcons.pickupLabeledMarker();
+    final drop = await MapMarkerIcons.dropoffLabeledMarker();
+    final self = await MapMarkerIcons.selfMarker();
+    if (!mounted) return;
+    setState(() {
+      _pickupIcon = pickup;
+      _dropIcon = drop;
+      _selfIcon = self;
+    });
+  }
+
   Future<void> _initDriverLocation() async {
     try {
-      final position =
+      // Prefer last-known for fast first paint (web GPS can be slow).
+      Position? position = await Geolocator.getLastKnownPosition();
+      position ??=
           await ref.read(locationServiceProvider).getCurrentPosition();
       if (!mounted) return;
       setState(() {
-        _driverLat = position.latitude;
+        _driverLat = position!.latitude;
         _driverLng = position.longitude;
         _speedKmh = position.speed >= 0 ? position.speed * 3.6 : null;
       });
@@ -133,8 +175,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
 
     setState(() => _loadingRoutes = true);
 
+    // Full pickup→drop route only after ride starts; before that focus pickup only.
     List<LatLng> tripPoints = [];
-    if (_hasValidDestination) {
+    if (_isRideStarted && _hasValidDestination) {
       try {
         final route = await ref.read(directionsServiceProvider).getDirectionsByCoordinates(
               pickupLat: widget.ride.pickupLat,
@@ -222,6 +265,7 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
 
   @override
   void dispose() {
+    widget.controller?._unbind(goToMyLocation);
     _positionSub?.cancel();
     if (_mapReady && _controller != null && !kIsWeb) {
       _controller!.dispose();
@@ -234,8 +278,8 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
     if (controller == null || !_hasValidPickup) return;
 
     final points = <LatLng>[
-      _pickup,
-      if (_hasValidDestination) _destination,
+      if (!_isRideStarted) _pickup,
+      if (_isRideStarted && _hasValidDestination) _destination,
       ..._tripRoutePoints,
       ..._activeLegPoints,
     ];
@@ -266,13 +310,14 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
     }
 
     try {
+      // Extra padding so route stays visible above the bottom sheet.
       await controller.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
             southwest: LatLng(minLat, minLng),
             northeast: LatLng(maxLat, maxLng),
           ),
-          72,
+          100,
         ),
       );
     } catch (_) {}
@@ -307,49 +352,91 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   }
 
   Set<Marker> get _markers {
-    final markers = <Marker>{
-      Marker(
-        markerId: const MarkerId('pickup'),
-        position: _pickup,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-        infoWindow: InfoWindow(
-          title: 'Passenger pickup',
-          snippet: widget.ride.pickupAddress,
-        ),
-      ),
-    };
+    final markers = <Marker>{};
 
-    if (_hasValidDestination) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('destination'),
-          position: _destination,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(
-            title: 'Drop location',
-            snippet: widget.ride.destinationAddress,
+    // Heading to pickup / arrived: only pickup. After OTP start: only drop.
+    if (!_isRideStarted) {
+      final icon = _pickupIcon;
+      if (icon != null) {
+        markers.add(
+          Marker(
+            markerId: const MarkerId('pickup'),
+            position: _pickup,
+            icon: icon,
+            anchor: const Offset(0.5, 1),
+            infoWindow: InfoWindow(
+              title: 'Passenger pickup',
+              snippet: widget.ride.pickupAddress,
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } else if (_hasValidDestination) {
+      final icon = _dropIcon;
+      if (icon != null) {
+        markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            position: _destination,
+            icon: icon,
+            anchor: const Offset(0.5, 1),
+            infoWindow: InfoWindow(
+              title: 'Drop location',
+              snippet: widget.ride.destinationAddress,
+            ),
+          ),
+        );
+      }
     }
 
     final dLat = _driverLat;
     final dLng = _driverLng;
+    final selfIcon = _selfIcon;
     if (dLat != null &&
         dLng != null &&
+        selfIcon != null &&
         DirectionsService.hasCoordinates(dLat, dLng)) {
       markers.add(
         Marker(
-          markerId: const MarkerId('driver'),
+          markerId: const MarkerId('self'),
           position: LatLng(dLat, dLng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          icon: selfIcon,
           anchor: const Offset(0.5, 0.5),
+          zIndex: 2,
           infoWindow: const InfoWindow(title: 'You'),
         ),
       );
     }
 
     return markers;
+  }
+
+  Future<void> goToMyLocation() async {
+    try {
+      var lat = _driverLat;
+      var lng = _driverLng;
+      if (lat == null ||
+          lng == null ||
+          !DirectionsService.hasCoordinates(lat, lng)) {
+        final position =
+            await ref.read(locationServiceProvider).getCurrentPosition();
+        lat = position.latitude;
+        lng = position.longitude;
+        if (mounted) {
+          setState(() {
+            _driverLat = lat;
+            _driverLng = lng;
+          });
+          await _loadActiveLeg();
+        }
+      }
+      if (!mounted) return;
+      await _controller?.animateCamera(
+        CameraUpdate.newLatLngZoom(LatLng(lat!, lng!), 16),
+      );
+    } catch (_) {
+      // Permission / GPS unavailable — ignore; map stays as-is.
+    }
   }
 
   @override
@@ -376,7 +463,8 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
           },
           myLocationEnabled: !kIsWeb,
           myLocationButtonEnabled: false,
-          zoomControlsEnabled: kIsWeb,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
           markers: _markers,
           polylines: _polylines,
         ),

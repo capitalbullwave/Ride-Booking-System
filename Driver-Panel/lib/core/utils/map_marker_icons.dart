@@ -1,73 +1,61 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:wavego_user/core/theme/app_colors.dart';
 
-/// Compact map markers — green pickup + bike_topdown.png for captain.
+/// Custom map markers — web-safe (defaultMarkerWithHue often stays red on web).
 class MapMarkerIcons {
   MapMarkerIcons._();
 
   static final _cache = <String, BitmapDescriptor>{};
 
-  static const String bikeTopDownAsset = 'assets/images/map/bike_topdown.png';
-
   static Future<BitmapDescriptor> pickupLabeledMarker() =>
       _compactSpotMarker(
-        cacheKey: 'pickup_green_v10',
+        cacheKey: 'driver_pickup_v1',
         label: 'Pickup',
-        accent: const Color(0xFF16A34A), // green
+        accent: const Color(0xFF16A34A),
       );
 
   static Future<BitmapDescriptor> dropoffLabeledMarker() =>
       _compactSpotMarker(
-        cacheKey: 'drop_v10',
+        cacheKey: 'driver_drop_v1',
         label: 'Drop',
         accent: const Color(0xFFEF4444),
       );
 
-  static final BitmapDescriptor pickupMarker =
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
-
-  static final BitmapDescriptor dropoffMarker =
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
-
-  /// Captain location icon = bike_topdown.png only.
-  static Future<BitmapDescriptor> captainBikeMarker() async {
-    const key = 'captain_bike_png_v9';
+  /// Blue "you are here" dot — web-safe alternative to defaultMarkerWithHue.
+  static Future<BitmapDescriptor> selfMarker() async {
+    const key = 'driver_self_v1';
     final cached = _cache[key];
     if (cached != null) return cached;
-    final icon = await _loadBikePng();
+
+    const pixelRatio = 3.0;
+    const logical = 28.0;
+    final size = (logical * pixelRatio).toInt();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(pixelRatio);
+
+    final center = const Offset(logical / 2, logical / 2);
+    canvas.drawCircle(
+      center,
+      11,
+      Paint()..color = const Color(0x401A73E8),
+    );
+    canvas.drawCircle(center, 7, Paint()..color = Colors.white);
+    canvas.drawCircle(center, 5.2, Paint()..color = const Color(0xFF1A73E8));
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size, size);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    final icon = BitmapDescriptor.bytes(
+      byteData!.buffer.asUint8List(),
+      imagePixelRatio: pixelRatio,
+      width: logical,
+      height: logical,
+    );
     _cache[key] = icon;
     return icon;
-  }
-
-  static Future<BitmapDescriptor> vehicleMarker(String? slug) =>
-      captainBikeMarker();
-
-  static Future<BitmapDescriptor> _loadBikePng() async {
-    // Decode PNG then set explicit map size so it always shows as the bike.
-    final data = await rootBundle.load(bikeTopDownAsset);
-    final codec = await ui.instantiateImageCodec(
-      data.buffer.asUint8List(),
-      targetWidth: 160,
-      targetHeight: 160,
-    );
-    final frame = await codec.getNextFrame();
-    final byteData =
-        await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData == null) {
-      throw StateError('Failed to encode bike marker');
-    }
-    debugPrint('MapMarkerIcons: bike_topdown.png ready for map');
-    return BitmapDescriptor.bytes(
-      byteData.buffer.asUint8List(),
-      width: 64,
-      height: 64,
-      imagePixelRatio: 2.5,
-    );
   }
 
   static Future<BitmapDescriptor> _compactSpotMarker({
@@ -115,13 +103,6 @@ class MapMarkerIcons {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
     );
     canvas.drawRRect(chip, Paint()..color = accent);
-    canvas.drawRRect(
-      chip,
-      Paint()
-        ..color = accent.withValues(alpha: 0.85)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8,
-    );
     tp.paint(
       canvas,
       Offset(chipLeft + 6, chipTop + (chipH - tp.height) / 2),
@@ -146,7 +127,6 @@ class MapMarkerIcons {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
     );
     canvas.drawCircle(spot, 5.5, Paint()..color = Colors.white);
-    // Green (or accent) fill — Rapido/Uber pickup spot
     canvas.drawCircle(spot, 4.2, Paint()..color = accent);
     canvas.drawCircle(spot, 1.6, Paint()..color = Colors.white);
 

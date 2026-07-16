@@ -39,10 +39,12 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
 
   final _otpController = TextEditingController();
   final _sheetController = DraggableScrollableController();
+  final _tripMapController = TripMapController();
   String? _otpError;
   bool _otpSubmitting = false;
   bool _statusUpdating = false;
   bool _loading = true;
+  bool _locatingMe = false;
   bool _cancelHandled = false;
   int _missingActiveRideCount = 0;
   int? _tripEtaMinutes;
@@ -267,11 +269,20 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
     final blockPrimaryAction = primaryBusy ||
         (ride.status == 'heading_to_pickup' && isStartingRide);
 
+    final sheetFraction = ride.status == 'arrived'
+        ? 0.68
+        : ride.status == 'started'
+            ? 0.34
+            : 0.38;
+    final myLocationBottom =
+        MediaQuery.sizeOf(context).height * sheetFraction + 12;
+
     return Scaffold(
       body: Stack(
         children: [
           TripMapView(
             ride: ride,
+            controller: _tripMapController,
             onTripMetrics: ({speedKmh, etaMinutes, distanceMeters}) {
               if (!mounted) return;
               setState(() {
@@ -297,11 +308,7 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
           ),
           DraggableScrollableSheet(
             controller: _sheetController,
-            initialChildSize: ride.status == 'arrived'
-                ? 0.68
-                : ride.status == 'started'
-                    ? 0.34
-                    : 0.38,
+            initialChildSize: sheetFraction,
             minChildSize: ride.status == 'started' ? 0.26 : 0.28,
             maxChildSize: ride.status == 'started' ? 0.42 : 0.78,
             builder: (context, scrollController) {
@@ -517,6 +524,44 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                 ),
               );
             },
+          ),
+          // Above bottom sheet (same pattern as user tracking screen).
+          Positioned(
+            right: 12,
+            bottom: myLocationBottom,
+            child: Material(
+              color: Colors.white,
+              elevation: 3,
+              shadowColor: Colors.black26,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: _locatingMe
+                    ? null
+                    : () async {
+                        setState(() => _locatingMe = true);
+                        try {
+                          await _tripMapController.goToMyLocation();
+                        } finally {
+                          if (mounted) setState(() => _locatingMe = false);
+                        }
+                      },
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: _locatingMe
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.my_location,
+                          size: 22,
+                          color: Color(0xFF1A73E8),
+                        ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

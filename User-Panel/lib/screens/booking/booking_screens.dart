@@ -1499,9 +1499,12 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
   UserActiveRide? _optimisticRide;
   double? _liveDriverLat;
   double? _liveDriverLng;
+  double? _liveDriverHeading;
   bool _ratingShown = false;
   bool _rideCompleted = false;
   bool _safetyCheckOpen = false;
+  bool _locatingMe = false;
+  final _liveMapController = LiveTrackingMapController();
 
   @override
   void initState() {
@@ -1582,6 +1585,10 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
         setState(() {
           _liveDriverLat = (msg['lat'] as num?)?.toDouble();
           _liveDriverLng = (msg['lng'] as num?)?.toDouble();
+          final h = (msg['heading'] as num?)?.toDouble();
+          if (h != null && h.isFinite && h >= 0) {
+            _liveDriverHeading = h;
+          }
         });
       } else if (event == 'ride_started') {
         setState(() {
@@ -1727,6 +1734,27 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
     return base;
   }
 
+  Future<void> _goToMyLocation() async {
+    if (_locatingMe) return;
+    setState(() => _locatingMe = true);
+    try {
+      await _liveMapController.goToMyLocation();
+    } finally {
+      if (mounted) setState(() => _locatingMe = false);
+    }
+  }
+
+  double _myLocationButtonBottom(UserActiveRide? ride) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    if (ride == null || ride.isSearching) {
+      return screenHeight * 0.22 + 12;
+    }
+    if (ride.isInProgress) {
+      return screenHeight * 0.48 + 12;
+    }
+    return screenHeight * 0.45 + 12;
+  }
+
   Widget _buildMap(UserActiveRide? ride) {
     final trip = ref.watch(tripBookingProvider);
     final bookedVehicleSlug =
@@ -1734,10 +1762,12 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
     if (ride != null && !ride.isSearching && ride.pickupLat != null) {
       return LiveTrackingMap(
         ride: ride,
-        driverLat: _liveDriverLat,
-        driverLng: _liveDriverLng,
+        driverLat: _liveDriverLat ?? ride.driverLat,
+        driverLng: _liveDriverLng ?? ride.driverLng,
+        driverHeading: _liveDriverHeading,
         fallbackVehicleSlug: bookedVehicleSlug,
         tripRoute: trip.route,
+        controller: _liveMapController,
       );
     }
     final route = trip.route;
@@ -1831,6 +1861,36 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
               },
             ),
           ),
+          // Above bottom sheet so it stays visible (map overlays sit under the sheet).
+          if (driverAssigned)
+            Positioned(
+              right: 12,
+              bottom: _myLocationButtonBottom(resolvedForMap),
+              child: Material(
+                color: Colors.white,
+                elevation: 3,
+                shadowColor: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: _locatingMe ? null : _goToMyLocation,
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: _locatingMe
+                        ? const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(
+                            Icons.my_location,
+                            size: 22,
+                            color: Color(0xFF1A73E8),
+                          ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

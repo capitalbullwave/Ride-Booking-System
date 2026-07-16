@@ -52,6 +52,8 @@ flutter:
     - assets/images/
     - assets/images/services/
     - assets/images/features/
+    - assets/images/map/
+    - assets/images/map/bike_topdown.png
     - assets/lottie/
     - assets/mock/
 
