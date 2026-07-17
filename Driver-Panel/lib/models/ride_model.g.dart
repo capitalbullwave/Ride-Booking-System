@@ -22,6 +22,11 @@ _RideRequest _$RideRequestFromJson(Map<String, dynamic> json) => _RideRequest(
   passengerPhone: json['passenger_phone'] as String?,
   passengerRating: (json['passenger_rating'] as num?)?.toDouble() ?? 4.5,
   expiresIn: (json['expires_in'] as num?)?.toInt() ?? 15,
+  stops:
+      (json['stops'] as List<dynamic>?)
+          ?.map((e) => RideStop.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <RideStop>[],
 );
 
 Map<String, dynamic> _$RideRequestToJson(_RideRequest instance) =>
@@ -41,6 +46,7 @@ Map<String, dynamic> _$RideRequestToJson(_RideRequest instance) =>
       'passenger_phone': instance.passengerPhone,
       'passenger_rating': instance.passengerRating,
       'expires_in': instance.expiresIn,
+      'stops': instance.stops,
     };
 
 _ActiveRide _$ActiveRideFromJson(Map<String, dynamic> json) => _ActiveRide(
@@ -59,6 +65,11 @@ _ActiveRide _$ActiveRideFromJson(Map<String, dynamic> json) => _ActiveRide(
   estimatedFare: (json['estimated_fare'] as num).toDouble(),
   distance: (json['distance'] as num?)?.toDouble(),
   startedAt: json['started_at'] as String?,
+  stops:
+      (json['stops'] as List<dynamic>?)
+          ?.map((e) => RideStop.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <RideStop>[],
 );
 
 Map<String, dynamic> _$ActiveRideToJson(_ActiveRide instance) =>
@@ -78,6 +89,7 @@ Map<String, dynamic> _$ActiveRideToJson(_ActiveRide instance) =>
       'estimated_fare': instance.estimatedFare,
       'distance': instance.distance,
       'started_at': instance.startedAt,
+      'stops': instance.stops,
     };
 
 _RideSummary _$RideSummaryFromJson(Map<String, dynamic> json) => _RideSummary(
@@ -93,6 +105,11 @@ _RideSummary _$RideSummaryFromJson(Map<String, dynamic> json) => _RideSummary(
   driverRating: (json['driver_rating'] as num?)?.toDouble(),
   paymentMode: json['payment_mode'] as String,
   completedAt: json['completed_at'] as String?,
+  stops:
+      (json['stops'] as List<dynamic>?)
+          ?.map((e) => RideStop.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <RideStop>[],
 );
 
 Map<String, dynamic> _$RideSummaryToJson(_RideSummary instance) =>
@@ -109,6 +126,7 @@ Map<String, dynamic> _$RideSummaryToJson(_RideSummary instance) =>
       'driver_rating': instance.driverRating,
       'payment_mode': instance.paymentMode,
       'completed_at': instance.completedAt,
+      'stops': instance.stops,
     };
 
 _PaymentBreakdown _$PaymentBreakdownFromJson(Map<String, dynamic> json) =>

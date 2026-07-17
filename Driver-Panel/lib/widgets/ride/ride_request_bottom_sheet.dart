@@ -169,6 +169,17 @@ class _RideRequestSheetState extends ConsumerState<_RideRequestSheet> {
                 address: request.pickupAddress,
                 label: 'Pickup',
               ),
+              for (var i = 0; i < request.stops.length; i++) ...[
+                if (request.stops[i].address.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _AddressRow(
+                    icon: Icons.change_history,
+                    color: AppColors.primary,
+                    address: request.stops[i].address,
+                    label: 'Stop ${i + 1}',
+                  ),
+                ],
+              ],
               const SizedBox(height: 12),
               _AddressRow(
                 icon: Icons.location_on,

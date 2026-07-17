@@ -25,7 +25,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview> {
   GoogleMapController? _controller;
 
   Set<Marker> _buildMarkers(LatLng pickup, LatLng dropoff) {
-    return {
+    final markers = <Marker>{
       Marker(
         markerId: const MarkerId('pickup'),
         position: pickup,
@@ -41,6 +41,21 @@ class _RouteMapPreviewState extends State<RouteMapPreview> {
         infoWindow: InfoWindow(title: 'Drop', snippet: widget.route.dropoff.address),
       ),
     };
+
+    for (var i = 0; i < widget.route.stops.length; i++) {
+      final stop = widget.route.stops[i];
+      markers.add(
+        Marker(
+          markerId: MarkerId('stop_${i + 1}'),
+          position: LatLng(stop.lat, stop.lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          anchor: const Offset(0.5, 1.0),
+          infoWindow: InfoWindow(title: 'Stop ${i + 1}', snippet: stop.address),
+        ),
+      );
+    }
+
+    return markers;
   }
 
   @override
@@ -55,6 +70,12 @@ class _RouteMapPreviewState extends State<RouteMapPreview> {
 
     final pickup = LatLng(widget.route.pickup.lat, widget.route.pickup.lng);
     final dropoff = LatLng(widget.route.dropoff.lat, widget.route.dropoff.lng);
+    final fitPoints = <LatLng>[
+      pickup,
+      dropoff,
+      ...widget.route.stops.map((s) => LatLng(s.lat, s.lng)),
+      ...points,
+    ];
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppRadius.card),
@@ -65,7 +86,7 @@ class _RouteMapPreviewState extends State<RouteMapPreview> {
           initialCameraPosition: CameraPosition(target: pickup, zoom: 12),
           onMapCreated: (controller) {
             _controller = controller;
-            _fitBounds(points);
+            _fitBounds(fitPoints);
           },
           markers: _buildMarkers(pickup, dropoff),
           polylines: {

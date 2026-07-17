@@ -23,7 +23,13 @@ class Validators {
     if (value == null || value.trim().isEmpty) {
       return 'Email is required';
     }
-    final regex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    return optionalEmail(value);
+  }
+
+  /// Email is optional — empty is OK; if provided must be valid.
+  static String? optionalEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final regex = RegExp(r'^[\w\-.]+@([\w-]+\.)+[\w-]{2,}$');
     if (!regex.hasMatch(value.trim())) {
       return 'Enter a valid email address';
     }

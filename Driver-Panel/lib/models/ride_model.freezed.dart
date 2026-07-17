@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$RideRequest {
 
- String get id;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress;@JsonKey(name: 'pickup_lat') double get pickupLat;@JsonKey(name: 'pickup_lng') double get pickupLng;@JsonKey(name: 'destination_lat') double get destinationLat;@JsonKey(name: 'destination_lng') double get destinationLng; double get distance;@JsonKey(name: 'estimated_time') int get estimatedTime;@JsonKey(name: 'estimated_fare') double get estimatedFare;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'passenger_name') String get passengerName;@JsonKey(name: 'passenger_phone') String? get passengerPhone;@JsonKey(name: 'passenger_rating') double get passengerRating;@JsonKey(name: 'expires_in') int get expiresIn;
+ String get id;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress;@JsonKey(name: 'pickup_lat') double get pickupLat;@JsonKey(name: 'pickup_lng') double get pickupLng;@JsonKey(name: 'destination_lat') double get destinationLat;@JsonKey(name: 'destination_lng') double get destinationLng; double get distance;@JsonKey(name: 'estimated_time') int get estimatedTime;@JsonKey(name: 'estimated_fare') double get estimatedFare;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'passenger_name') String get passengerName;@JsonKey(name: 'passenger_phone') String? get passengerPhone;@JsonKey(name: 'passenger_rating') double get passengerRating;@JsonKey(name: 'expires_in') int get expiresIn;@JsonKey(name: 'stops') List<RideStop> get stops;
 /// Create a copy of RideRequest
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $RideRequestCopyWith<RideRequest> get copyWith => _$RideRequestCopyWithImpl<Ride
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RideRequest&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedTime, estimatedTime) || other.estimatedTime == estimatedTime)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.expiresIn, expiresIn) || other.expiresIn == expiresIn));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RideRequest&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedTime, estimatedTime) || other.estimatedTime == estimatedTime)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.expiresIn, expiresIn) || other.expiresIn == expiresIn)&&const DeepCollectionEquality().equals(other.stops, stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,distance,estimatedTime,estimatedFare,paymentMode,passengerName,passengerPhone,passengerRating,expiresIn);
+int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,distance,estimatedTime,estimatedFare,paymentMode,passengerName,passengerPhone,passengerRating,expiresIn,const DeepCollectionEquality().hash(stops));
 
 @override
 String toString() {
-  return 'RideRequest(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, distance: $distance, estimatedTime: $estimatedTime, estimatedFare: $estimatedFare, paymentMode: $paymentMode, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, expiresIn: $expiresIn)';
+  return 'RideRequest(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, distance: $distance, estimatedTime: $estimatedTime, estimatedFare: $estimatedFare, paymentMode: $paymentMode, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, expiresIn: $expiresIn, stops: $stops)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $RideRequestCopyWith<$Res>  {
   factory $RideRequestCopyWith(RideRequest value, $Res Function(RideRequest) _then) = _$RideRequestCopyWithImpl;
 @useResult
 $Res call({
- String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng, double distance,@JsonKey(name: 'estimated_time') int estimatedTime,@JsonKey(name: 'estimated_fare') double estimatedFare,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'expires_in') int expiresIn
+ String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng, double distance,@JsonKey(name: 'estimated_time') int estimatedTime,@JsonKey(name: 'estimated_fare') double estimatedFare,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'expires_in') int expiresIn,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -65,7 +65,7 @@ class _$RideRequestCopyWithImpl<$Res>
 
 /// Create a copy of RideRequest
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? distance = null,Object? estimatedTime = null,Object? estimatedFare = null,Object? paymentMode = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? expiresIn = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? distance = null,Object? estimatedTime = null,Object? estimatedFare = null,Object? paymentMode = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? expiresIn = null,Object? stops = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickupAddress: null == pickupAddress ? _self.pickupAddress : pickupAddress // ignore: cast_nullable_to_non_nullable
@@ -82,7 +82,8 @@ as String,passengerName: null == passengerName ? _self.passengerName : passenger
 as String,passengerPhone: freezed == passengerPhone ? _self.passengerPhone : passengerPhone // ignore: cast_nullable_to_non_nullable
 as String?,passengerRating: null == passengerRating ? _self.passengerRating : passengerRating // ignore: cast_nullable_to_non_nullable
 as double,expiresIn: null == expiresIn ? _self.expiresIn : expiresIn // ignore: cast_nullable_to_non_nullable
-as int,
+as int,stops: null == stops ? _self.stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 
@@ -167,10 +168,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RideRequest() when $default != null:
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn,_that.stops);case _:
   return orElse();
 
 }
@@ -188,10 +189,10 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pick
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn, @JsonKey(name: 'stops')  List<RideStop> stops)  $default,) {final _that = this;
 switch (_that) {
 case _RideRequest():
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn,_that.stops);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -208,10 +209,10 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pick
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng,  double distance, @JsonKey(name: 'estimated_time')  int estimatedTime, @JsonKey(name: 'estimated_fare')  double estimatedFare, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'expires_in')  int expiresIn, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,) {final _that = this;
 switch (_that) {
 case _RideRequest() when $default != null:
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.distance,_that.estimatedTime,_that.estimatedFare,_that.paymentMode,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.expiresIn,_that.stops);case _:
   return null;
 
 }
@@ -223,7 +224,7 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.pick
 @JsonSerializable()
 
 class _RideRequest implements RideRequest {
-  const _RideRequest({required this.id, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, @JsonKey(name: 'pickup_lat') required this.pickupLat, @JsonKey(name: 'pickup_lng') required this.pickupLng, @JsonKey(name: 'destination_lat') required this.destinationLat, @JsonKey(name: 'destination_lng') required this.destinationLng, required this.distance, @JsonKey(name: 'estimated_time') required this.estimatedTime, @JsonKey(name: 'estimated_fare') required this.estimatedFare, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'passenger_name') required this.passengerName, @JsonKey(name: 'passenger_phone') this.passengerPhone, @JsonKey(name: 'passenger_rating') this.passengerRating = 4.5, @JsonKey(name: 'expires_in') this.expiresIn = 15});
+  const _RideRequest({required this.id, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, @JsonKey(name: 'pickup_lat') required this.pickupLat, @JsonKey(name: 'pickup_lng') required this.pickupLng, @JsonKey(name: 'destination_lat') required this.destinationLat, @JsonKey(name: 'destination_lng') required this.destinationLng, required this.distance, @JsonKey(name: 'estimated_time') required this.estimatedTime, @JsonKey(name: 'estimated_fare') required this.estimatedFare, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'passenger_name') required this.passengerName, @JsonKey(name: 'passenger_phone') this.passengerPhone, @JsonKey(name: 'passenger_rating') this.passengerRating = 4.5, @JsonKey(name: 'expires_in') this.expiresIn = 15, @JsonKey(name: 'stops') final  List<RideStop> stops = const <RideStop>[]}): _stops = stops;
   factory _RideRequest.fromJson(Map<String, dynamic> json) => _$RideRequestFromJson(json);
 
 @override final  String id;
@@ -241,6 +242,13 @@ class _RideRequest implements RideRequest {
 @override@JsonKey(name: 'passenger_phone') final  String? passengerPhone;
 @override@JsonKey(name: 'passenger_rating') final  double passengerRating;
 @override@JsonKey(name: 'expires_in') final  int expiresIn;
+ final  List<RideStop> _stops;
+@override@JsonKey(name: 'stops') List<RideStop> get stops {
+  if (_stops is EqualUnmodifiableListView) return _stops;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_stops);
+}
+
 
 /// Create a copy of RideRequest
 /// with the given fields replaced by the non-null parameter values.
@@ -255,16 +263,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RideRequest&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedTime, estimatedTime) || other.estimatedTime == estimatedTime)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.expiresIn, expiresIn) || other.expiresIn == expiresIn));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RideRequest&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.estimatedTime, estimatedTime) || other.estimatedTime == estimatedTime)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.expiresIn, expiresIn) || other.expiresIn == expiresIn)&&const DeepCollectionEquality().equals(other._stops, _stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,distance,estimatedTime,estimatedFare,paymentMode,passengerName,passengerPhone,passengerRating,expiresIn);
+int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,distance,estimatedTime,estimatedFare,paymentMode,passengerName,passengerPhone,passengerRating,expiresIn,const DeepCollectionEquality().hash(_stops));
 
 @override
 String toString() {
-  return 'RideRequest(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, distance: $distance, estimatedTime: $estimatedTime, estimatedFare: $estimatedFare, paymentMode: $paymentMode, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, expiresIn: $expiresIn)';
+  return 'RideRequest(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, distance: $distance, estimatedTime: $estimatedTime, estimatedFare: $estimatedFare, paymentMode: $paymentMode, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, expiresIn: $expiresIn, stops: $stops)';
 }
 
 
@@ -275,7 +283,7 @@ abstract mixin class _$RideRequestCopyWith<$Res> implements $RideRequestCopyWith
   factory _$RideRequestCopyWith(_RideRequest value, $Res Function(_RideRequest) _then) = __$RideRequestCopyWithImpl;
 @override @useResult
 $Res call({
- String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng, double distance,@JsonKey(name: 'estimated_time') int estimatedTime,@JsonKey(name: 'estimated_fare') double estimatedFare,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'expires_in') int expiresIn
+ String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng, double distance,@JsonKey(name: 'estimated_time') int estimatedTime,@JsonKey(name: 'estimated_fare') double estimatedFare,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'expires_in') int expiresIn,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -292,7 +300,7 @@ class __$RideRequestCopyWithImpl<$Res>
 
 /// Create a copy of RideRequest
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? distance = null,Object? estimatedTime = null,Object? estimatedFare = null,Object? paymentMode = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? expiresIn = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? distance = null,Object? estimatedTime = null,Object? estimatedFare = null,Object? paymentMode = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? expiresIn = null,Object? stops = null,}) {
   return _then(_RideRequest(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickupAddress: null == pickupAddress ? _self.pickupAddress : pickupAddress // ignore: cast_nullable_to_non_nullable
@@ -309,7 +317,8 @@ as String,passengerName: null == passengerName ? _self.passengerName : passenger
 as String,passengerPhone: freezed == passengerPhone ? _self.passengerPhone : passengerPhone // ignore: cast_nullable_to_non_nullable
 as String?,passengerRating: null == passengerRating ? _self.passengerRating : passengerRating // ignore: cast_nullable_to_non_nullable
 as double,expiresIn: null == expiresIn ? _self.expiresIn : expiresIn // ignore: cast_nullable_to_non_nullable
-as int,
+as int,stops: null == stops ? _self._stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 
@@ -320,7 +329,7 @@ as int,
 /// @nodoc
 mixin _$ActiveRide {
 
- String get id; String get status;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress;@JsonKey(name: 'pickup_lat') double get pickupLat;@JsonKey(name: 'pickup_lng') double get pickupLng;@JsonKey(name: 'destination_lat') double get destinationLat;@JsonKey(name: 'destination_lng') double get destinationLng;@JsonKey(name: 'passenger_name') String get passengerName;@JsonKey(name: 'passenger_phone') String? get passengerPhone;@JsonKey(name: 'passenger_rating') double get passengerRating;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'estimated_fare') double get estimatedFare; double? get distance;@JsonKey(name: 'started_at') String? get startedAt;
+ String get id; String get status;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress;@JsonKey(name: 'pickup_lat') double get pickupLat;@JsonKey(name: 'pickup_lng') double get pickupLng;@JsonKey(name: 'destination_lat') double get destinationLat;@JsonKey(name: 'destination_lng') double get destinationLng;@JsonKey(name: 'passenger_name') String get passengerName;@JsonKey(name: 'passenger_phone') String? get passengerPhone;@JsonKey(name: 'passenger_rating') double get passengerRating;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'estimated_fare') double get estimatedFare; double? get distance;@JsonKey(name: 'started_at') String? get startedAt;@JsonKey(name: 'stops') List<RideStop> get stops;
 /// Create a copy of ActiveRide
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -333,16 +342,16 @@ $ActiveRideCopyWith<ActiveRide> get copyWith => _$ActiveRideCopyWithImpl<ActiveR
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ActiveRide&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ActiveRide&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&const DeepCollectionEquality().equals(other.stops, stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,status,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,passengerName,passengerPhone,passengerRating,paymentMode,estimatedFare,distance,startedAt);
+int get hashCode => Object.hash(runtimeType,id,status,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,passengerName,passengerPhone,passengerRating,paymentMode,estimatedFare,distance,startedAt,const DeepCollectionEquality().hash(stops));
 
 @override
 String toString() {
-  return 'ActiveRide(id: $id, status: $status, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, paymentMode: $paymentMode, estimatedFare: $estimatedFare, distance: $distance, startedAt: $startedAt)';
+  return 'ActiveRide(id: $id, status: $status, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, paymentMode: $paymentMode, estimatedFare: $estimatedFare, distance: $distance, startedAt: $startedAt, stops: $stops)';
 }
 
 
@@ -353,7 +362,7 @@ abstract mixin class $ActiveRideCopyWith<$Res>  {
   factory $ActiveRideCopyWith(ActiveRide value, $Res Function(ActiveRide) _then) = _$ActiveRideCopyWithImpl;
 @useResult
 $Res call({
- String id, String status,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'estimated_fare') double estimatedFare, double? distance,@JsonKey(name: 'started_at') String? startedAt
+ String id, String status,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'estimated_fare') double estimatedFare, double? distance,@JsonKey(name: 'started_at') String? startedAt,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -370,7 +379,7 @@ class _$ActiveRideCopyWithImpl<$Res>
 
 /// Create a copy of ActiveRide
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? status = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? paymentMode = null,Object? estimatedFare = null,Object? distance = freezed,Object? startedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? status = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? paymentMode = null,Object? estimatedFare = null,Object? distance = freezed,Object? startedAt = freezed,Object? stops = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
@@ -387,7 +396,8 @@ as double,paymentMode: null == paymentMode ? _self.paymentMode : paymentMode // 
 as String,estimatedFare: null == estimatedFare ? _self.estimatedFare : estimatedFare // ignore: cast_nullable_to_non_nullable
 as double,distance: freezed == distance ? _self.distance : distance // ignore: cast_nullable_to_non_nullable
 as double?,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,stops: null == stops ? _self.stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 
@@ -472,10 +482,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ActiveRide() when $default != null:
-return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt);case _:
+return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt,_that.stops);case _:
   return orElse();
 
 }
@@ -493,10 +503,10 @@ return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddre
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt, @JsonKey(name: 'stops')  List<RideStop> stops)  $default,) {final _that = this;
 switch (_that) {
 case _ActiveRide():
-return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt);case _:
+return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt,_that.stops);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -513,10 +523,10 @@ return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddre
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String status, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress, @JsonKey(name: 'pickup_lat')  double pickupLat, @JsonKey(name: 'pickup_lng')  double pickupLng, @JsonKey(name: 'destination_lat')  double destinationLat, @JsonKey(name: 'destination_lng')  double destinationLng, @JsonKey(name: 'passenger_name')  String passengerName, @JsonKey(name: 'passenger_phone')  String? passengerPhone, @JsonKey(name: 'passenger_rating')  double passengerRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'estimated_fare')  double estimatedFare,  double? distance, @JsonKey(name: 'started_at')  String? startedAt, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,) {final _that = this;
 switch (_that) {
 case _ActiveRide() when $default != null:
-return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt);case _:
+return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddress,_that.pickupLat,_that.pickupLng,_that.destinationLat,_that.destinationLng,_that.passengerName,_that.passengerPhone,_that.passengerRating,_that.paymentMode,_that.estimatedFare,_that.distance,_that.startedAt,_that.stops);case _:
   return null;
 
 }
@@ -528,7 +538,7 @@ return $default(_that.id,_that.status,_that.pickupAddress,_that.destinationAddre
 @JsonSerializable()
 
 class _ActiveRide implements ActiveRide {
-  const _ActiveRide({required this.id, required this.status, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, @JsonKey(name: 'pickup_lat') required this.pickupLat, @JsonKey(name: 'pickup_lng') required this.pickupLng, @JsonKey(name: 'destination_lat') required this.destinationLat, @JsonKey(name: 'destination_lng') required this.destinationLng, @JsonKey(name: 'passenger_name') required this.passengerName, @JsonKey(name: 'passenger_phone') this.passengerPhone, @JsonKey(name: 'passenger_rating') this.passengerRating = 4.5, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'estimated_fare') required this.estimatedFare, this.distance, @JsonKey(name: 'started_at') this.startedAt});
+  const _ActiveRide({required this.id, required this.status, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, @JsonKey(name: 'pickup_lat') required this.pickupLat, @JsonKey(name: 'pickup_lng') required this.pickupLng, @JsonKey(name: 'destination_lat') required this.destinationLat, @JsonKey(name: 'destination_lng') required this.destinationLng, @JsonKey(name: 'passenger_name') required this.passengerName, @JsonKey(name: 'passenger_phone') this.passengerPhone, @JsonKey(name: 'passenger_rating') this.passengerRating = 4.5, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'estimated_fare') required this.estimatedFare, this.distance, @JsonKey(name: 'started_at') this.startedAt, @JsonKey(name: 'stops') final  List<RideStop> stops = const <RideStop>[]}): _stops = stops;
   factory _ActiveRide.fromJson(Map<String, dynamic> json) => _$ActiveRideFromJson(json);
 
 @override final  String id;
@@ -546,6 +556,13 @@ class _ActiveRide implements ActiveRide {
 @override@JsonKey(name: 'estimated_fare') final  double estimatedFare;
 @override final  double? distance;
 @override@JsonKey(name: 'started_at') final  String? startedAt;
+ final  List<RideStop> _stops;
+@override@JsonKey(name: 'stops') List<RideStop> get stops {
+  if (_stops is EqualUnmodifiableListView) return _stops;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_stops);
+}
+
 
 /// Create a copy of ActiveRide
 /// with the given fields replaced by the non-null parameter values.
@@ -560,16 +577,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ActiveRide&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _ActiveRide&&(identical(other.id, id) || other.id == id)&&(identical(other.status, status) || other.status == status)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.pickupLat, pickupLat) || other.pickupLat == pickupLat)&&(identical(other.pickupLng, pickupLng) || other.pickupLng == pickupLng)&&(identical(other.destinationLat, destinationLat) || other.destinationLat == destinationLat)&&(identical(other.destinationLng, destinationLng) || other.destinationLng == destinationLng)&&(identical(other.passengerName, passengerName) || other.passengerName == passengerName)&&(identical(other.passengerPhone, passengerPhone) || other.passengerPhone == passengerPhone)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.estimatedFare, estimatedFare) || other.estimatedFare == estimatedFare)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.startedAt, startedAt) || other.startedAt == startedAt)&&const DeepCollectionEquality().equals(other._stops, _stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,status,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,passengerName,passengerPhone,passengerRating,paymentMode,estimatedFare,distance,startedAt);
+int get hashCode => Object.hash(runtimeType,id,status,pickupAddress,destinationAddress,pickupLat,pickupLng,destinationLat,destinationLng,passengerName,passengerPhone,passengerRating,paymentMode,estimatedFare,distance,startedAt,const DeepCollectionEquality().hash(_stops));
 
 @override
 String toString() {
-  return 'ActiveRide(id: $id, status: $status, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, paymentMode: $paymentMode, estimatedFare: $estimatedFare, distance: $distance, startedAt: $startedAt)';
+  return 'ActiveRide(id: $id, status: $status, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, pickupLat: $pickupLat, pickupLng: $pickupLng, destinationLat: $destinationLat, destinationLng: $destinationLng, passengerName: $passengerName, passengerPhone: $passengerPhone, passengerRating: $passengerRating, paymentMode: $paymentMode, estimatedFare: $estimatedFare, distance: $distance, startedAt: $startedAt, stops: $stops)';
 }
 
 
@@ -580,7 +597,7 @@ abstract mixin class _$ActiveRideCopyWith<$Res> implements $ActiveRideCopyWith<$
   factory _$ActiveRideCopyWith(_ActiveRide value, $Res Function(_ActiveRide) _then) = __$ActiveRideCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String status,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'estimated_fare') double estimatedFare, double? distance,@JsonKey(name: 'started_at') String? startedAt
+ String id, String status,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress,@JsonKey(name: 'pickup_lat') double pickupLat,@JsonKey(name: 'pickup_lng') double pickupLng,@JsonKey(name: 'destination_lat') double destinationLat,@JsonKey(name: 'destination_lng') double destinationLng,@JsonKey(name: 'passenger_name') String passengerName,@JsonKey(name: 'passenger_phone') String? passengerPhone,@JsonKey(name: 'passenger_rating') double passengerRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'estimated_fare') double estimatedFare, double? distance,@JsonKey(name: 'started_at') String? startedAt,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -597,7 +614,7 @@ class __$ActiveRideCopyWithImpl<$Res>
 
 /// Create a copy of ActiveRide
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? status = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? paymentMode = null,Object? estimatedFare = null,Object? distance = freezed,Object? startedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? status = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? pickupLat = null,Object? pickupLng = null,Object? destinationLat = null,Object? destinationLng = null,Object? passengerName = null,Object? passengerPhone = freezed,Object? passengerRating = null,Object? paymentMode = null,Object? estimatedFare = null,Object? distance = freezed,Object? startedAt = freezed,Object? stops = null,}) {
   return _then(_ActiveRide(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
@@ -614,7 +631,8 @@ as double,paymentMode: null == paymentMode ? _self.paymentMode : paymentMode // 
 as String,estimatedFare: null == estimatedFare ? _self.estimatedFare : estimatedFare // ignore: cast_nullable_to_non_nullable
 as double,distance: freezed == distance ? _self.distance : distance // ignore: cast_nullable_to_non_nullable
 as double?,startedAt: freezed == startedAt ? _self.startedAt : startedAt // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,stops: null == stops ? _self._stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 
@@ -625,7 +643,7 @@ as String?,
 /// @nodoc
 mixin _$RideSummary {
 
- String get id;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress; double get distance; int get duration; double get fare; double get commission;@JsonKey(name: 'net_earnings') double get netEarnings;@JsonKey(name: 'passenger_rating') double? get passengerRating;@JsonKey(name: 'driver_rating') double? get driverRating;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'completed_at') String? get completedAt;
+ String get id;@JsonKey(name: 'pickup_address') String get pickupAddress;@JsonKey(name: 'destination_address') String get destinationAddress; double get distance; int get duration; double get fare; double get commission;@JsonKey(name: 'net_earnings') double get netEarnings;@JsonKey(name: 'passenger_rating') double? get passengerRating;@JsonKey(name: 'driver_rating') double? get driverRating;@JsonKey(name: 'payment_mode') String get paymentMode;@JsonKey(name: 'completed_at') String? get completedAt;@JsonKey(name: 'stops') List<RideStop> get stops;
 /// Create a copy of RideSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -638,16 +656,16 @@ $RideSummaryCopyWith<RideSummary> get copyWith => _$RideSummaryCopyWithImpl<Ride
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is RideSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.fare, fare) || other.fare == fare)&&(identical(other.commission, commission) || other.commission == commission)&&(identical(other.netEarnings, netEarnings) || other.netEarnings == netEarnings)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.driverRating, driverRating) || other.driverRating == driverRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is RideSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.fare, fare) || other.fare == fare)&&(identical(other.commission, commission) || other.commission == commission)&&(identical(other.netEarnings, netEarnings) || other.netEarnings == netEarnings)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.driverRating, driverRating) || other.driverRating == driverRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt)&&const DeepCollectionEquality().equals(other.stops, stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,distance,duration,fare,commission,netEarnings,passengerRating,driverRating,paymentMode,completedAt);
+int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,distance,duration,fare,commission,netEarnings,passengerRating,driverRating,paymentMode,completedAt,const DeepCollectionEquality().hash(stops));
 
 @override
 String toString() {
-  return 'RideSummary(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, distance: $distance, duration: $duration, fare: $fare, commission: $commission, netEarnings: $netEarnings, passengerRating: $passengerRating, driverRating: $driverRating, paymentMode: $paymentMode, completedAt: $completedAt)';
+  return 'RideSummary(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, distance: $distance, duration: $duration, fare: $fare, commission: $commission, netEarnings: $netEarnings, passengerRating: $passengerRating, driverRating: $driverRating, paymentMode: $paymentMode, completedAt: $completedAt, stops: $stops)';
 }
 
 
@@ -658,7 +676,7 @@ abstract mixin class $RideSummaryCopyWith<$Res>  {
   factory $RideSummaryCopyWith(RideSummary value, $Res Function(RideSummary) _then) = _$RideSummaryCopyWithImpl;
 @useResult
 $Res call({
- String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress, double distance, int duration, double fare, double commission,@JsonKey(name: 'net_earnings') double netEarnings,@JsonKey(name: 'passenger_rating') double? passengerRating,@JsonKey(name: 'driver_rating') double? driverRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'completed_at') String? completedAt
+ String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress, double distance, int duration, double fare, double commission,@JsonKey(name: 'net_earnings') double netEarnings,@JsonKey(name: 'passenger_rating') double? passengerRating,@JsonKey(name: 'driver_rating') double? driverRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'completed_at') String? completedAt,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -675,7 +693,7 @@ class _$RideSummaryCopyWithImpl<$Res>
 
 /// Create a copy of RideSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? distance = null,Object? duration = null,Object? fare = null,Object? commission = null,Object? netEarnings = null,Object? passengerRating = freezed,Object? driverRating = freezed,Object? paymentMode = null,Object? completedAt = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? distance = null,Object? duration = null,Object? fare = null,Object? commission = null,Object? netEarnings = null,Object? passengerRating = freezed,Object? driverRating = freezed,Object? paymentMode = null,Object? completedAt = freezed,Object? stops = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickupAddress: null == pickupAddress ? _self.pickupAddress : pickupAddress // ignore: cast_nullable_to_non_nullable
@@ -689,7 +707,8 @@ as double,passengerRating: freezed == passengerRating ? _self.passengerRating : 
 as double?,driverRating: freezed == driverRating ? _self.driverRating : driverRating // ignore: cast_nullable_to_non_nullable
 as double?,paymentMode: null == paymentMode ? _self.paymentMode : paymentMode // ignore: cast_nullable_to_non_nullable
 as String,completedAt: freezed == completedAt ? _self.completedAt : completedAt // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,stops: null == stops ? _self.stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 
@@ -774,10 +793,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _RideSummary() when $default != null:
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt,_that.stops);case _:
   return orElse();
 
 }
@@ -795,10 +814,10 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.dist
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt, @JsonKey(name: 'stops')  List<RideStop> stops)  $default,) {final _that = this;
 switch (_that) {
 case _RideSummary():
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt,_that.stops);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -815,10 +834,10 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.dist
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id, @JsonKey(name: 'pickup_address')  String pickupAddress, @JsonKey(name: 'destination_address')  String destinationAddress,  double distance,  int duration,  double fare,  double commission, @JsonKey(name: 'net_earnings')  double netEarnings, @JsonKey(name: 'passenger_rating')  double? passengerRating, @JsonKey(name: 'driver_rating')  double? driverRating, @JsonKey(name: 'payment_mode')  String paymentMode, @JsonKey(name: 'completed_at')  String? completedAt, @JsonKey(name: 'stops')  List<RideStop> stops)?  $default,) {final _that = this;
 switch (_that) {
 case _RideSummary() when $default != null:
-return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt);case _:
+return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.distance,_that.duration,_that.fare,_that.commission,_that.netEarnings,_that.passengerRating,_that.driverRating,_that.paymentMode,_that.completedAt,_that.stops);case _:
   return null;
 
 }
@@ -830,7 +849,7 @@ return $default(_that.id,_that.pickupAddress,_that.destinationAddress,_that.dist
 @JsonSerializable()
 
 class _RideSummary implements RideSummary {
-  const _RideSummary({required this.id, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, required this.distance, required this.duration, required this.fare, required this.commission, @JsonKey(name: 'net_earnings') required this.netEarnings, @JsonKey(name: 'passenger_rating') this.passengerRating, @JsonKey(name: 'driver_rating') this.driverRating, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'completed_at') this.completedAt});
+  const _RideSummary({required this.id, @JsonKey(name: 'pickup_address') required this.pickupAddress, @JsonKey(name: 'destination_address') required this.destinationAddress, required this.distance, required this.duration, required this.fare, required this.commission, @JsonKey(name: 'net_earnings') required this.netEarnings, @JsonKey(name: 'passenger_rating') this.passengerRating, @JsonKey(name: 'driver_rating') this.driverRating, @JsonKey(name: 'payment_mode') required this.paymentMode, @JsonKey(name: 'completed_at') this.completedAt, @JsonKey(name: 'stops') final  List<RideStop> stops = const <RideStop>[]}): _stops = stops;
   factory _RideSummary.fromJson(Map<String, dynamic> json) => _$RideSummaryFromJson(json);
 
 @override final  String id;
@@ -845,6 +864,13 @@ class _RideSummary implements RideSummary {
 @override@JsonKey(name: 'driver_rating') final  double? driverRating;
 @override@JsonKey(name: 'payment_mode') final  String paymentMode;
 @override@JsonKey(name: 'completed_at') final  String? completedAt;
+ final  List<RideStop> _stops;
+@override@JsonKey(name: 'stops') List<RideStop> get stops {
+  if (_stops is EqualUnmodifiableListView) return _stops;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_stops);
+}
+
 
 /// Create a copy of RideSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -859,16 +885,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RideSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.fare, fare) || other.fare == fare)&&(identical(other.commission, commission) || other.commission == commission)&&(identical(other.netEarnings, netEarnings) || other.netEarnings == netEarnings)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.driverRating, driverRating) || other.driverRating == driverRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _RideSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.pickupAddress, pickupAddress) || other.pickupAddress == pickupAddress)&&(identical(other.destinationAddress, destinationAddress) || other.destinationAddress == destinationAddress)&&(identical(other.distance, distance) || other.distance == distance)&&(identical(other.duration, duration) || other.duration == duration)&&(identical(other.fare, fare) || other.fare == fare)&&(identical(other.commission, commission) || other.commission == commission)&&(identical(other.netEarnings, netEarnings) || other.netEarnings == netEarnings)&&(identical(other.passengerRating, passengerRating) || other.passengerRating == passengerRating)&&(identical(other.driverRating, driverRating) || other.driverRating == driverRating)&&(identical(other.paymentMode, paymentMode) || other.paymentMode == paymentMode)&&(identical(other.completedAt, completedAt) || other.completedAt == completedAt)&&const DeepCollectionEquality().equals(other._stops, _stops));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,distance,duration,fare,commission,netEarnings,passengerRating,driverRating,paymentMode,completedAt);
+int get hashCode => Object.hash(runtimeType,id,pickupAddress,destinationAddress,distance,duration,fare,commission,netEarnings,passengerRating,driverRating,paymentMode,completedAt,const DeepCollectionEquality().hash(_stops));
 
 @override
 String toString() {
-  return 'RideSummary(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, distance: $distance, duration: $duration, fare: $fare, commission: $commission, netEarnings: $netEarnings, passengerRating: $passengerRating, driverRating: $driverRating, paymentMode: $paymentMode, completedAt: $completedAt)';
+  return 'RideSummary(id: $id, pickupAddress: $pickupAddress, destinationAddress: $destinationAddress, distance: $distance, duration: $duration, fare: $fare, commission: $commission, netEarnings: $netEarnings, passengerRating: $passengerRating, driverRating: $driverRating, paymentMode: $paymentMode, completedAt: $completedAt, stops: $stops)';
 }
 
 
@@ -879,7 +905,7 @@ abstract mixin class _$RideSummaryCopyWith<$Res> implements $RideSummaryCopyWith
   factory _$RideSummaryCopyWith(_RideSummary value, $Res Function(_RideSummary) _then) = __$RideSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress, double distance, int duration, double fare, double commission,@JsonKey(name: 'net_earnings') double netEarnings,@JsonKey(name: 'passenger_rating') double? passengerRating,@JsonKey(name: 'driver_rating') double? driverRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'completed_at') String? completedAt
+ String id,@JsonKey(name: 'pickup_address') String pickupAddress,@JsonKey(name: 'destination_address') String destinationAddress, double distance, int duration, double fare, double commission,@JsonKey(name: 'net_earnings') double netEarnings,@JsonKey(name: 'passenger_rating') double? passengerRating,@JsonKey(name: 'driver_rating') double? driverRating,@JsonKey(name: 'payment_mode') String paymentMode,@JsonKey(name: 'completed_at') String? completedAt,@JsonKey(name: 'stops') List<RideStop> stops
 });
 
 
@@ -896,7 +922,7 @@ class __$RideSummaryCopyWithImpl<$Res>
 
 /// Create a copy of RideSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? distance = null,Object? duration = null,Object? fare = null,Object? commission = null,Object? netEarnings = null,Object? passengerRating = freezed,Object? driverRating = freezed,Object? paymentMode = null,Object? completedAt = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? pickupAddress = null,Object? destinationAddress = null,Object? distance = null,Object? duration = null,Object? fare = null,Object? commission = null,Object? netEarnings = null,Object? passengerRating = freezed,Object? driverRating = freezed,Object? paymentMode = null,Object? completedAt = freezed,Object? stops = null,}) {
   return _then(_RideSummary(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,pickupAddress: null == pickupAddress ? _self.pickupAddress : pickupAddress // ignore: cast_nullable_to_non_nullable
@@ -910,7 +936,8 @@ as double,passengerRating: freezed == passengerRating ? _self.passengerRating : 
 as double?,driverRating: freezed == driverRating ? _self.driverRating : driverRating // ignore: cast_nullable_to_non_nullable
 as double?,paymentMode: null == paymentMode ? _self.paymentMode : paymentMode // ignore: cast_nullable_to_non_nullable
 as String,completedAt: freezed == completedAt ? _self.completedAt : completedAt // ignore: cast_nullable_to_non_nullable
-as String?,
+as String?,stops: null == stops ? _self._stops : stops // ignore: cast_nullable_to_non_nullable
+as List<RideStop>,
   ));
 }
 

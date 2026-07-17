@@ -88,6 +88,7 @@ class RideViewModel extends StateNotifier<RideState> {
         paymentMode: request.paymentMode,
         estimatedFare: request.estimatedFare,
         distance: request.distance,
+        stops: request.stops,
       ),
     );
   }
@@ -139,6 +140,34 @@ class RideViewModel extends StateNotifier<RideState> {
       passengerPhone: ride.passengerPhone ?? incoming.passengerPhone,
       estimatedFare:
           ride.estimatedFare == 0 ? incoming.estimatedFare : ride.estimatedFare,
+      distance: ride.distance ?? incoming.distance,
+      stops: ride.stops.isEmpty ? incoming.stops : ride.stops,
+    );
+  }
+
+  /// Keep passenger/route fields (especially stops) when API omits them.
+  ActiveRide _mergeWithPrevious(ActiveRide ride, ActiveRide? previous) {
+    if (previous == null) return ride;
+    return ride.copyWith(
+      passengerName: ride.passengerName == 'Passenger'
+          ? previous.passengerName
+          : ride.passengerName,
+      passengerPhone: ride.passengerPhone ?? previous.passengerPhone,
+      pickupAddress:
+          ride.pickupAddress.isEmpty ? previous.pickupAddress : ride.pickupAddress,
+      destinationAddress: ride.destinationAddress.isEmpty
+          ? previous.destinationAddress
+          : ride.destinationAddress,
+      pickupLat: ride.pickupLat == 0 ? previous.pickupLat : ride.pickupLat,
+      pickupLng: ride.pickupLng == 0 ? previous.pickupLng : ride.pickupLng,
+      destinationLat:
+          ride.destinationLat == 0 ? previous.destinationLat : ride.destinationLat,
+      destinationLng:
+          ride.destinationLng == 0 ? previous.destinationLng : ride.destinationLng,
+      estimatedFare:
+          ride.estimatedFare == 0 ? previous.estimatedFare : ride.estimatedFare,
+      distance: ride.distance ?? previous.distance,
+      stops: ride.stops.isEmpty ? previous.stops : ride.stops,
     );
   }
 
@@ -152,9 +181,11 @@ class RideViewModel extends StateNotifier<RideState> {
     try {
       final ride = await _repository.getActiveRide();
       if (ride != null) {
-        state = state.copyWith(activeRide: ride);
+        state = state.copyWith(
+          activeRide: _mergeWithPrevious(ride, state.activeRide),
+        );
       }
-      return ride;
+      return state.activeRide;
     } catch (_) {
       return null;
     }
@@ -168,27 +199,7 @@ class RideViewModel extends StateNotifier<RideState> {
         status,
         otp: otp,
       );
-      if (previous != null) {
-        ride = ride.copyWith(
-          passengerName: ride.passengerName == 'Passenger'
-              ? previous.passengerName
-              : ride.passengerName,
-          passengerPhone: ride.passengerPhone ?? previous.passengerPhone,
-          pickupAddress:
-              ride.pickupAddress.isEmpty ? previous.pickupAddress : ride.pickupAddress,
-          destinationAddress: ride.destinationAddress.isEmpty
-              ? previous.destinationAddress
-              : ride.destinationAddress,
-          pickupLat: ride.pickupLat == 0 ? previous.pickupLat : ride.pickupLat,
-          pickupLng: ride.pickupLng == 0 ? previous.pickupLng : ride.pickupLng,
-          destinationLat:
-              ride.destinationLat == 0 ? previous.destinationLat : ride.destinationLat,
-          destinationLng:
-              ride.destinationLng == 0 ? previous.destinationLng : ride.destinationLng,
-          estimatedFare:
-              ride.estimatedFare == 0 ? previous.estimatedFare : ride.estimatedFare,
-        );
-      }
+      ride = _mergeWithPrevious(ride, previous);
       state = state.copyWith(activeRide: ride);
     } catch (e) {
       rethrow;
@@ -204,27 +215,7 @@ class RideViewModel extends StateNotifier<RideState> {
         'started',
         otp: otp.trim(),
       );
-      if (previous != null) {
-        ride = ride.copyWith(
-          passengerName: ride.passengerName == 'Passenger'
-              ? previous.passengerName
-              : ride.passengerName,
-          passengerPhone: ride.passengerPhone ?? previous.passengerPhone,
-          pickupAddress:
-              ride.pickupAddress.isEmpty ? previous.pickupAddress : ride.pickupAddress,
-          destinationAddress: ride.destinationAddress.isEmpty
-              ? previous.destinationAddress
-              : ride.destinationAddress,
-          pickupLat: ride.pickupLat == 0 ? previous.pickupLat : ride.pickupLat,
-          pickupLng: ride.pickupLng == 0 ? previous.pickupLng : ride.pickupLng,
-          destinationLat:
-              ride.destinationLat == 0 ? previous.destinationLat : ride.destinationLat,
-          destinationLng:
-              ride.destinationLng == 0 ? previous.destinationLng : ride.destinationLng,
-          estimatedFare:
-              ride.estimatedFare == 0 ? previous.estimatedFare : ride.estimatedFare,
-        );
-      }
+      ride = _mergeWithPrevious(ride, previous);
       state = state.copyWith(activeRide: ride, isAccepting: false);
     } catch (e) {
       state = state.copyWith(isAccepting: false);
@@ -252,8 +243,11 @@ class RideViewModel extends StateNotifier<RideState> {
         state = state.copyWith(clearActiveRide: true, clearIncomingRequest: true);
         return null;
       }
-      state = state.copyWith(activeRide: ride, isAccepting: false);
-      return ride;
+      state = state.copyWith(
+        activeRide: _mergeWithPrevious(ride, state.activeRide),
+        isAccepting: false,
+      );
+      return state.activeRide;
     } catch (_) {
       return state.activeRide;
     }

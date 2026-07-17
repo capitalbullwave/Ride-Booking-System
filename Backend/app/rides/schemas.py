@@ -8,6 +8,13 @@ from pydantic import BaseModel, Field
 from app.schemas.common import BaseSchema
 
 
+class RideStopSchema(BaseModel):
+    address: str = Field(..., min_length=1, max_length=500)
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    sequence: int = Field(default=1, ge=1, le=3)
+
+
 class RideEstimateRequest(BaseModel):
     pickup_lat: float = Field(..., ge=-90, le=90, description="Pickup latitude")
     pickup_lng: float = Field(..., ge=-180, le=180, description="Pickup longitude")
@@ -25,6 +32,11 @@ class RideEstimateRequest(BaseModel):
         default=None,
         ge=0,
         description="Route duration from maps (minutes). Optional when distance_km is provided.",
+    )
+    stops: Optional[List[RideStopSchema]] = Field(
+        default=None,
+        max_length=3,
+        description="Optional intermediate stops. Fare uses full route pickup → stops → drop.",
     )
 
 
@@ -73,6 +85,11 @@ class RideBookRequest(BaseModel):
         ge=0,
         description="Route duration from maps (minutes). Optional when distance_km is provided.",
     )
+    stops: Optional[List[RideStopSchema]] = Field(
+        default=None,
+        max_length=3,
+        description="Optional intermediate stops between pickup and final dropoff (max 3).",
+    )
 
 
 class RideCancelRequest(BaseModel):
@@ -109,6 +126,7 @@ class RideResponse(BaseSchema):
     dropoff_address: str
     dropoff_lat: float
     dropoff_lng: float
+    stops: Optional[List[RideStopSchema]] = None
     estimated_distance_km: float
     estimated_duration_min: float
     estimated_fare: float

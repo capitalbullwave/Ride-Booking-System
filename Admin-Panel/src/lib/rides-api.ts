@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api";
-import { Ride, RideStatus, VehicleType } from "@/types";
+import { Ride, RideStatus, RideStop, VehicleType } from "@/types";
 
 export interface PaginatedRidesResponse {
   items: Ride[];
@@ -14,6 +14,7 @@ type RideApiItem = Ride & {
   distance?: number | string | null;
   duration?: number | string | null;
   vehicleType?: string;
+  stops?: unknown;
 };
 
 function normalizeVehicleType(value: string | undefined): VehicleType {
@@ -24,10 +25,42 @@ function normalizeVehicleType(value: string | undefined): VehicleType {
     : "sedan";
 }
 
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function normalizeStops(raw: unknown): RideStop[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const address = String(row.address ?? "").trim();
+      const lat = toOptionalNumber(row.lat);
+      const lng = toOptionalNumber(row.lng);
+      if (!address || lat == null || lng == null) return null;
+      return {
+        address,
+        lat,
+        lng,
+        sequence: toOptionalNumber(row.sequence) ?? index + 1,
+      } satisfies RideStop;
+    })
+    .filter((s): s is RideStop => s != null)
+    .slice(0, 3);
+}
+
 function normalizeRide(ride: RideApiItem): Ride {
   return {
     ...ride,
     vehicleType: normalizeVehicleType(ride.vehicleType),
+    pickupLat: toOptionalNumber(ride.pickupLat),
+    pickupLng: toOptionalNumber(ride.pickupLng),
+    dropLat: toOptionalNumber(ride.dropLat),
+    dropLng: toOptionalNumber(ride.dropLng),
+    stops: normalizeStops(ride.stops),
     distance: Number(ride.distance ?? 0),
     fare: Number(ride.fare ?? 0),
     driverCommissionPercentage:

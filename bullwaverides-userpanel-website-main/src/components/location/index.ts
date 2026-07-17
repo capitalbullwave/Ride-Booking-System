@@ -1,0 +1,1 @@
+export { LocationSearchView } from "./LocationSearchView";

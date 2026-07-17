@@ -30,8 +30,12 @@ class RideFareEstimateResult {
   const RideFareEstimateResult({
     required this.discountPercent,
     required this.quotes,
+    this.distanceKm,
+    this.durationMin,
   });
 
   final double discountPercent;
   final Map<String, VehicleFareQuote> quotes;
+  final double? distanceKm;
+  final double? durationMin;
 }

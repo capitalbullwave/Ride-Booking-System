@@ -218,26 +218,37 @@ class RideService extends BaseApiService {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       final data = await loadMockJson('ride_summary.json');
-      return RideSummary.fromJson(data['data'] as Map<String, dynamic>);
+      return BackendMappers.rideSummaryFromJson(
+        data['data'] as Map<String, dynamic>,
+      );
     }
 
-    final history = await get<Map<String, dynamic>>(
-      ApiEndpoints.rideHistory,
-      queryParameters: {'page': 1, 'page_size': 50},
-      parser: (data) => data as Map<String, dynamic>,
-    );
+    try {
+      final response = await get<Map<String, dynamic>>(
+        ApiEndpoints.rideSummary(rideId),
+        parser: (data) => data as Map<String, dynamic>,
+      );
+      return BackendMappers.rideSummaryFromJson(response);
+    } catch (_) {
+      // Fallback for older backends: scan ride history.
+      final history = await get<Map<String, dynamic>>(
+        ApiEndpoints.rideHistory,
+        queryParameters: {'page': 1, 'page_size': 50},
+        parser: (data) => data as Map<String, dynamic>,
+      );
 
-    final items = history['items'] as List<dynamic>? ?? [];
-    final ride = items.cast<Map<String, dynamic>>().firstWhere(
-          (item) => item['id']?.toString() == rideId,
-          orElse: () => <String, dynamic>{},
-        );
+      final items = history['items'] as List<dynamic>? ?? [];
+      final ride = items.cast<Map<String, dynamic>>().firstWhere(
+            (item) => item['id']?.toString() == rideId,
+            orElse: () => <String, dynamic>{},
+          );
 
-    if (ride.isEmpty) {
-      throw const ValidationException('Ride summary not found.');
+      if (ride.isEmpty) {
+        throw const ValidationException('Ride summary not found.');
+      }
+
+      return BackendMappers.rideSummaryFromJson(ride);
     }
-
-    return BackendMappers.rideSummaryFromJson(ride);
   }
 }
 

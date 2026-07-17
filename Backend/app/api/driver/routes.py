@@ -65,6 +65,7 @@ def _driver_active_ride_payload(ride: Ride) -> dict:
     payload["dropoff_address"] = ride.dropoff_address
     payload["payment_method"] = ride.payment_method
     payload["estimated_distance_km"] = ride.estimated_distance_km
+    payload["stops"] = list(ride.stops or [])
     if ride.user:
         payload["passenger_name"] = f"{ride.user.first_name} {ride.user.last_name}".strip() or "Passenger"
         payload["passenger_phone"] = ride.user.phone
@@ -161,6 +162,35 @@ class CollectPaymentRequest(BaseModel):
     method: str = Field(..., pattern="^(CASH|CASHFREE|UPI)$")
 
 
+def _is_placeholder_driver_email(email: str | None, phone: str | None) -> bool:
+    """True for auto-generated phone@driver.ridebook.app / phone@ridebook.app emails."""
+    if not email:
+        return True
+    value = email.strip().lower()
+    if not value.endswith("@ridebook.app"):
+        return False
+    local = value.split("@", 1)[0]
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    local_digits = "".join(ch for ch in local if ch.isdigit())
+    return bool(local_digits and digits and local_digits in digits)
+
+
+def _driver_placeholder_email(phone: str) -> str:
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    return f"{digits or 'driver'}@driver.ridebook.app"
+
+
+def _profile_response(driver: Driver, *, total_rides: int | None = None) -> DriverResponse:
+    response = DriverResponse.model_validate(driver)
+    updates: dict = {}
+    if total_rides is not None:
+        updates["total_rides"] = total_rides
+    # Never expose system placeholder emails in the driver app.
+    if _is_placeholder_driver_email(response.email, driver.phone):
+        updates["email"] = ""
+    return response.model_copy(update=updates) if updates else response
+
+
 @router.get("/profile", response_model=DriverResponse)
 async def get_profile(
     driver: Annotated[Driver, Depends(get_current_driver)],
@@ -169,9 +199,7 @@ async def get_profile(
     from app.services.driver_dashboard_service import DriverDashboardService
 
     completed_trips = await DriverDashboardService(db).count_completed_trips(driver.id)
-    return DriverResponse.model_validate(driver).model_copy(
-        update={"total_rides": completed_trips}
-    )
+    return _profile_response(driver, total_rides=completed_trips)
 
 
 @router.put("/profile", response_model=DriverResponse)
@@ -181,10 +209,26 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ):
     repo = DriverRepository(db)
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+
+    if "email" in updates:
+        email = (updates.get("email") or "").strip().lower()
+        if not email:
+            # DB email is NOT NULL — restore phone-based placeholder when cleared.
+            updates["email"] = _driver_placeholder_email(driver.phone)
+        else:
+            existing = await repo.get_by_email(email)
+            if existing and existing.id != driver.id:
+                raise ValidationException("This email is already in use")
+            updates["email"] = email
+
+    if "first_name" in updates and updates["first_name"] == "":
+        raise ValidationException("Name is required")
+
+    for field, value in updates.items():
         setattr(driver, field, value)
     await repo.update(driver)
-    return DriverResponse.model_validate(driver)
+    return _profile_response(driver)
 
 
 @router.post("/upload-license")
@@ -356,6 +400,7 @@ async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: 
                     "pickup_lng": ride.pickup_lng,
                     "dropoff_lat": ride.dropoff_lat,
                     "dropoff_lng": ride.dropoff_lng,
+                    "stops": list(ride.stops or []),
                     "estimated_fare": float(ride.estimated_fare or 0),
                     "estimated_distance_km": float(ride.estimated_distance_km or 0),
                     "estimated_duration_min": float(ride.estimated_duration_min or 0),
@@ -480,6 +525,7 @@ async def ride_requests(driver: Annotated[Driver, Depends(get_current_driver)], 
             "pickup_lng": r.pickup_lng,
             "dropoff_lat": r.dropoff_lat,
             "dropoff_lng": r.dropoff_lng,
+            "stops": list(r.stops or []),
             "estimated_fare": r.estimated_fare,
             "estimated_distance_km": r.estimated_distance_km,
             "estimated_duration_min": r.estimated_duration_min,
@@ -576,6 +622,7 @@ async def accept_ride(
         "pickup_lng": ride.pickup_lng,
         "dropoff_lat": ride.dropoff_lat,
         "dropoff_lng": ride.dropoff_lng,
+        "stops": list(ride.stops or []),
         "estimated_fare": ride.estimated_fare,
     }
     if ride.vehicle_type:
@@ -1237,6 +1284,61 @@ async def ride_history(
         "page_size": page_size,
         "total_pages": max(1, (total + page_size - 1) // page_size),
     }
+
+
+@router.get("/rides/{ride_id}/summary")
+async def ride_summary(
+    ride_id: UUID,
+    driver: Annotated[Driver, Depends(get_current_driver)],
+    db: AsyncSession = Depends(get_db),
+):
+    """Completed-ride summary for the captain (distance, duration, fare split, stops)."""
+    ride = await RideService(db).get_ride(ride_id)
+    if ride.driver_id != driver.id:
+        raise ForbiddenException("Access denied")
+
+    ride = await _ensure_ride_settled(db, ride)
+
+    distance_km = float(
+        ride.actual_distance_km
+        if ride.actual_distance_km is not None
+        else (ride.estimated_distance_km or 0)
+    )
+    duration_min = float(
+        ride.actual_duration_min
+        if ride.actual_duration_min is not None
+        else (ride.estimated_duration_min or 0)
+    )
+    if duration_min <= 0 and ride.started_at and ride.completed_at:
+        duration_min = max(
+            0.0,
+            (ride.completed_at - ride.started_at).total_seconds() / 60.0,
+        )
+
+    payload = {
+        "id": str(ride.id),
+        "public_id": ride.public_id,
+        "pickup_address": ride.pickup_address,
+        "dropoff_address": ride.dropoff_address,
+        "destination_address": ride.dropoff_address,
+        "stops": list(ride.stops or []),
+        "estimated_distance_km": round(distance_km, 2),
+        "actual_distance_km": (
+            round(float(ride.actual_distance_km), 2)
+            if ride.actual_distance_km is not None
+            else None
+        ),
+        "estimated_duration_min": round(duration_min, 2),
+        "actual_duration_min": (
+            round(float(ride.actual_duration_min), 2)
+            if ride.actual_duration_min is not None
+            else None
+        ),
+        "status": ride.status,
+        "completed_at": ride.completed_at.isoformat() if ride.completed_at else None,
+    }
+    payload.update(_payment_breakdown_payload(ride))
+    return payload
 
 
 class ArrivedRideRequest(BaseModel):

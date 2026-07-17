@@ -31,6 +31,7 @@ class DirectionsService extends BaseApiService {
     required double dropoffLng,
     String pickupAddress = '',
     String dropoffAddress = '',
+    List<({double lat, double lng})> waypoints = const [],
   }) {
     return getDirectionsByCoordinates(
       pickupLat: pickupLat,
@@ -39,6 +40,7 @@ class DirectionsService extends BaseApiService {
       dropoffLng: dropoffLng,
       pickupAddress: pickupAddress,
       dropoffAddress: dropoffAddress,
+      waypoints: waypoints,
     );
   }
 
@@ -49,6 +51,7 @@ class DirectionsService extends BaseApiService {
     required double dropoffLng,
     String pickupAddress = '',
     String dropoffAddress = '',
+    List<({double lat, double lng})> waypoints = const [],
   }) async {
     final pickup = hasCoordinates(pickupLat, pickupLng)
         ? coordinatesQuery(pickupLat, pickupLng)
@@ -61,9 +64,21 @@ class DirectionsService extends BaseApiService {
             ? dropoffAddress
             : coordinatesQuery(dropoffLat, dropoffLng));
 
+    final filledWaypoints = waypoints
+        .where((w) => hasCoordinates(w.lat, w.lng))
+        .take(3)
+        .toList();
+
     final data = await get<Map<String, dynamic>>(
       '/public/places/directions',
-      queryParameters: {'pickup': pickup, 'dropoff': dropoff},
+      queryParameters: {
+        'pickup': pickup,
+        'dropoff': dropoff,
+        if (filledWaypoints.isNotEmpty)
+          'waypoints': filledWaypoints
+              .map((w) => coordinatesQuery(w.lat, w.lng))
+              .join('|'),
+      },
       parser: (raw) => raw as Map<String, dynamic>,
     );
 

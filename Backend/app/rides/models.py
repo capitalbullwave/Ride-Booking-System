@@ -47,6 +47,9 @@ class Ride(UUIDMixin, TimestampMixin, Base):
     dropoff_address: Mapped[str] = mapped_column(String(500), nullable=False)
     dropoff_lat: Mapped[float] = mapped_column(Float, nullable=False)
     dropoff_lng: Mapped[float] = mapped_column(Float, nullable=False)
+    # Ordered intermediate stops between pickup and final dropoff (max 3).
+    # Shape: [{"address": str, "lat": float, "lng": float, "sequence": int}, ...]
+    stops: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
     estimated_distance_km: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     estimated_duration_min: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     actual_distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

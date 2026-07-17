@@ -1,0 +1,14 @@
+# Render Blueprint for the staging API.
+# Free/starter web services sleep after idle → intermittent 503s.
+# Prefer a paid plan with "Always On", or keep the GitHub keep-alive workflow.
+services:
+  - type: web
+    name: ride-application-backend
+    runtime: docker
+    dockerfilePath: ./Backend/Dockerfile
+    dockerContext: ./Backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: staging

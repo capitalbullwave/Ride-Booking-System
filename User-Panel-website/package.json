@@ -7,7 +7,7 @@
     "dev:frontend": "next dev --turbopack -p 3000",
     "dev:backend": "python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --app-dir ../Backend",
     "build": "next build --turbopack",
-    "start": "next start -p 3000",
+    "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {

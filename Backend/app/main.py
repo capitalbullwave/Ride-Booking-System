@@ -6,7 +6,9 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -106,6 +108,7 @@ def create_app() -> FastAPI:
 
     @application.get("/health", include_in_schema=False, tags=["Health"])
     async def health_check():
+        """Liveness for Render/load balancers — keep this fast (no DB)."""
         return {
             "status": "healthy",
             "app": settings.app_name,
@@ -121,6 +124,22 @@ def create_app() -> FastAPI:
                 "websocket": "/ws",
             },
         }
+
+    @application.get("/health/ready", include_in_schema=False, tags=["Health"])
+    async def readiness_check():
+        """Readiness — verifies DB connectivity for deeper monitoring."""
+        from app.core.database import async_engine
+
+        try:
+            async with async_engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            return {"status": "ready", "database": "ok"}
+        except Exception as exc:
+            logger.warning("readiness_check_failed", error=str(exc))
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "database": "error"},
+            )
 
     @application.websocket("/ws/{token}")
     async def websocket_legacy(websocket: WebSocket, token: str):

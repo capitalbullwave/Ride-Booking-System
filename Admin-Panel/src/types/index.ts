@@ -85,6 +85,13 @@ export interface DriverDocument {
   url?: string;
 }
 
+export interface RideStop {
+  address: string;
+  lat: number;
+  lng: number;
+  sequence?: number;
+}
+
 export interface Ride {
   id: string;
   publicId?: string;
@@ -96,7 +103,13 @@ export interface Ride {
   driverName?: string;
   vehicleType: VehicleType;
   pickupLocation: string;
+  pickupLat?: number;
+  pickupLng?: number;
   dropLocation: string;
+  dropLat?: number;
+  dropLng?: number;
+  /** Intermediate stops between pickup and drop (max 3). */
+  stops?: RideStop[];
   distance: number;
   fare: number;
   driverCommissionPercentage?: number;

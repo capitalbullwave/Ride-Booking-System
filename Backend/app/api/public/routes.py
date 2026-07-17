@@ -41,9 +41,22 @@ async def search_places(
 async def get_directions(
     pickup: str = Query(..., min_length=3, max_length=300),
     dropoff: str = Query(..., min_length=3, max_length=300),
+    waypoints: str | None = Query(
+        default=None,
+        max_length=1200,
+        description="Optional intermediate stops as lat,lng|lat,lng (max 3)",
+    ),
     maps: MapsService = Depends(get_maps_service),
 ):
-    route = await maps.get_route_between(pickup, dropoff)
+    waypoint_list: list[str] = []
+    if waypoints:
+        for part in waypoints.replace(";", "|").split("|"):
+            cleaned = part.strip()
+            if cleaned:
+                waypoint_list.append(cleaned)
+        waypoint_list = waypoint_list[:3]
+
+    route = await maps.get_route_between(pickup, dropoff, waypoints=waypoint_list or None)
     if not route:
         raise HTTPException(status_code=404, detail="Could not calculate route for these locations")
 
@@ -54,6 +67,7 @@ async def get_directions(
         duration_min=round(route["duration_min"], 1),
         path=[LatLngPoint(**point) for point in route["path"]],
         source=route["source"],
+        stops=[RoutePoint(**s) for s in (route.get("stops") or [])],
     )
 
 

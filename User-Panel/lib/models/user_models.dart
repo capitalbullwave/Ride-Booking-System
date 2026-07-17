@@ -361,6 +361,29 @@ class ActivityItem {
       );
 }
 
+class RideStopLocation {
+  const RideStopLocation({
+    required this.address,
+    required this.lat,
+    required this.lng,
+    this.sequence = 1,
+  });
+
+  final String address;
+  final double lat;
+  final double lng;
+  final int sequence;
+
+  factory RideStopLocation.fromJson(Map<String, dynamic> json) => RideStopLocation(
+        address: json['address'] as String? ?? '',
+        lat: (json['lat'] as num?)?.toDouble() ?? 0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0,
+        sequence: (json['sequence'] as num?)?.toInt() ?? 1,
+      );
+
+  bool get hasCoordinates => lat != 0 || lng != 0;
+}
+
 class UserActiveRide {
   const UserActiveRide({
     required this.id,
@@ -383,6 +406,10 @@ class UserActiveRide {
     this.dropoffLng,
     this.driverLat,
     this.driverLng,
+    this.stops = const [],
+    this.distanceKm,
+    this.durationMin,
+    this.paymentMethod,
     this.womenSafetyEnabled = false,
     this.preferWomenRiders = false,
     this.isEmergency = false,
@@ -408,6 +435,10 @@ class UserActiveRide {
   final double? dropoffLng;
   final double? driverLat;
   final double? driverLng;
+  final List<RideStopLocation> stops;
+  final double? distanceKm;
+  final double? durationMin;
+  final String? paymentMethod;
   final bool womenSafetyEnabled;
   final bool preferWomenRiders;
   final bool isEmergency;
@@ -418,6 +449,15 @@ class UserActiveRide {
   /// Extra women safety UX (badge + periodic "Are you safe?" check-in).
   bool get showWomenSafetyControls =>
       womenSafetyEnabled || preferWomenRiders;
+
+  static List<RideStopLocation> stopsFromJson(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => RideStopLocation.fromJson(Map<String, dynamic>.from(e)))
+        .where((s) => s.address.trim().isNotEmpty)
+        .toList();
+  }
 
   factory UserActiveRide.fromJson(Map<String, dynamic> json) {
     final driver = json['driver'] as Map<String, dynamic>?;
@@ -446,6 +486,10 @@ class UserActiveRide {
       dropoffLng: (json['dropoff_lng'] as num?)?.toDouble(),
       driverLat: (json['driver_lat'] as num?)?.toDouble(),
       driverLng: (json['driver_lng'] as num?)?.toDouble(),
+      stops: stopsFromJson(json['stops']),
+      distanceKm: (json['estimated_distance_km'] as num?)?.toDouble(),
+      durationMin: (json['estimated_duration_min'] as num?)?.toDouble(),
+      paymentMethod: json['payment_method'] as String?,
       womenSafetyEnabled: json['women_safety_enabled'] == true,
       preferWomenRiders: json['prefer_women_riders'] == true,
       isEmergency: json['is_emergency'] == true,
@@ -474,6 +518,10 @@ class UserActiveRide {
       dropoffLng: dropoffLng,
       driverLat: lat ?? driverLat,
       driverLng: lng ?? driverLng,
+      stops: stops,
+      distanceKm: distanceKm,
+      durationMin: durationMin,
+      paymentMethod: paymentMethod,
       womenSafetyEnabled: womenSafetyEnabled,
       preferWomenRiders: preferWomenRiders,
       isEmergency: isEmergency,
@@ -486,6 +534,7 @@ class UserActiveRide {
     bool? womenSafetyEnabled,
     bool? preferWomenRiders,
     bool? isEmergency,
+    List<RideStopLocation>? stops,
   }) {
     return UserActiveRide(
       id: id,
@@ -508,6 +557,10 @@ class UserActiveRide {
       dropoffLng: dropoffLng,
       driverLat: driverLat,
       driverLng: driverLng,
+      stops: stops ?? this.stops,
+      distanceKm: distanceKm,
+      durationMin: durationMin,
+      paymentMethod: paymentMethod,
       womenSafetyEnabled: womenSafetyEnabled ?? this.womenSafetyEnabled,
       preferWomenRiders: preferWomenRiders ?? this.preferWomenRiders,
       isEmergency: isEmergency ?? this.isEmergency,

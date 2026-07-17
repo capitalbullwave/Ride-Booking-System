@@ -166,7 +166,36 @@ export async function apiFetch<T>(
     });
   };
 
-  let response = await makeRequest(null);
+  const RETRYABLE = new Set([502, 503, 504]);
+  const MAX_RETRIES = 3;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  let response: Response | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      response = await makeRequest(null);
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(800 * (attempt + 1));
+        continue;
+      }
+      throw error instanceof Error
+        ? error
+        : new Error("Network error. Please try again.");
+    }
+
+    if (!RETRYABLE.has(response.status) || attempt === MAX_RETRIES) {
+      break;
+    }
+
+    // Render free tier often returns 503 while waking from idle.
+    await sleep(1000 * (attempt + 1));
+  }
+
+  if (!response) {
+    throw new Error("Request failed");
+  }
 
   // Access tokens expire in ~30 minutes; refresh once and retry.
   if (!skipRefresh && response.status === 401 && session?.refreshToken) {
@@ -180,7 +209,11 @@ export async function apiFetch<T>(
     const body = await readResponseBody(response);
     const message =
       parseApiMessage(body) ??
-      (response.status >= 500 ? BACKEND_HINT : "Request failed");
+      (response.status === 503
+        ? "Server is waking up. Please wait a few seconds and try again."
+        : response.status >= 500
+          ? BACKEND_HINT
+          : "Request failed");
     throw new Error(message);
   }
 

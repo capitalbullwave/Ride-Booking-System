@@ -606,8 +606,34 @@ async def list_rides(
 
 
 @router.get("/rides/export")
-async def export_rides(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Ride).order_by(Ride.created_at.desc()).limit(5000))
+async def export_rides(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    status: str | None = None,
+    search: str | None = None,
+):
+    """Must stay above `/rides/{ride_id}` so `export` is not parsed as a UUID."""
+    query = select(Ride)
+    if status and status != "all":
+        status_map = {
+            "requested": [RideStatus.REQUESTED.value, RideStatus.SEARCHING.value],
+            "driver_assigned": [RideStatus.ACCEPTED.value],
+            "driver_arrived": [RideStatus.DRIVER_ARRIVED.value],
+            "ride_started": [RideStatus.STARTED.value],
+            "ride_completed": [RideStatus.COMPLETED.value],
+            "cancelled": [RideStatus.CANCELLED.value],
+        }
+        if status in status_map:
+            query = query.where(Ride.status.in_(status_map[status]))
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                Ride.pickup_address.ilike(term),
+                Ride.dropoff_address.ilike(term),
+            )
+        )
+    result = await db.execute(query.order_by(Ride.created_at.desc()).limit(5000))
     rides = result.scalars().all()
     output = io.StringIO()
     writer = csv.writer(output)
@@ -622,8 +648,8 @@ async def export_rides(admin: Annotated[AdminUser, Depends(get_current_admin)], 
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=rides.csv"},
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=wavego-rides.csv"},
     )
 
 
@@ -652,32 +678,6 @@ async def list_ride_messages_admin(
         raise NotFoundException("Ride not found")
     service = RideChatService(db)
     return {"success": True, "data": await service.list_messages(ride_id)}
-
-
-@router.get("/users/export")
-async def export_users(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.is_deleted == False).order_by(User.created_at.desc()))
-    users = result.scalars().all()
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "Registered"])
-    for u in users:
-        writer.writerow([str(u.id), f"{u.first_name} {u.last_name}", u.email, u.phone, "active" if u.is_active else "blocked", u.created_at.date()])
-    output.seek(0)
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=users.csv"})
-
-
-@router.get("/drivers/export")
-async def export_drivers(admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Driver).where(Driver.is_deleted == False).order_by(Driver.created_at.desc()))
-    drivers = result.scalars().all()
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "KYC", "Joined"])
-    for d in drivers:
-        writer.writerow([str(d.id), f"{d.first_name} {d.last_name}", d.email, d.phone, d.status, d.kyc_status, d.created_at.date()])
-    output.seek(0)
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=drivers.csv"})
 
 
 @router.get("/finance/transactions")

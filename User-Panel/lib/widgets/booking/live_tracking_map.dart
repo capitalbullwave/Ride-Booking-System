@@ -97,7 +97,9 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
     }
     if (widget.tripRoute != oldWidget.tripRoute ||
         widget.ride.pickupLat != oldWidget.ride.pickupLat ||
-        widget.ride.dropoffLat != oldWidget.ride.dropoffLat) {
+        widget.ride.dropoffLat != oldWidget.ride.dropoffLat ||
+        widget.ride.stops != oldWidget.ride.stops ||
+        widget.ride.status != oldWidget.ride.status) {
       _loadRoutes();
     }
     if (widget.ride.vehicleTypeSlug != oldWidget.ride.vehicleTypeSlug ||
@@ -204,14 +206,50 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
     }
   }
 
+  List<SelectedPlace> _stopPlaces() {
+    final fromRoute = widget.tripRoute?.stops ?? const <RoutePoint>[];
+    if (fromRoute.isNotEmpty) {
+      return [
+        for (final s in fromRoute)
+          SelectedPlace(
+            label: s.address,
+            latitude: s.lat,
+            longitude: s.lng,
+          ),
+      ];
+    }
+    return [
+      for (final s in widget.ride.stops.where((s) => s.hasCoordinates))
+        SelectedPlace(
+          label: s.address,
+          latitude: s.lat,
+          longitude: s.lng,
+        ),
+    ];
+  }
+
+  List<RoutePoint> _stopPoints() {
+    final fromRoute = widget.tripRoute?.stops ?? const <RoutePoint>[];
+    if (fromRoute.isNotEmpty) return fromRoute;
+    return [
+      for (final s in widget.ride.stops.where((s) => s.hasCoordinates))
+        RoutePoint(lat: s.lat, lng: s.lng, address: s.address),
+    ];
+  }
+
   Future<void> _loadRoutes() async {
     setState(() => _loadingRoutes = true);
 
     List<LatLng> tripPoints = [];
-    // Full trip route only once ride has started (pickup → drop).
+    final stopPlaces = _stopPlaces();
+    // Full trip route only once ride has started (pickup → stops → drop).
     if (!_enRouteToPickup) {
-      if (widget.tripRoute != null && widget.tripRoute!.path.length >= 2) {
-        tripPoints = _latLngsFromDirections(widget.tripRoute!);
+      final cached = widget.tripRoute;
+      final canUseCached = cached != null &&
+          cached.path.length >= 2 &&
+          (stopPlaces.isEmpty || cached.stops.isNotEmpty);
+      if (canUseCached) {
+        tripPoints = _latLngsFromDirections(cached);
       } else if (widget.ride.pickupLat != null &&
           widget.ride.pickupLng != null &&
           widget.ride.dropoffLat != null &&
@@ -225,6 +263,7 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
                     dropoffLng: widget.ride.dropoffLng!,
                     pickupAddress: widget.ride.pickupAddress,
                     dropoffAddress: widget.ride.dropoffAddress,
+                    stops: stopPlaces,
                   );
           tripPoints = _latLngsFromDirections(route);
         } catch (_) {}
@@ -325,6 +364,21 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
       );
     }
 
+    final stops = _stopPoints();
+    for (var i = 0; i < stops.length; i++) {
+      final stop = stops[i];
+      markers.add(
+        Marker(
+          markerId: MarkerId('stop_${i + 1}'),
+          position: LatLng(stop.lat, stop.lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          anchor: const Offset(0.5, 1.0),
+          zIndex: 1,
+          infoWindow: InfoWindow(title: 'Stop ${i + 1}', snippet: stop.address),
+        ),
+      );
+    }
+
     // Captain — ONLY bike_topdown.png (wait until loaded; no capsule)
     if (_hasDriverLocation && _driverIcon != null) {
       final vehicleLabel = widget.ride.vehicleTypeName ?? 'Captain';
@@ -402,6 +456,9 @@ class _LiveTrackingMapState extends ConsumerState<LiveTrackingMap> {
         widget.ride.dropoffLat != null &&
         widget.ride.dropoffLng != null) {
       points.add(LatLng(widget.ride.dropoffLat!, widget.ride.dropoffLng!));
+    }
+    for (final stop in _stopPoints()) {
+      points.add(LatLng(stop.lat, stop.lng));
     }
 
     if (points.isEmpty) return;

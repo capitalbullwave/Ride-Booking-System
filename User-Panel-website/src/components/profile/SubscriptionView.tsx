@@ -43,13 +43,17 @@ export function SubscriptionView() {
         getUserSubscription(),
       ]);
       setPlans(
-        (plansRes.plans as Plan[]).map((p) => ({
-          ...p,
-          price_inr: Number((p as { price_inr?: number; price?: number }).price_inr ?? (p as { price?: number }).price ?? 0),
-          benefits: Array.isArray(p.benefits) ? p.benefits : [],
+        plansRes.plans.map((p) => ({
+          id: String(p.id ?? p.slug ?? ""),
+          slug: String(p.slug ?? ""),
+          name: String(p.name ?? ""),
+          price_inr: Number(p.price_inr ?? p.price ?? 0),
+          ride_discount_percent: Number(p.ride_discount_percent ?? 0),
+          benefits: Array.isArray(p.benefits) ? (p.benefits as string[]) : [],
+          is_popular: Boolean(p.is_popular),
         }))
       );
-      const slug = (subRes.subscription?.plan as { slug?: string })?.slug ?? "free";
+      const slug = String(subRes.subscription?.plan?.slug ?? "free");
       setActiveSlug(slug);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load plans");

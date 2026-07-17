@@ -80,17 +80,30 @@ class PlacesService extends BaseApiService {
   Future<DirectionsResult> getDirections({
     required SelectedPlace pickup,
     required SelectedPlace dropoff,
+    List<SelectedPlace> stops = const [],
   }) async {
     final pickupQuery = _directionsQuery(pickup);
     final dropoffQuery = _directionsQuery(dropoff);
+    final filledStops = stops
+        .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
+        .take(3)
+        .toList();
 
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 500));
       return DirectionsResult(
         pickup: RoutePoint(lat: 28.6315, lng: 77.2167, address: pickup.label),
         dropoff: RoutePoint(lat: 28.5562, lng: 77.1000, address: dropoff.label),
-        distanceKm: 18.5,
-        durationMin: 42,
+        stops: [
+          for (final s in filledStops)
+            RoutePoint(
+              lat: s.latitude!,
+              lng: s.longitude!,
+              address: s.label,
+            ),
+        ],
+        distanceKm: 18.5 + filledStops.length * 3,
+        durationMin: 42 + filledStops.length * 8.0,
         path: const [
           LatLngPoint(lat: 28.6315, lng: 77.2167),
           LatLngPoint(lat: 28.6000, lng: 77.1500),
@@ -102,7 +115,12 @@ class PlacesService extends BaseApiService {
 
     final data = await get<Map<String, dynamic>>(
       ApiEndpoints.placesDirections,
-      queryParameters: {'pickup': pickupQuery, 'dropoff': dropoffQuery},
+      queryParameters: {
+        'pickup': pickupQuery,
+        'dropoff': dropoffQuery,
+        if (filledStops.isNotEmpty)
+          'waypoints': filledStops.map(_directionsQuery).join('|'),
+      },
       parser: (raw) => raw as Map<String, dynamic>,
     );
 
@@ -116,6 +134,7 @@ class PlacesService extends BaseApiService {
     required double dropoffLng,
     String pickupAddress = '',
     String dropoffAddress = '',
+    List<SelectedPlace> stops = const [],
   }) {
     return getDirections(
       pickup: SelectedPlace(
@@ -128,6 +147,7 @@ class PlacesService extends BaseApiService {
         latitude: dropoffLat,
         longitude: dropoffLng,
       ),
+      stops: stops,
     );
   }
 
@@ -339,6 +359,7 @@ class RideBookingService extends BaseApiService {
     double? rentalHours,
     double? distanceKm,
     double? durationMin,
+    List<SelectedPlace> stops = const [],
   }) async {
     if (useMock) {
       return const RideFareEstimateResult(
@@ -346,6 +367,11 @@ class RideBookingService extends BaseApiService {
         quotes: {},
       );
     }
+
+    final filledStops = stops
+        .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
+        .take(3)
+        .toList();
 
     final data = await post<Map<String, dynamic>>(
       ApiEndpoints.rideEstimate,
@@ -358,6 +384,16 @@ class RideBookingService extends BaseApiService {
         if (rentalHours != null) 'rental_hours': rentalHours,
         if (distanceKm != null) 'distance_km': distanceKm,
         if (durationMin != null) 'duration_min': durationMin,
+        if (filledStops.isNotEmpty)
+          'stops': [
+            for (var i = 0; i < filledStops.length; i++)
+              {
+                'address': filledStops[i].label,
+                'lat': filledStops[i].latitude,
+                'lng': filledStops[i].longitude,
+                'sequence': i + 1,
+              },
+          ],
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );
@@ -376,6 +412,8 @@ class RideBookingService extends BaseApiService {
     return RideFareEstimateResult(
       discountPercent: (data['discount_percent'] as num?)?.toDouble() ?? 0,
       quotes: quotes,
+      distanceKm: (data['distance_km'] as num?)?.toDouble(),
+      durationMin: (data['duration_min'] as num?)?.toDouble(),
     );
   }
 
@@ -395,6 +433,7 @@ class RideBookingService extends BaseApiService {
     bool preferWomenRiders = false,
     double? distanceKm,
     double? durationMin,
+    List<SelectedPlace>? stops,
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -425,6 +464,16 @@ class RideBookingService extends BaseApiService {
         'prefer_women_riders': preferWomenRiders,
         if (distanceKm != null) 'distance_km': distanceKm,
         if (durationMin != null) 'duration_min': durationMin,
+        if (stops != null && stops.isNotEmpty)
+          'stops': [
+            for (var i = 0; i < stops.length && i < 3; i++)
+              {
+                'address': stops[i].label,
+                'lat': stops[i].latitude ?? 0,
+                'lng': stops[i].longitude ?? 0,
+                'sequence': i + 1,
+              },
+          ],
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );

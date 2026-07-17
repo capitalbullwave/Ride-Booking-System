@@ -49,6 +49,7 @@ class ApiEndpoints {
   static String rideMessages(String rideId) => '/driver/ride/$rideId/messages';
   static const String activeRide = '/driver/active-ride';
   static const String rideHistory = '/driver/ride-history';
+  static String rideSummary(String rideId) => '/driver/rides/$rideId/summary';
 
   // Wallet & earnings
   static const String dashboard = '/driver/dashboard';

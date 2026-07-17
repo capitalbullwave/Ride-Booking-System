@@ -18,7 +18,7 @@ from app.models import Notification, Rating, Ride, SavedAddress, StudentPass, Su
 from app.repositories.ride_repository import RideRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.payment import WalletTopUp, WalletTransactionResponse
-from app.rides.schemas import RideBookRequest
+from app.rides.schemas import RideBookRequest, RideStopSchema
 from app.schemas.ride import RideDetailResponse, RideResponse
 from app.services.driver_matching import DriverMatchingService
 from app.services.payment_service import WalletService
@@ -66,6 +66,13 @@ class SavedAddressCreate(BaseModel):
     is_default: bool = False
 
 
+class RideStopIn(BaseModel):
+    address: str = Field(..., min_length=1, max_length=500)
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    sequence: int | None = Field(default=None, ge=1, le=3)
+
+
 class BookRideRequest(BaseModel):
     pickup_address: str
     dropoff_address: str
@@ -82,6 +89,7 @@ class BookRideRequest(BaseModel):
     prefer_women_riders: bool = False
     distance_km: float | None = Field(default=None, ge=0)
     duration_min: float | None = Field(default=None, ge=0)
+    stops: list[RideStopIn] | None = Field(default=None, max_length=3)
 
 
 class ValidateCouponRequest(BaseModel):
@@ -200,6 +208,7 @@ def _ride_summary(ride: Ride) -> dict:
         "public_id": ride.public_id,
         "pickup_address": ride.pickup_address,
         "dropoff_address": ride.dropoff_address,
+        "stops": list(ride.stops or []),
         "status": ride.status,
         "fare_estimate": ride.estimated_fare,
         "fare_final": ride.final_fare,
@@ -228,6 +237,10 @@ def _active_ride_summary(ride: Ride) -> dict:
     summary["pickup_lng"] = ride.pickup_lng
     summary["dropoff_lat"] = ride.dropoff_lat
     summary["dropoff_lng"] = ride.dropoff_lng
+    summary["estimated_distance_km"] = ride.estimated_distance_km
+    summary["estimated_duration_min"] = ride.estimated_duration_min
+    summary["payment_method"] = ride.payment_method
+    summary["stops"] = list(ride.stops or [])
     if ride.driver:
         summary["driver"] = {
             "id": str(ride.driver.id),
@@ -484,6 +497,19 @@ async def book_ride(
         scheduled_at=data.scheduled_at,
         distance_km=data.distance_km,
         duration_min=data.duration_min,
+        stops=(
+            [
+                RideStopSchema(
+                    address=s.address,
+                    lat=s.lat,
+                    lng=s.lng,
+                    sequence=s.sequence or (i + 1),
+                )
+                for i, s in enumerate(data.stops[:3])
+            ]
+            if data.stops
+            else None
+        ),
     )
     ride = await RideService(db).create_ride(user.id, ride_data)
 

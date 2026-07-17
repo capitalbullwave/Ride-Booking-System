@@ -67,6 +67,11 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   BitmapDescriptor? _pickupIcon;
   BitmapDescriptor? _dropIcon;
   BitmapDescriptor? _selfIcon;
+  final Map<int, BitmapDescriptor> _stopIcons = {};
+
+  List<RideStop> get _validStops => widget.ride.stops
+      .where((s) => DirectionsService.hasCoordinates(s.lat, s.lng))
+      .toList();
 
   void _emitMetrics() {
     widget.onTripMetrics?.call(
@@ -133,8 +138,10 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
         oldWidget.ride.pickupLng != widget.ride.pickupLng ||
         oldWidget.ride.destinationLat != widget.ride.destinationLat ||
         oldWidget.ride.destinationLng != widget.ride.destinationLng ||
-        oldWidget.ride.status != widget.ride.status) {
+        oldWidget.ride.status != widget.ride.status ||
+        oldWidget.ride.stops.length != widget.ride.stops.length) {
       _loadRoutes();
+      _loadStopIcons();
     }
   }
 
@@ -148,6 +155,17 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
       _dropIcon = drop;
       _selfIcon = self;
     });
+    await _loadStopIcons();
+  }
+
+  Future<void> _loadStopIcons() async {
+    final stops = _validStops;
+    for (var i = 0; i < stops.length; i++) {
+      final n = i + 1;
+      if (_stopIcons.containsKey(n)) continue;
+      _stopIcons[n] = await MapMarkerIcons.stopLabeledMarker(n);
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _initDriverLocation() async {
@@ -175,9 +193,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
 
     setState(() => _loadingRoutes = true);
 
-    // Full pickup→drop route only after ride starts; before that focus pickup only.
+    // Full pickup → stops → drop route whenever destination is known.
     List<LatLng> tripPoints = [];
-    if (_isRideStarted && _hasValidDestination) {
+    if (_hasValidPickup && _hasValidDestination) {
       try {
         final route = await ref.read(directionsServiceProvider).getDirectionsByCoordinates(
               pickupLat: widget.ride.pickupLat,
@@ -186,6 +204,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
               dropoffLng: widget.ride.destinationLng,
               pickupAddress: widget.ride.pickupAddress,
               dropoffAddress: widget.ride.destinationAddress,
+              waypoints: [
+                for (final stop in _validStops) (lat: stop.lat, lng: stop.lng),
+              ],
             );
         tripPoints = route.points;
       } catch (_) {}
@@ -241,6 +262,11 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
             pickupLng: dLng,
             dropoffLat: targetLat,
             dropoffLng: targetLng,
+            waypoints: _isRideStarted
+                ? [
+                    for (final stop in _validStops) (lat: stop.lat, lng: stop.lng),
+                  ]
+                : const [],
           );
       if (!mounted) return;
       setState(() {
@@ -278,8 +304,9 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
     if (controller == null || !_hasValidPickup) return;
 
     final points = <LatLng>[
-      if (!_isRideStarted) _pickup,
-      if (_isRideStarted && _hasValidDestination) _destination,
+      _pickup,
+      if (_hasValidDestination) _destination,
+      for (final stop in _validStops) LatLng(stop.lat, stop.lng),
       ..._tripRoutePoints,
       ..._activeLegPoints,
     ];
@@ -331,8 +358,8 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
         Polyline(
           polylineId: const PolylineId('trip_route'),
           points: _tripRoutePoints,
-          color: AppColors.primary.withValues(alpha: 0.45),
-          width: 4,
+          color: AppColors.primary.withValues(alpha: _isRideStarted ? 0.55 : 0.4),
+          width: _isRideStarted ? 5 : 4,
         ),
       );
     }
@@ -354,8 +381,8 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
   Set<Marker> get _markers {
     final markers = <Marker>{};
 
-    // Heading to pickup / arrived: only pickup. After OTP start: only drop.
-    if (!_isRideStarted) {
+    // Always show pickup when heading there; after start keep trip context.
+    if (_hasValidPickup) {
       final icon = _pickupIcon;
       if (icon != null) {
         markers.add(
@@ -371,7 +398,30 @@ class _TripMapViewState extends ConsumerState<TripMapView> {
           ),
         );
       }
-    } else if (_hasValidDestination) {
+    }
+
+    final stops = _validStops;
+    for (var i = 0; i < stops.length; i++) {
+      final stop = stops[i];
+      final n = i + 1;
+      final icon = _stopIcons[n] ??
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+      markers.add(
+        Marker(
+          markerId: MarkerId('stop_$n'),
+          position: LatLng(stop.lat, stop.lng),
+          icon: icon,
+          anchor: const Offset(0.5, 1),
+          zIndexInt: 2,
+          infoWindow: InfoWindow(
+            title: 'Stop $n',
+            snippet: stop.address,
+          ),
+        ),
+      );
+    }
+
+    if (_hasValidDestination) {
       final icon = _dropIcon;
       if (icon != null) {
         markers.add(

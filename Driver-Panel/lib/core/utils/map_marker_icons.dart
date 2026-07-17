@@ -23,6 +23,13 @@ class MapMarkerIcons {
         accent: const Color(0xFFEF4444),
       );
 
+  static Future<BitmapDescriptor> stopLabeledMarker(int number) =>
+      _compactSpotMarker(
+        cacheKey: 'driver_stop_${number}_v1',
+        label: 'Stop $number',
+        accent: const Color(0xFF73398F),
+      );
+
   /// Blue "you are here" dot — web-safe alternative to defaultMarkerWithHue.
   static Future<BitmapDescriptor> selfMarker() async {
     const key = 'driver_self_v1';

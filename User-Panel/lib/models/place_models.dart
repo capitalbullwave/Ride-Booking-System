@@ -82,11 +82,13 @@ class DirectionsResult {
     required this.distanceKm,
     required this.durationMin,
     required this.path,
+    this.stops = const [],
     this.source = 'google',
   });
 
   final RoutePoint pickup;
   final RoutePoint dropoff;
+  final List<RoutePoint> stops;
   final double distanceKm;
   final double durationMin;
   final List<LatLngPoint> path;
@@ -95,6 +97,9 @@ class DirectionsResult {
   factory DirectionsResult.fromJson(Map<String, dynamic> json) => DirectionsResult(
         pickup: RoutePoint.fromJson(json['pickup'] as Map<String, dynamic>),
         dropoff: RoutePoint.fromJson(json['dropoff'] as Map<String, dynamic>),
+        stops: (json['stops'] as List<dynamic>? ?? [])
+            .map((e) => RoutePoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
         distanceKm: (json['distance_km'] as num).toDouble(),
         durationMin: (json['duration_min'] as num).toDouble(),
         path: (json['path'] as List<dynamic>)
@@ -108,6 +113,7 @@ class TripBookingState {
   const TripBookingState({
     this.pickup,
     this.dropoff,
+    this.stops = const [],
     this.route,
     this.activeRideId,
     this.bookedVehicleSlug,
@@ -117,6 +123,8 @@ class TripBookingState {
 
   final SelectedPlace? pickup;
   final SelectedPlace? dropoff;
+  /// Intermediate stops between pickup and final dropoff (max 3).
+  final List<SelectedPlace> stops;
   final DirectionsResult? route;
   final String? activeRideId;
   final String? bookedVehicleSlug;
@@ -126,6 +134,7 @@ class TripBookingState {
   TripBookingState copyWith({
     SelectedPlace? pickup,
     SelectedPlace? dropoff,
+    List<SelectedPlace>? stops,
     DirectionsResult? route,
     String? activeRideId,
     String? bookedVehicleSlug,
@@ -133,10 +142,12 @@ class TripBookingState {
     DateTime? scheduledAt,
     bool clearRoute = false,
     bool clearScheduledAt = false,
+    bool clearStops = false,
   }) =>
       TripBookingState(
         pickup: pickup ?? this.pickup,
         dropoff: dropoff ?? this.dropoff,
+        stops: clearStops ? const [] : (stops ?? this.stops),
         route: clearRoute ? null : (route ?? this.route),
         activeRideId: activeRideId ?? this.activeRideId,
         bookedVehicleSlug: bookedVehicleSlug ?? this.bookedVehicleSlug,

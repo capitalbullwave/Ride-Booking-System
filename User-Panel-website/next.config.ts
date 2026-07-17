@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
-const PRODUCTION_BACKEND_URL = "http://127.0.0.1:8000";
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8000";
+const STAGING_BACKEND_URL = "https://ride-application-backend.onrender.com";
 
-const backendUrl = process.env.BACKEND_URL ?? PRODUCTION_BACKEND_URL;
+const backendUrl =
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "production" ? STAGING_BACKEND_URL : LOCAL_BACKEND_URL);
 
 const nextConfig: NextConfig = {
   async rewrites() {

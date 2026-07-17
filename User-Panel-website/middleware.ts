@@ -3,20 +3,36 @@ import type { NextRequest } from "next/server";
 import { AUTH_COOKIE_NAME, PROFILE_COMPLETE_COOKIE } from "@/constants/auth";
 import { ROUTES } from "@/constants/routes";
 
+/** Exact paths anyone can open without login (marketing + auth + legal). */
 const PUBLIC_PATHS = new Set<string>([
   ROUTES.landing,
   ROUTES.login,
   ROUTES.signup,
   ROUTES.createProfile,
   ROUTES.otp,
+  ROUTES.about,
+  ROUTES.blogs,
+  ROUTES.safety,
   ROUTES.terms,
   ROUTES.privacy,
-  ROUTES.safety,
+  ROUTES.legalSafety,
+  "/robots.txt",
+  "/sitemap.xml",
+  "/opengraph-image",
+  "/twitter-image",
+  "/icon",
 ]);
+
+/** Nested public sections (blog articles, legal pages, safety sub-pages). */
+const PUBLIC_PREFIXES = [
+  `${ROUTES.blogs}/`,
+  `${ROUTES.safety}/`,
+  "/legal/",
+] as const;
 
 function isPublicPath(pathname: string) {
   if (PUBLIC_PATHS.has(pathname)) return true;
-  return false;
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 function postAuthDestination(request: NextRequest, profileComplete: boolean) {
@@ -56,6 +72,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|images|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|twitter-image|icon|images|api|uploads|.*\\.(?:svg|png|jpg|jpeg|gif|webp|apk)$).*)",
   ],
 };

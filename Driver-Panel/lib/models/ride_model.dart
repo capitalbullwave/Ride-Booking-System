@@ -3,6 +3,34 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'ride_model.freezed.dart';
 part 'ride_model.g.dart';
 
+class RideStop {
+  const RideStop({
+    required this.address,
+    required this.lat,
+    required this.lng,
+    this.sequence = 1,
+  });
+
+  final String address;
+  final double lat;
+  final double lng;
+  final int sequence;
+
+  factory RideStop.fromJson(Map<String, dynamic> json) => RideStop(
+        address: json['address'] as String? ?? '',
+        lat: (json['lat'] as num?)?.toDouble() ?? 0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0,
+        sequence: (json['sequence'] as num?)?.toInt() ?? 1,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'address': address,
+        'lat': lat,
+        'lng': lng,
+        'sequence': sequence,
+      };
+}
+
 @freezed
 abstract class RideRequest with _$RideRequest {
   const factory RideRequest({
@@ -21,6 +49,7 @@ abstract class RideRequest with _$RideRequest {
     @JsonKey(name: 'passenger_phone') String? passengerPhone,
     @JsonKey(name: 'passenger_rating') @Default(4.5) double passengerRating,
     @JsonKey(name: 'expires_in') @Default(15) int expiresIn,
+    @JsonKey(name: 'stops') @Default(<RideStop>[]) List<RideStop> stops,
   }) = _RideRequest;
 
   factory RideRequest.fromJson(Map<String, dynamic> json) =>
@@ -45,6 +74,7 @@ abstract class ActiveRide with _$ActiveRide {
     @JsonKey(name: 'estimated_fare') required double estimatedFare,
     double? distance,
     @JsonKey(name: 'started_at') String? startedAt,
+    @JsonKey(name: 'stops') @Default(<RideStop>[]) List<RideStop> stops,
   }) = _ActiveRide;
 
   factory ActiveRide.fromJson(Map<String, dynamic> json) =>
@@ -79,6 +109,7 @@ abstract class RideSummary with _$RideSummary {
     @JsonKey(name: 'driver_rating') double? driverRating,
     @JsonKey(name: 'payment_mode') required String paymentMode,
     @JsonKey(name: 'completed_at') String? completedAt,
+    @JsonKey(name: 'stops') @Default(<RideStop>[]) List<RideStop> stops,
   }) = _RideSummary;
 
   factory RideSummary.fromJson(Map<String, dynamic> json) =>

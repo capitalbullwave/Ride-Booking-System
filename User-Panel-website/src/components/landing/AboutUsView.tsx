@@ -3,32 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { AnimateIn } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
 import { landingCaptainImage, landingHeroSlides } from "@/constants/services";
-import { cn } from "@/lib/utils";
-
-const founders = [
-  {
-    name: "Rohit Jaiswal",
-    role: "Co-founder",
-    initials: "RJ",
-    image: "/images/about/rohit-jaiswakl.png",
-  },
-  { name: "Priya Sharma", role: "Co-founder", initials: "PS" },
-  { name: "Rahul Kapoor", role: "Co-founder", initials: "RK" },
-] as const;
-
-const footerExploreLinks = [
-  { label: "Home", href: ROUTES.landing },
-  { label: "About Us", href: ROUTES.about },
-  { label: "Become a captain", href: `${ROUTES.landing}#captains` },
-  { label: "Ambulance SOS", href: ROUTES.ambulance },
-  { label: "Help center", href: ROUTES.profileHelp },
-] as const;
+import { getProtectedPath } from "@/lib/auth-session";
 
 const footerLegalLinks = [
   { label: "Terms of service", href: ROUTES.terms },
@@ -75,52 +55,6 @@ function SocialIcon({ icon }: { icon: (typeof socialLinks)[number]["icon"] }) {
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
     </svg>
-  );
-}
-
-function FounderCard({
-  name,
-  role,
-  initials,
-  image,
-}: {
-  name: string;
-  role: string;
-  initials: string;
-  image?: string;
-}) {
-  const [imageError, setImageError] = useState(false);
-  const showImage = Boolean(image) && !imageError;
-
-  return (
-    <div className="flex flex-col items-center text-center sm:items-start sm:text-left">
-      <div className="relative">
-        <span className="absolute -left-2 -top-2 h-16 w-16 rounded-2xl bg-secondary/60 sm:h-20 sm:w-20" />
-        <div
-          className={cn(
-            "relative flex h-36 w-36 items-center justify-center overflow-hidden",
-            "rounded-[2rem] rounded-tr-[4rem] bg-primary/10 sm:h-44 sm:w-44"
-          )}
-        >
-          {showImage ? (
-            <Image
-              src={image!}
-              alt={name}
-              fill
-              className="object-cover object-top"
-              sizes="(max-width: 640px) 144px, 176px"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <span className="font-heading text-3xl font-bold text-primary sm:text-4xl">
-              {initials}
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="mt-5 font-heading text-lg font-bold text-foreground">{name}</p>
-      <p className="mt-0.5 text-sm text-muted-foreground">{role}</p>
-    </div>
   );
 }
 
@@ -204,36 +138,6 @@ export function AboutUsView() {
         </AnimateIn>
       </section>
 
-      {/* Champions / founders */}
-      <section className="relative overflow-hidden bg-background px-6 py-16 md:py-24">
-        <AnimateIn delay={0.06}>
-        <div className="pointer-events-none absolute -left-24 top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-secondary/30" />
-
-        <div className="relative mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-center lg:gap-16">
-          <div>
-            <h2 className="font-heading text-3xl font-bold leading-tight text-foreground sm:text-4xl lg:text-[2.75rem]">
-              <span className="relative inline-block">
-                Champions
-                <span className="absolute -bottom-1 left-0 h-0.5 w-full bg-secondary" />
-              </span>{" "}
-              of our success story
-            </h2>
-            <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-              Bull Wave Rides has come a long way since our founding. With hard work and perseverance we
-              have earned the trust of riders and captains across India. As a brand and as a
-              service, we constantly reinvent ourselves to move cities forward.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-6">
-            {founders.map((founder) => (
-              <FounderCard key={founder.name} {...founder} />
-            ))}
-          </div>
-        </div>
-        </AnimateIn>
-      </section>
-
       {/* Careers hero */}
       <section className="relative min-h-[420px] overflow-hidden md:min-h-[480px]">
         <Image
@@ -282,7 +186,15 @@ export function AboutUsView() {
 
             <div>
               <nav className="flex flex-col gap-3 text-sm text-white/75">
-                {footerExploreLinks.map((link) => (
+                {(
+                  [
+                    { label: "Home", href: ROUTES.landing },
+                    { label: "About Us", href: ROUTES.about },
+                    { label: "Become a captain", href: `${ROUTES.landing}#captains` },
+                    { label: "Ambulance SOS", href: getProtectedPath(ROUTES.ambulance) },
+                    { label: "Help center", href: getProtectedPath(ROUTES.profileHelp) },
+                  ] as const
+                ).map((link) => (
                   <Link
                     key={link.label}
                     href={link.href}

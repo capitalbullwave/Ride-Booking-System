@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/geo_distance.dart';
+import 'package:wavego_user/models/place_models.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/widgets/booking/driver_avatar_rating.dart';
 
-class RideAcceptedPanel extends StatelessWidget {
+class RideAcceptedPanel extends ConsumerWidget {
   const RideAcceptedPanel({
     super.key,
     required this.ride,
@@ -19,7 +22,7 @@ class RideAcceptedPanel extends StatelessWidget {
   final VoidCallback? onTripDetails;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     double? meters;
     if (ride.driverLat != null &&
         ride.driverLng != null &&
@@ -256,7 +259,11 @@ class RideAcceptedPanel extends StatelessWidget {
             const SizedBox(width: 12),
             OutlinedButton(
               onPressed: onTripDetails ??
-                  () => showRideTripDetailsSheet(context: context, ride: ride),
+                  () => showRideTripDetailsSheet(
+                        context: context,
+                        ride: ride,
+                        route: ref.read(tripBookingProvider).route,
+                      ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary, width: 1.2),
@@ -343,6 +350,7 @@ class _PinBox extends StatelessWidget {
 void showRideTripDetailsSheet({
   required BuildContext context,
   required UserActiveRide ride,
+  DirectionsResult? route,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -351,141 +359,222 @@ void showRideTripDetailsSheet({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) {
-      final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
-      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-      return SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxHeight),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(99),
-                    ),
+    builder: (context) => _TripDetailsSheet(ride: ride, route: route),
+  );
+}
+
+class _TripDetailsSheet extends ConsumerWidget {
+  const _TripDetailsSheet({
+    required this.ride,
+    this.route,
+  });
+
+  final UserActiveRide ride;
+  final DirectionsResult? route;
+
+  List<RideStopLocation> _effectiveStops(TripBookingState trip) {
+    if (ride.stops.any((s) => s.address.trim().isNotEmpty)) {
+      return ride.stops.where((s) => s.address.trim().isNotEmpty).toList();
+    }
+    return [
+      for (final s in trip.stops.where((s) => s.label.trim().isNotEmpty))
+        RideStopLocation(
+          address: s.label,
+          lat: s.latitude ?? 0,
+          lng: s.longitude ?? 0,
+        ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final trip = ref.watch(tripBookingProvider);
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final filledStops = _effectiveStops(trip);
+    final distanceKm =
+        ride.distanceKm ?? route?.distanceKm ?? trip.route?.distanceKm;
+    final durationMin =
+        ride.durationMin ?? route?.durationMin ?? trip.route?.durationMin;
+
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Trip details',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              if (ride.publicId != null && ride.publicId!.isNotEmpty) ...[
+                const SizedBox(height: 4),
                 Text(
-                  'Trip details',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                  'Ride ID: ${ride.publicId}',
+                  style: const TextStyle(
+                    color: AppColors.mutedForeground,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                const SizedBox(height: 16),
-                _TripDetailRow(
-                  label: 'Pickup',
-                  value: ride.pickupAddress,
-                  dotColor: const Color(0xFFE53935),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                ride.statusLabel,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
                 ),
+              ),
+              const SizedBox(height: 16),
+              _TripDetailRow(
+                label: 'Pickup',
+                value: ride.pickupAddress,
+                dotColor: const Color(0xFFE53935),
+              ),
+              for (var i = 0; i < filledStops.length; i++) ...[
                 const SizedBox(height: 12),
                 _TripDetailRow(
-                  label: 'Drop',
-                  value: ride.dropoffAddress,
-                  dotColor: AppColors.success,
+                  label: 'Stop ${i + 1}',
+                  value: filledStops[i].address,
+                  dotColor: AppColors.primary,
+                  diamond: true,
+                  number: i + 1,
                 ),
-                if (ride.fareEstimate != null) ...[
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Estimated fare',
-                        style: TextStyle(color: AppColors.mutedForeground),
-                      ),
-                      Text(
-                        '₹${ride.fareEstimate!.round()}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
+              ],
+              const SizedBox(height: 12),
+              _TripDetailRow(
+                label: 'Drop',
+                value: ride.dropoffAddress,
+                dotColor: AppColors.success,
+              ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              if (ride.fareEstimate != null)
+                _metaRow(
+                  'Estimated fare',
+                  '₹${ride.fareEstimate!.round()}',
+                  highlight: true,
+                ),
+              if (distanceKm != null && distanceKm > 0)
+                _metaRow(
+                  'Distance',
+                  '${distanceKm.toStringAsFixed(1)} km',
+                ),
+              if (durationMin != null && durationMin > 0)
+                _metaRow(
+                  'Duration',
+                  '${durationMin.round()} min',
+                ),
+              if (filledStops.isNotEmpty)
+                _metaRow(
+                  'Stops',
+                  '${filledStops.length}',
+                ),
+              if (ride.vehicleTypeName != null)
+                _metaRow('Vehicle', ride.vehicleTypeName!),
+              if (ride.vehicleNumber != null && ride.vehicleNumber!.isNotEmpty)
+                _metaRow('Vehicle number', ride.vehicleNumber!),
+              if (ride.driverName != null && ride.driverName!.isNotEmpty)
+                _metaRow('Captain', ride.driverName!),
+              if (ride.paymentMethod != null && ride.paymentMethod!.isNotEmpty)
+                _metaRow('Payment', ride.paymentMethod!),
+              if (ride.startCode != null &&
+                  ride.startCode!.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Ride PIN',
+                  style: TextStyle(
+                    color: AppColors.mutedForeground,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-                if (ride.vehicleTypeName != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Vehicle',
-                        style: TextStyle(color: AppColors.mutedForeground),
-                      ),
-                      Text(
-                        ride.vehicleTypeName!,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ],
-                if (ride.startCode != null &&
-                    ride.startCode!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Ride PIN',
-                    style: TextStyle(
-                      color: AppColors.mutedForeground,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: ride.startCode!
-                        .trim()
-                        .split('')
-                        .map(
-                          (digit) => Container(
-                            width: 40,
-                            height: 44,
-                            margin: const EdgeInsets.only(right: 8),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.muted,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Text(
-                              digit,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 18,
-                                color: AppColors.primary,
-                              ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: ride.startCode!
+                      .trim()
+                      .split('')
+                      .map(
+                        (digit) => Container(
+                          width: 40,
+                          height: 44,
+                          margin: const EdgeInsets.only(right: 8),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.muted,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            digit,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              color: AppColors.primary,
                             ),
                           ),
-                        )
-                        .toList(),
+                        ),
+                      )
+                      .toList(),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Share this PIN with your captain only when you start the ride.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.mutedForeground,
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Share this PIN with your captain only when you start the ride.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.mutedForeground,
-                    ),
-                  ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ),
-      );
-    },
-  );
+      ),
+    );
+  }
+
+  Widget _metaRow(String label, String value, {bool highlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.mutedForeground),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: highlight ? 16 : 14,
+              color: highlight ? AppColors.primary : AppColors.foreground,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TripDetailRow extends StatelessWidget {
@@ -493,11 +582,15 @@ class _TripDetailRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.dotColor,
+    this.diamond = false,
+    this.number,
   });
 
   final String label;
   final String value;
   final Color dotColor;
+  final bool diamond;
+  final int? number;
 
   @override
   Widget build(BuildContext context) {
@@ -505,12 +598,40 @@ class _TripDetailRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(top: 5),
-          child: Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
-          ),
+          padding: const EdgeInsets.only(top: 4),
+          child: diamond && number != null
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: Center(
+                    child: Transform.rotate(
+                      angle: 0.785398,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        alignment: Alignment.center,
+                        color: dotColor,
+                        child: Transform.rotate(
+                          angle: -0.785398,
+                          child: Text(
+                            '$number',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+              : Container(
+                  width: 10,
+                  height: 10,
+                  decoration:
+                      BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -519,10 +640,10 @@ class _TripDetailRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  color: AppColors.mutedForeground,
+                style: TextStyle(
+                  color: diamond ? AppColors.primary : AppColors.mutedForeground,
                   fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 2),

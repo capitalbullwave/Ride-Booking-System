@@ -53,10 +53,15 @@ class _RideSummaryScreenState extends ConsumerState<RideSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_error != null) return Scaffold(body: ErrorStateWidget(message: _error!, onRetry: _load));
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null) {
+      return Scaffold(body: ErrorStateWidget(message: _error!, onRetry: _load));
+    }
 
     final s = _summary!;
+    final stops = s.stops.where((stop) => stop.address.trim().isNotEmpty).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ride Summary')),
@@ -64,38 +69,59 @@ class _RideSummaryScreenState extends ConsumerState<RideSummaryScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    _Row(Icons.trip_origin, AppColors.success, 'Pickup', s.pickupAddress),
-                    const SizedBox(height: 12),
-                    _Row(Icons.location_on, AppColors.error, 'Destination', s.destinationAddress),
-                    const Divider(height: 32),
-                    _Detail('Distance', DateFormatter.distance(s.distance)),
-                    _Detail('Duration', DateFormatter.duration(s.duration)),
-                    _Detail('Fare', DateFormatter.currency(s.fare)),
-                    _Detail('Commission', DateFormatter.currency(s.commission)),
-                    _Detail('Net Earnings', DateFormatter.currency(s.netEarnings), highlight: true),
-                  ],
+            Expanded(
+              child: SingleChildScrollView(
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        _Row(
+                          Icons.trip_origin,
+                          AppColors.success,
+                          'Pickup',
+                          s.pickupAddress,
+                        ),
+                        for (var i = 0; i < stops.length; i++) ...[
+                          const SizedBox(height: 12),
+                          _Row(
+                            Icons.change_history,
+                            AppColors.primary,
+                            'Stop ${i + 1}',
+                            stops[i].address,
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        _Row(
+                          Icons.location_on,
+                          AppColors.error,
+                          'Destination',
+                          s.destinationAddress,
+                        ),
+                        const Divider(height: 32),
+                        _Detail('Distance', DateFormatter.distance(s.distance)),
+                        _Detail('Duration', DateFormatter.duration(s.duration)),
+                        _Detail('Fare', DateFormatter.currency(s.fare)),
+                        _Detail(
+                          'Commission',
+                          DateFormatter.currency(s.commission),
+                        ),
+                        _Detail(
+                          'Net Earnings',
+                          DateFormatter.currency(s.netEarnings),
+                          highlight: true,
+                        ),
+                        if (s.paymentMode.trim().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          _Detail('Payment', s.paymentMode),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _Rating('Passenger', s.passengerRating ?? 0),
-                    _Rating('Your Rating', s.driverRating ?? 0),
-                  ],
-                ),
-              ),
-            ),
-            const Spacer(),
             AppButton(
               label: 'Back to Dashboard',
               onPressed: () {
@@ -128,7 +154,12 @@ class _Row extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
               Text(value),
             ],
           ),
@@ -152,31 +183,15 @@ class _Detail extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label),
-          Text(value, style: TextStyle(fontWeight: highlight ? FontWeight.bold : FontWeight.w600, color: highlight ? AppColors.primary : null)),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: highlight ? FontWeight.bold : FontWeight.w600,
+              color: highlight ? AppColors.primary : null,
+            ),
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _Rating extends StatelessWidget {
-  const _Rating(this.label, this.rating);
-  final String label;
-  final double rating;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            const Icon(Icons.star, color: AppColors.warning, size: 20),
-            Text(' $rating', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-      ],
     );
   }
 }

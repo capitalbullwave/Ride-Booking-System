@@ -52,16 +52,22 @@ class LocationScreen extends ConsumerStatefulWidget {
 
 class _LocationScreenState extends ConsumerState<LocationScreen> {
   final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
   Timer? _debounce;
   List<PlaceSuggestion> _results = [];
   bool _isSearching = false;
   bool _isLocating = false;
   String? _error;
+  /// `null` = editing final drop; otherwise editing stop at this index.
+  int? _editingStopIndex;
+
+  bool get _isEditingStop => _editingStopIndex != null;
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -117,7 +123,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       await ref.read(recentPlacesServiceProvider).add(place);
       ref.read(recentPlacesProvider.notifier).state =
           ref.read(recentPlacesServiceProvider).getAll();
-      context.pop(place);
+      await _applySelectedPlace(place);
     } on LocationServiceException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -154,7 +160,9 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => MapPickerScreen(
-          title: isPickup ? 'Set pickup on map' : 'Set destination on map',
+          title: _isEditingStop
+              ? 'Set stop on map'
+              : (isPickup ? 'Set pickup on map' : 'Set destination on map'),
         ),
       ),
     );
@@ -162,8 +170,71 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       await ref.read(recentPlacesServiceProvider).add(result);
       ref.read(recentPlacesProvider.notifier).state =
           ref.read(recentPlacesServiceProvider).getAll();
-      context.pop(result);
+      await _applySelectedPlace(result);
     }
+  }
+
+  Future<void> _applySelectedPlace(SelectedPlace selected) async {
+    if (!mounted) return;
+    final stopIndex = _editingStopIndex;
+    if (stopIndex != null && widget.field == 'dropoff') {
+      ref.read(tripBookingProvider.notifier).updateStopAt(stopIndex, selected);
+      setState(() {
+        _editingStopIndex = null;
+        _searchController.clear();
+        _results = [];
+        _isLocating = false;
+      });
+      return;
+    }
+    context.pop(selected);
+  }
+
+  void _startAddStop() {
+    final stops = ref.read(tripBookingProvider).stops;
+    if (stops.length >= TripBookingNotifier.maxStops) {
+      context.showSnackBar(
+        'Maximum ${TripBookingNotifier.maxStops} stops allowed',
+        isError: true,
+      );
+      return;
+    }
+    ref.read(tripBookingProvider.notifier).addEmptyStop();
+    final newIndex = stops.length;
+    setState(() {
+      _editingStopIndex = newIndex;
+      _searchController.clear();
+      _results = [];
+      _error = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocus.requestFocus();
+    });
+  }
+
+  void _focusStop(int index) {
+    final stops = ref.read(tripBookingProvider).stops;
+    if (index < 0 || index >= stops.length) return;
+    setState(() {
+      _editingStopIndex = index;
+      _searchController.text = stops[index].label;
+      _results = [];
+      _error = null;
+    });
+    _searchFocus.requestFocus();
+    if (stops[index].label.trim().length >= 2) {
+      _onSearchChanged(stops[index].label);
+    }
+  }
+
+  void _focusDrop() {
+    setState(() {
+      _editingStopIndex = null;
+      _searchController.clear();
+      _results = [];
+      _error = null;
+    });
+    _searchFocus.requestFocus();
   }
 
   Widget _locationOptionTile({
@@ -221,6 +292,268 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     );
   }
 
+  Widget _stopRow({
+    required int index,
+    required SelectedPlace stop,
+    required bool isActive,
+  }) {
+    final filled = stop.label.trim().isNotEmpty;
+    return InkWell(
+      onTap: () => _focusStop(index),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: isActive
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.35))
+              : null,
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: Center(
+                child: Transform.rotate(
+                  angle: 0.785398,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    alignment: Alignment.center,
+                    color: const Color(0xFF1F2937),
+                    child: Transform.rotate(
+                      angle: -0.785398,
+                      child: Text(
+                        '${index + 1}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: isActive
+                  ? TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocus,
+                      onChanged: (value) {
+                        setState(() {});
+                        _onSearchChanged(value);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Add Stop',
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _results = []);
+                                },
+                              )
+                            : null,
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        filled ? stop.label : 'Add Stop',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight:
+                              filled ? FontWeight.w500 : FontWeight.w400,
+                          color: filled
+                              ? AppColors.foreground
+                              : AppColors.mutedForeground,
+                        ),
+                      ),
+                    ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(Icons.close, size: 20),
+              onPressed: () {
+                ref.read(tripBookingProvider.notifier).removeStopAt(index);
+                setState(() {
+                  if (_editingStopIndex == index) {
+                    _editingStopIndex = null;
+                    _searchController.clear();
+                    _results = [];
+                  } else if (_editingStopIndex != null &&
+                      _editingStopIndex! > index) {
+                    _editingStopIndex = _editingStopIndex! - 1;
+                  }
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dropRouteCard({
+    required List<SelectedPlace> stops,
+    required bool canAddStop,
+  }) {
+    final dropActive = !_isEditingStop;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            for (var i = 0; i < stops.length; i++) ...[
+              _stopRow(
+                index: i,
+                stop: stops[i],
+                isActive: _editingStopIndex == i,
+              ),
+              const SizedBox(height: 4),
+            ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: _focusDrop,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: dropActive
+                            ? AppColors.primary.withValues(alpha: 0.06)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: dropActive
+                            ? Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.35),
+                              )
+                            : null,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: const Color(0xFFC45A2C),
+                                width: 3,
+                              ),
+                              color: Colors.white,
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFC45A2C),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: dropActive
+                                ? TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocus,
+                                    onTap: _focusDrop,
+                                    onChanged: (value) {
+                                      setState(() {});
+                                      _onSearchChanged(value);
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Drop location',
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                      ),
+                                      suffixIcon:
+                                          _searchController.text.isNotEmpty
+                                              ? IconButton(
+                                                  icon: const Icon(
+                                                    Icons.clear,
+                                                    size: 20,
+                                                  ),
+                                                  onPressed: () {
+                                                    _searchController.clear();
+                                                    setState(
+                                                      () => _results = [],
+                                                    );
+                                                  },
+                                                )
+                                              : null,
+                                    ),
+                                  )
+                                : const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Text(
+                                      'Drop location',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: AppColors.mutedForeground,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: canAddStop
+                      ? 'Add stop'
+                      : 'Maximum ${TripBookingNotifier.maxStops} stops',
+                  onPressed: canAddStop ? _startAddStop : null,
+                  icon: Icon(
+                    Icons.add,
+                    color: canAddStop
+                        ? AppColors.primary
+                        : AppColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _selectPlace(PlaceSuggestion place) async {
     if (!place.hasCoordinates && place.id.isNotEmpty && place.source == 'google') {
       try {
@@ -235,7 +568,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
         ref.read(recentPlacesProvider.notifier).state =
             ref.read(recentPlacesServiceProvider).getAll();
         if (!mounted) return;
-        context.pop(selected);
+        await _applySelectedPlace(selected);
         return;
       } catch (e) {
         if (mounted) {
@@ -254,12 +587,16 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
     ref.read(recentPlacesProvider.notifier).state =
         ref.read(recentPlacesServiceProvider).getAll();
     if (!mounted) return;
-    context.pop(selected);
+    await _applySelectedPlace(selected);
   }
 
   @override
   Widget build(BuildContext context) {
     final isPickup = widget.field == 'pickup';
+    final isDropoff = widget.field == 'dropoff';
+    final tripStops =
+        isDropoff ? ref.watch(tripBookingProvider).stops : const <SelectedPlace>[];
+    final canAddStop = isDropoff && tripStops.length < TripBookingNotifier.maxStops;
 
     return Scaffold(
       appBar: AppBar(
@@ -267,30 +604,34 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              autofocus: false,
-              onChanged: (value) {
-                setState(() {});
-                _onSearchChanged(value);
-              },
-              decoration: InputDecoration(
-                hintText: 'Search location',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() => _results = []);
-                        },
-                      )
-                    : null,
+          if (isDropoff)
+            _dropRouteCard(stops: tripStops, canAddStop: canAddStop)
+          else
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocus,
+                autofocus: false,
+                onChanged: (value) {
+                  setState(() {});
+                  _onSearchChanged(value);
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search location',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _results = []);
+                          },
+                        )
+                      : null,
+                ),
               ),
             ),
-          ),
           _locationOptionTile(
             icon: Icons.my_location,
             title: 'Use current location',
@@ -305,8 +646,7 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
             onTap: _openMapPicker,
           ),
           const Divider(height: 1),
-          if (_isSearching)
-            const LinearProgressIndicator(minHeight: 2),
+          if (_isSearching) const LinearProgressIndicator(minHeight: 2),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -333,7 +673,9 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                       if (favorites.isEmpty && saved.isEmpty && recents.isEmpty) {
                         return Center(
                           child: Text(
-                            'Search or pick a saved place',
+                            _isEditingStop
+                                ? 'Search or pick a stop location'
+                                : 'Search or pick a saved place',
                             style: TextStyle(color: AppColors.mutedForeground),
                           ),
                         );
@@ -348,11 +690,19 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                                   title: p.title,
                                   subtitle: p.address,
                                   onTap: () async {
-                                    final selected = ref.read(savedPlacesServiceProvider).toSelectedPlace(p);
-                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    final selected = ref
+                                        .read(savedPlacesServiceProvider)
+                                        .toSelectedPlace(p);
+                                    await ref
+                                        .read(recentPlacesServiceProvider)
+                                        .add(selected);
                                     ref.read(recentPlacesProvider.notifier).state =
-                                        ref.read(recentPlacesServiceProvider).getAll();
-                                    if (context.mounted) context.pop(selected);
+                                        ref
+                                            .read(recentPlacesServiceProvider)
+                                            .getAll();
+                                    if (context.mounted) {
+                                      await _applySelectedPlace(selected);
+                                    }
                                   },
                                 )),
                             const Divider(height: 1),
@@ -364,11 +714,19 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                                   title: p.title,
                                   subtitle: p.address,
                                   onTap: () async {
-                                    final selected = ref.read(savedPlacesServiceProvider).toSelectedPlace(p);
-                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    final selected = ref
+                                        .read(savedPlacesServiceProvider)
+                                        .toSelectedPlace(p);
+                                    await ref
+                                        .read(recentPlacesServiceProvider)
+                                        .add(selected);
                                     ref.read(recentPlacesProvider.notifier).state =
-                                        ref.read(recentPlacesServiceProvider).getAll();
-                                    if (context.mounted) context.pop(selected);
+                                        ref
+                                            .read(recentPlacesServiceProvider)
+                                            .getAll();
+                                    if (context.mounted) {
+                                      await _applySelectedPlace(selected);
+                                    }
                                   },
                                 )),
                             const Divider(height: 1),
@@ -378,15 +736,22 @@ class _LocationScreenState extends ConsumerState<LocationScreen> {
                             ...recents.take(10).map((p) => _recommendedTile(
                                   icon: Icons.history,
                                   title: p.label,
-                                  subtitle: p.latitude != null && p.longitude != null
+                                  subtitle: p.latitude != null &&
+                                          p.longitude != null
                                       ? 'Saved coordinates'
                                       : 'No coordinates',
                                   onTap: () async {
                                     final selected = p.toSelected();
-                                    await ref.read(recentPlacesServiceProvider).add(selected);
+                                    await ref
+                                        .read(recentPlacesServiceProvider)
+                                        .add(selected);
                                     ref.read(recentPlacesProvider.notifier).state =
-                                        ref.read(recentPlacesServiceProvider).getAll();
-                                    if (context.mounted) context.pop(selected);
+                                        ref
+                                            .read(recentPlacesServiceProvider)
+                                            .getAll();
+                                    if (context.mounted) {
+                                      await _applySelectedPlace(selected);
+                                    }
                                   },
                                 )),
                           ],
@@ -598,6 +963,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
       final route = await ref.read(placesServiceProvider).getDirections(
             pickup: pickup,
             dropoff: dropoff,
+            stops: trip.stops
+                .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
+                .toList(),
           );
       ref.read(tripBookingProvider.notifier).setRoute(route);
       if (mounted) {
@@ -651,6 +1019,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
 
     try {
       final mode = ref.read(tripBookingProvider).mode;
+      final filledStops = trip.stops
+          .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
+          .toList();
       final result = await ref.read(rideBookingServiceProvider).estimateRide(
             pickupLat: pickupLat,
             pickupLng: pickupLng,
@@ -659,12 +1030,28 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             serviceGroup: mode == HomeBookingMode.rental ? 'rental' : 'ride',
             distanceKm: route?.distanceKm,
             durationMin: route?.durationMin,
+            stops: filledStops,
           );
       if (!mounted) return;
       setState(() {
         _fareQuotes = result.quotes;
         _memberDiscountPercent = result.discountPercent;
         _loadingFares = false;
+        // Prefer server full-route metrics (pickup → stops → drop) when present.
+        if (result.distanceKm != null &&
+            result.distanceKm! > 0 &&
+            _route != null) {
+          _route = DirectionsResult(
+            pickup: _route!.pickup,
+            dropoff: _route!.dropoff,
+            stops: _route!.stops,
+            distanceKm: result.distanceKm!,
+            durationMin: result.durationMin ?? _route!.durationMin,
+            path: _route!.path,
+            source: _route!.source,
+          );
+          ref.read(tripBookingProvider.notifier).setRoute(_route!);
+        }
       });
     } catch (_) {
       if (mounted) {
@@ -804,6 +1191,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             womenSafetyEnabled: preferWomenRiders,
             distanceKm: route.distanceKm,
             durationMin: route.durationMin,
+            stops: trip.stops
+                .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
+                .toList(),
           );
       final rideId = result['id']?.toString();
       if (rideId != null && rideId.isNotEmpty) {
@@ -1556,11 +1946,16 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
       final event = msg['event']?.toString() ?? '';
       if (!mounted) return;
       if (event == 'ride_accepted') {
+        final trip = ref.read(tripBookingProvider);
         setState(() {
           _optimisticRide = UserActiveRide(
             id: msg['ride_id']?.toString() ?? _rideId ?? '',
-            pickupAddress: msg['pickup_address'] as String? ?? '',
-            dropoffAddress: msg['dropoff_address'] as String? ?? '',
+            pickupAddress: msg['pickup_address'] as String? ??
+                trip.pickup?.label ??
+                '',
+            dropoffAddress: msg['dropoff_address'] as String? ??
+                trip.dropoff?.label ??
+                '',
             status: msg['status'] as String? ?? 'DRIVER_ASSIGNED',
             fareEstimate: (msg['estimated_fare'] as num?)?.toDouble(),
             driverName: msg['driver_name'] as String?,
@@ -1573,10 +1968,28 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
             vehicleTypeName: (msg['vehicle_type'] as Map?)?['name'] as String? ??
                 msg['vehicle_type_name'] as String?,
             startCode: msg['start_code']?.toString(),
-            pickupLat: (msg['pickup_lat'] as num?)?.toDouble(),
-            pickupLng: (msg['pickup_lng'] as num?)?.toDouble(),
-            dropoffLat: (msg['dropoff_lat'] as num?)?.toDouble(),
-            dropoffLng: (msg['dropoff_lng'] as num?)?.toDouble(),
+            pickupLat: (msg['pickup_lat'] as num?)?.toDouble() ??
+                trip.pickup?.latitude,
+            pickupLng: (msg['pickup_lng'] as num?)?.toDouble() ??
+                trip.pickup?.longitude,
+            dropoffLat: (msg['dropoff_lat'] as num?)?.toDouble() ??
+                trip.dropoff?.latitude,
+            dropoffLng: (msg['dropoff_lng'] as num?)?.toDouble() ??
+                trip.dropoff?.longitude,
+            stops: UserActiveRide.stopsFromJson(msg['stops']).isNotEmpty
+                ? UserActiveRide.stopsFromJson(msg['stops'])
+                : [
+                    for (final s in trip.stops.where(
+                      (s) => s.label.trim().isNotEmpty && s.hasCoordinates,
+                    ))
+                      RideStopLocation(
+                        address: s.label,
+                        lat: s.latitude!,
+                        lng: s.longitude!,
+                      ),
+                  ],
+            distanceKm: trip.route?.distanceKm,
+            durationMin: trip.route?.durationMin,
           );
         });
         ref.invalidate(activeRideProvider);
@@ -1728,6 +2141,29 @@ class _RideTrackingScreenState extends ConsumerState<RideTrackingScreen> {
       base = apiRide;
     }
     if (base == null) return null;
+
+    if (base.stops.isEmpty) {
+      final optimisticStops = _optimisticRide?.stops ?? const [];
+      if (optimisticStops.isNotEmpty) {
+        base = base.copyWith(stops: optimisticStops);
+      } else {
+        final trip = ref.read(tripBookingProvider);
+        final fromTrip = [
+          for (final s in trip.stops.where(
+            (s) => s.label.trim().isNotEmpty && s.hasCoordinates,
+          ))
+            RideStopLocation(
+              address: s.label,
+              lat: s.latitude!,
+              lng: s.longitude!,
+            ),
+        ];
+        if (fromTrip.isNotEmpty) {
+          base = base.copyWith(stops: fromTrip);
+        }
+      }
+    }
+
     if (_liveDriverLat != null && _liveDriverLng != null) {
       return base.copyWithDriverLocation(lat: _liveDriverLat, lng: _liveDriverLng);
     }

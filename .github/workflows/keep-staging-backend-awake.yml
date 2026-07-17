@@ -1,0 +1,30 @@
+name: Keep staging backend awake
+
+# Render free/starter services spin down after idle and return 503 while waking.
+# Ping /health every 10 minutes so staging stays warm.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping staging /health
+        env:
+          BACKEND_HEALTH_URL: https://ride-application-backend.onrender.com/health
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt ${attempt}..."
+            if curl -fsS --max-time 90 "${BACKEND_HEALTH_URL}"; then
+              echo ""
+              echo "Backend is awake."
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Backend did not respond after retries."
+          exit 1

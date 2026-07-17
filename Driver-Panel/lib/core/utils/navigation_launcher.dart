@@ -9,8 +9,25 @@ class NavigationLauncher {
     required double lng,
     String? label,
     String app = 'Google Maps',
+    List<({double lat, double lng})> waypoints = const [],
   }) async {
     final encodedLabel = label != null ? Uri.encodeComponent(label) : null;
+
+    // Multi-stop: use Google Maps directions with waypoints.
+    if (waypoints.isNotEmpty && app != 'MapMyIndia') {
+      final wp = waypoints
+          .map((w) => '${w.lat},${w.lng}')
+          .join('|');
+      final multi = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=$lat,$lng'
+        '&waypoints=$wp'
+        '&travelmode=driving',
+      );
+      if (await canLaunchUrl(multi)) {
+        return launchUrl(multi, mode: LaunchMode.externalApplication);
+      }
+    }
 
     final Uri primary;
     if (app == 'MapMyIndia') {

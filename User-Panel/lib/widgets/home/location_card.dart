@@ -13,6 +13,8 @@ class LocationCard extends StatelessWidget {
     required this.onPickupTap,
     required this.onDropoffTap,
     required this.onFindRide,
+    this.stops = const [],
+    this.onStopTap,
     this.isBookingLocked = false,
     this.actionLabel = 'Find a ride',
     this.dropPlaceholder = 'Where are you going?',
@@ -25,9 +27,12 @@ class LocationCard extends StatelessWidget {
 
   final String pickup;
   final String dropoff;
+  /// Filled intermediate stops only — when empty, UI stays Pickup + Drop.
+  final List<String> stops;
   final VoidCallback onSwap;
   final VoidCallback onPickupTap;
   final VoidCallback onDropoffTap;
+  final ValueChanged<int>? onStopTap;
   final VoidCallback onFindRide;
   final bool isBookingLocked;
   final String actionLabel;
@@ -40,6 +45,8 @@ class LocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final filledStops = stops.where((s) => s.trim().isNotEmpty).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -85,6 +92,17 @@ class LocationCard extends StatelessWidget {
                         isPlaceholder: pickup.isEmpty,
                         onTap: onPickupTap,
                       ),
+                      for (var i = 0; i < filledStops.length; i++) ...[
+                        const SizedBox(height: 12),
+                        _LocationRow(
+                          dotColor: AppColors.primary,
+                          label: 'Stop ${i + 1}',
+                          labelColor: AppColors.primary,
+                          value: filledStops[i],
+                          isPlaceholder: false,
+                          onTap: () => (onStopTap ?? (_) => onDropoffTap())(i),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       _LocationRow(
                         dotColor: AppColors.success,

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/utils/geo_distance.dart';
 import 'package:wavego_user/core/utils/vehicle_utils.dart';
 import 'package:wavego_user/models/user_models.dart';
+import 'package:wavego_user/providers/trip_booking_provider.dart';
 import 'package:wavego_user/widgets/booking/driver_avatar_rating.dart';
 import 'package:wavego_user/widgets/booking/ride_accepted_panel.dart';
 import 'package:wavego_user/widgets/booking/women_safety_ride_actions.dart';
 
-class RideInProgressPanel extends StatelessWidget {
+class RideInProgressPanel extends ConsumerWidget {
   const RideInProgressPanel({
     super.key,
     required this.ride,
@@ -22,7 +24,7 @@ class RideInProgressPanel extends StatelessWidget {
   final VoidCallback? onTripDetails;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     double? meters;
     if (ride.driverLat != null &&
         ride.driverLng != null &&
@@ -215,7 +217,11 @@ class RideInProgressPanel extends StatelessWidget {
             const SizedBox(width: 12),
             OutlinedButton(
               onPressed: onTripDetails ??
-                  () => showRideTripDetailsSheet(context: context, ride: ride),
+                  () => showRideTripDetailsSheet(
+                        context: context,
+                        ride: ride,
+                        route: ref.read(tripBookingProvider).route,
+                      ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary, width: 1.2),

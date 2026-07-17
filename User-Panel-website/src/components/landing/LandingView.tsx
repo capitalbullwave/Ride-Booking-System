@@ -5,12 +5,12 @@ import Link from "next/link";
 import { LandingHeroSlider } from "@/components/landing/LandingHeroSlider";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
   MapPin,
   Navigation2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DownloadAppMenu } from "@/components/landing/DownloadAppMenu";
 import { ServiceImage } from "@/components/home/ServiceImage";
 import { buildLocationSearchUrl, isLandingBookingTab } from "@/lib/location-search";
 import type { LocationFieldType } from "@/lib/location-search";
@@ -23,6 +23,7 @@ import { WhyWaveGoSection } from "@/components/landing/WhyWaveGoSection";
 import { SosSection } from "@/components/landing/SosSection";
 import { LandingFaqSection } from "@/components/landing/LandingFaqSection";
 import { ROUTES } from "@/constants/routes";
+import { APP_DOWNLOAD } from "@/constants/app-download";
 import {
   landingBookingTabs,
   landingCaptainImage,
@@ -308,14 +309,14 @@ export function LandingView() {
                   24/7 captain support &amp; safety tools
                 </li>
               </ul>
-              <Button
+              <DownloadAppMenu
                 size="lg"
-                className="mt-2 h-12 w-fit rounded-xl bg-secondary px-8 font-bold text-primary hover:bg-white"
-                onClick={() => router.push(ROUTES.login)}
-              >
-                Sign up to drive
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
+                label="Download Captain App"
+                buttonClassName="mt-2 h-12 w-fit rounded-xl bg-secondary px-8 font-bold text-primary hover:bg-white"
+                androidApkUrl={APP_DOWNLOAD.captainAndroidApkUrl}
+                androidFileName={APP_DOWNLOAD.captainAndroidFileName}
+                iosUrl={APP_DOWNLOAD.captainIosAppStoreUrl}
+              />
             </div>
 
             <div className="relative mx-auto w-full max-w-sm lg:max-w-none lg:translate-y-2">
@@ -410,10 +411,16 @@ export function LandingView() {
               <div>
                 <p className="mb-4 text-sm font-bold text-foreground">Support</p>
                 <nav className="flex flex-col gap-3 text-sm text-muted-foreground">
-                  <Link href={ROUTES.profileHelp} className="transition-colors hover:text-primary">
+                  <Link
+                    href={getProtectedPath(ROUTES.profileHelp)}
+                    className="transition-colors hover:text-primary"
+                  >
                     Help center
                   </Link>
-                  <Link href={ROUTES.ambulance} className="transition-colors hover:text-primary">
+                  <Link
+                    href={getProtectedPath(ROUTES.ambulance)}
+                    className="transition-colors hover:text-primary"
+                  >
                     Ambulance SOS
                   </Link>
                   <Link href={ROUTES.about} className="transition-colors hover:text-primary">
@@ -433,6 +440,9 @@ export function LandingView() {
                   </Link>
                   <Link href={ROUTES.privacy} className="transition-colors hover:text-primary">
                     Privacy policy
+                  </Link>
+                  <Link href={ROUTES.safety} className="transition-colors hover:text-primary">
+                    Safety policy
                   </Link>
                 </nav>
               </div>

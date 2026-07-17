@@ -35,17 +35,35 @@ class BackendMappers {
     return json['otp'] as String?;
   }
 
+  /// Auto-generated `phone@driver.ridebook.app` / `phone@ridebook.app` — treat as empty.
+  static String? displayEmail(String? email, String? phone) {
+    final value = (email ?? '').trim();
+    if (value.isEmpty) return null;
+    final lower = value.toLowerCase();
+    if (!lower.endsWith('@ridebook.app')) return value;
+    final local = lower.split('@').first;
+    final phoneDigits = (phone ?? '').replaceAll(RegExp(r'\D'), '');
+    final localDigits = local.replaceAll(RegExp(r'\D'), '');
+    if (localDigits.isNotEmpty &&
+        phoneDigits.isNotEmpty &&
+        phoneDigits.contains(localDigits)) {
+      return null;
+    }
+    return value;
+  }
+
   static DriverProfile driverProfile(Map<String, dynamic> json) {
     final firstName = json['first_name'] as String? ?? '';
     final lastName = json['last_name'] as String? ?? '';
     final status = (json['status'] as String? ?? 'OFFLINE').toUpperCase();
     final kyc = (json['kyc_status'] as String? ?? 'PENDING').toLowerCase();
+    final phone = json['phone'] as String? ?? '';
 
     return DriverProfile(
       id: json['id']?.toString() ?? '',
       name: '$firstName $lastName'.trim().isEmpty ? 'Driver' : '$firstName $lastName'.trim(),
-      phone: json['phone'] as String? ?? '',
-      email: json['email'] as String?,
+      phone: phone,
+      email: displayEmail(json['email'] as String?, phone),
       avatar: resolveMediaUrl(json['profile_photo'] as String?),
       rating: (json['rating_avg'] as num?)?.toDouble(),
       totalTrips: (json['total_rides'] as num?)?.toInt() ?? 0,
@@ -139,9 +157,28 @@ class BackendMappers {
     return rideRequestFromJson(data.first as Map<String, dynamic>);
   }
 
+  static List<RideStop> _stopsFromJson(dynamic raw) {
+    if (raw is! List) return const [];
+    final stops = <RideStop>[];
+    for (final item in raw) {
+      Map<String, dynamic>? map;
+      if (item is Map<String, dynamic>) {
+        map = item;
+      } else if (item is Map) {
+        map = Map<String, dynamic>.from(item);
+      }
+      if (map == null) continue;
+      final stop = RideStop.fromJson(map);
+      if (stop.address.trim().isEmpty) continue;
+      stops.add(stop);
+      if (stops.length >= 3) break;
+    }
+    return stops;
+  }
+
   static RideRequest rideRequestFromJson(Map<String, dynamic> json) {
     return RideRequest(
-      id: json['id']?.toString() ?? '',
+      id: json['id']?.toString() ?? json['ride_id']?.toString() ?? '',
       pickupAddress: json['pickup_address'] as String? ?? '',
       destinationAddress: json['dropoff_address'] as String? ?? '',
       pickupLat: (json['pickup_lat'] as num?)?.toDouble() ?? 0,
@@ -156,6 +193,7 @@ class BackendMappers {
       passengerName: json['passenger_name'] as String? ?? 'Passenger',
       passengerPhone: json['passenger_phone'] as String?,
       expiresIn: 15,
+      stops: _stopsFromJson(json['stops']),
     );
   }
 
@@ -178,6 +216,7 @@ class BackendMappers {
           0,
       distance: (json['estimated_distance_km'] as num?)?.toDouble(),
       startedAt: json['started_at']?.toString(),
+      stops: _stopsFromJson(json['stops']),
     );
   }
 
@@ -228,23 +267,66 @@ class BackendMappers {
   }
 
   static RideSummary rideSummaryFromJson(Map<String, dynamic> json) {
-    final fare = (json['final_fare'] as num?)?.toDouble() ??
+    final fare = (json['trip_fare'] as num?)?.toDouble() ??
+        (json['final_fare'] as num?)?.toDouble() ??
         (json['estimated_fare'] as num?)?.toDouble() ??
         0;
-    final driverEarning = (json['driver_earning'] as num?)?.toDouble() ?? 0;
-    final companyEarning = (json['company_earning'] as num?)?.toDouble() ?? 0;
+
+    var commission = (json['commission'] as num?)?.toDouble() ??
+        (json['company_earning'] as num?)?.toDouble() ??
+        0;
+    var netEarnings = (json['total_earnings'] as num?)?.toDouble() ??
+        (json['driver_earning'] as num?)?.toDouble() ??
+        (json['net_earnings'] as num?)?.toDouble() ??
+        0;
+
+    // Same coherent fallback as payment screen.
+    if (fare > 0 && netEarnings <= 0 && commission <= 0) {
+      final pct = (json['commission_percentage'] as num?)?.toDouble() ??
+          (json['driver_commission_percentage'] as num?)?.toDouble();
+      if (pct != null && pct > 0) {
+        netEarnings = double.parse((fare * pct / 100).toStringAsFixed(2));
+        commission = double.parse((fare - netEarnings).toStringAsFixed(2));
+      } else {
+        netEarnings = double.parse((fare * 0.8).toStringAsFixed(2));
+        commission = double.parse((fare - netEarnings).toStringAsFixed(2));
+      }
+    } else if (fare > 0 && netEarnings <= 0 && commission > 0) {
+      netEarnings = double.parse((fare - commission).toStringAsFixed(2));
+      if (netEarnings < 0) netEarnings = 0;
+    } else if (fare > 0 && commission <= 0 && netEarnings > 0) {
+      commission = double.parse((fare - netEarnings).toStringAsFixed(2));
+      if (commission < 0) commission = 0;
+    }
+
+    final distance = (json['actual_distance_km'] as num?)?.toDouble() ??
+        (json['estimated_distance_km'] as num?)?.toDouble() ??
+        (json['distance'] as num?)?.toDouble() ??
+        0;
+    final duration = ((json['actual_duration_min'] as num?)?.toDouble() ??
+            (json['estimated_duration_min'] as num?)?.toDouble() ??
+            (json['duration'] as num?)?.toDouble() ??
+            0)
+        .round();
+
+    final stops = _stopsFromJson(json['stops']);
+
     return RideSummary(
       id: json['id']?.toString() ?? '',
       pickupAddress: json['pickup_address'] as String? ?? '',
-      destinationAddress: json['dropoff_address'] as String? ?? '',
-      distance: (json['estimated_distance_km'] as num?)?.toDouble() ?? 0,
-      duration:
-          ((json['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
+      destinationAddress: json['dropoff_address'] as String? ??
+          json['destination_address'] as String? ??
+          '',
+      distance: distance,
+      duration: duration,
       fare: fare,
-      commission: companyEarning > 0 ? companyEarning : fare - driverEarning,
-      netEarnings: driverEarning,
-      paymentMode: json['payment_method'] as String? ?? 'CASH',
+      commission: commission,
+      netEarnings: netEarnings,
+      paymentMode: json['payment_mode'] as String? ??
+          json['payment_method'] as String? ??
+          'CASH',
       completedAt: json['completed_at']?.toString(),
+      stops: stops,
     );
   }
 

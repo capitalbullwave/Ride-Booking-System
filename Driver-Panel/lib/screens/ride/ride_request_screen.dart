@@ -154,8 +154,38 @@ class _RideRequestScreenState extends ConsumerState<RideRequestScreen> {
                 ),
                 const SizedBox(height: 24),
                 _AddressRow(icon: Icons.trip_origin, color: AppColors.success, address: request.pickupAddress, label: 'Pickup'),
+                if (request.stops.isNotEmpty) ...[
+                  for (var i = 0; i < request.stops.length; i++) ...[
+                    const SizedBox(height: 12),
+                    _AddressRow(
+                      icon: Icons.flag,
+                      color: AppColors.primary,
+                      address: request.stops[i].address,
+                      label: 'Stop ${i + 1}',
+                    ),
+                  ],
+                ],
                 const SizedBox(height: 12),
-                _AddressRow(icon: Icons.location_on, color: AppColors.error, address: request.destinationAddress, label: 'Destination'),
+                _AddressRow(icon: Icons.location_on, color: AppColors.error, address: request.destinationAddress, label: 'Drop'),
+                if (request.stops.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${request.stops.length} stop${request.stops.length == 1 ? '' : 's'} on this trip',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Row(
                   children: [

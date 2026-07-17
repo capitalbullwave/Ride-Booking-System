@@ -51,18 +51,57 @@ function resolveUserPath(path: string): string {
 
 
 
-const PRODUCTION_API_URL = "http://127.0.0.1:8000";
+const LOCAL_API_URL = "http://127.0.0.1:8000";
+/** Staging fallback when env vars are missing on the host (avoids 503 from 127.0.0.1). */
+const STAGING_API_URL = "https://ride-application-backend.onrender.com";
+
+function defaultApiBaseUrl(): string {
+  if (process.env.NODE_ENV === "production") {
+    return STAGING_API_URL;
+  }
+  return LOCAL_API_URL;
+}
 
 export function getApiBaseUrl(): string {
-
   if (typeof window !== "undefined") {
-
-    return process.env.NEXT_PUBLIC_API_URL ?? "";
-
+    return process.env.NEXT_PUBLIC_API_URL || defaultApiBaseUrl();
   }
 
-  return process.env.NEXT_PUBLIC_API_URL ?? process.env.BACKEND_URL ?? PRODUCTION_API_URL;
+  return (
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.BACKEND_URL ||
+    defaultApiBaseUrl()
+  );
+}
 
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+const MAX_RETRIES = 3;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Wake a sleeping Render/free-tier backend before the user hits a real API call. */
+export async function warmBackend(timeoutMs = 45_000): Promise<void> {
+  const base = getApiBaseUrl().replace(/\/$/, "");
+  if (!base || base.includes("127.0.0.1") || base.includes("localhost")) {
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    await fetch(`${base}/health`, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch {
+    // Warmup is best-effort; real requests still retry on 503.
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function resolveMediaUrl(url: string | undefined | null): string | null {
@@ -165,45 +204,59 @@ function buildAuthHeaders(init?: RequestInit): HeadersInit {
 
 
 export async function apiFetch<T>(
-
   path: string,
-
   init?: RequestInit,
-
   fallbackError = "Request failed"
-
 ): Promise<T> {
+  const url = `${getApiBaseUrl()}${resolveUserPath(path)}`;
+  const headers = buildAuthHeaders(init);
+  let response: Response | null = null;
 
-  const response = await fetch(`${getApiBaseUrl()}${resolveUserPath(path)}`, {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    try {
+      response = await fetch(url, {
+        ...init,
+        headers,
+      });
+    } catch (error) {
+      if (attempt < MAX_RETRIES) {
+        await sleep(800 * (attempt + 1));
+        continue;
+      }
+      throw error instanceof Error
+        ? error
+        : new Error("Network error. Please try again.");
+    }
 
-    ...init,
+    if (response.ok || !RETRYABLE_STATUS.has(response.status) || attempt === MAX_RETRIES) {
+      break;
+    }
 
-    headers: buildAuthHeaders(init),
+    // Render free tier often returns 503 while waking from idle.
+    await sleep(1000 * (attempt + 1));
+  }
 
-  });
-
-
+  if (!response) {
+    throw new Error(fallbackError);
+  }
 
   if (!response.ok) {
-
     const errorBody = await response.json().catch(() => null);
-
-    throw new Error(getErrorMessage(errorBody, fallbackError));
-
+    const message =
+      response.status === 503
+        ? getErrorMessage(
+            errorBody,
+            "Server is waking up. Please wait a few seconds and try again."
+          )
+        : getErrorMessage(errorBody, fallbackError);
+    throw new Error(message);
   }
-
-
 
   if (response.status === 204) {
-
     return undefined as T;
-
   }
 
-
-
   return response.json() as Promise<T>;
-
 }
 
 

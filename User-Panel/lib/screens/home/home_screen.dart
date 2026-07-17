@@ -187,9 +187,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return LocationCard(
       pickup: pickup,
       dropoff: dropoff,
+      stops: trip.stops
+          .map((s) => s.label.trim())
+          .where((s) => s.isNotEmpty)
+          .toList(),
       onSwap: _swapLocations,
       onPickupTap: () => _openLocation(context, isPickup: true),
       onDropoffTap: () => _openLocation(context, isPickup: false),
+      onStopTap: (_) => _openLocation(context, isPickup: false),
       onFindRide: () => _handleBook(trip),
       isBookingLocked: isBookingLocked,
       actionLabel: _actionLabelFor(trip),

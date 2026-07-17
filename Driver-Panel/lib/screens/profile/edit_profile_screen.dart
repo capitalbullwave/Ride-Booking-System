@@ -26,6 +26,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.initState();
     final profile = ref.read(dashboardViewModelProvider).profile;
     _nameCtrl = TextEditingController(text: profile?.name ?? '');
+    // Placeholder system emails are already stripped in BackendMappers.
     _emailCtrl = TextEditingController(text: profile?.email ?? '');
     _phoneCtrl = TextEditingController(text: profile?.phone ?? '');
   }
@@ -38,14 +39,29 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
+  Map<String, String> _splitName(String fullName) {
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) {
+      return {'first_name': '', 'last_name': ''};
+    }
+    if (parts.length == 1) {
+      return {'first_name': parts.first, 'last_name': ''};
+    }
+    return {
+      'first_name': parts.first,
+      'last_name': parts.sublist(1).join(' '),
+    };
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
+      final names = _splitName(_nameCtrl.text);
       await ref.read(profileRepositoryProvider).updateProfile({
-        'name': _nameCtrl.text.trim(),
+        'first_name': names['first_name'],
+        'last_name': names['last_name'],
         'email': _emailCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
       });
       await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
       if (mounted) {
@@ -69,13 +85,31 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           key: _formKey,
           child: Column(
             children: [
-              AppTextField(controller: _nameCtrl, label: 'Full Name', validator: (v) => Validators.required(v, 'Name')),
+              AppTextField(
+                controller: _nameCtrl,
+                label: 'Full Name',
+                validator: (v) => Validators.required(v, 'Name'),
+              ),
               const SizedBox(height: 16),
-              AppTextField(controller: _emailCtrl, label: 'Email', validator: Validators.email),
+              AppTextField(
+                controller: _emailCtrl,
+                label: 'Email',
+                keyboardType: TextInputType.emailAddress,
+                validator: Validators.optionalEmail,
+              ),
               const SizedBox(height: 16),
-              AppTextField(controller: _phoneCtrl, label: 'Phone', validator: Validators.phone, readOnly: true),
+              AppTextField(
+                controller: _phoneCtrl,
+                label: 'Phone',
+                validator: Validators.phone,
+                readOnly: true,
+              ),
               const Spacer(),
-              AppButton(label: 'Save Changes', isLoading: _saving, onPressed: _save),
+              AppButton(
+                label: 'Save Changes',
+                isLoading: _saving,
+                onPressed: _save,
+              ),
             ],
           ),
         ),

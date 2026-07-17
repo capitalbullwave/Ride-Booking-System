@@ -1,9 +1,12 @@
 """Admin core routes — users, drivers, auth."""
+import csv
+import io
 from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -213,7 +216,12 @@ def _map_ride(ride: Ride, user: User | None = None, driver: Driver | None = None
         "driverName": f"{driver.first_name} {driver.last_name}" if driver else None,
         "vehicleType": "sedan",
         "pickupLocation": ride.pickup_address,
+        "pickupLat": ride.pickup_lat,
+        "pickupLng": ride.pickup_lng,
         "dropLocation": ride.dropoff_address,
+        "dropLat": ride.dropoff_lat,
+        "dropLng": ride.dropoff_lng,
+        "stops": list(ride.stops or []),
         "distance": ride.actual_distance_km or ride.estimated_distance_km,
         "fare": ride.final_fare or ride.estimated_fare,
         "driverCommissionPercentage": ride.driver_commission_percentage,
@@ -309,6 +317,57 @@ async def list_users(
         "limit": limit,
         "total_pages": max(1, (total + limit - 1) // limit),
     }
+
+
+@router.get("/users/export")
+async def export_users(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status: str | None = None,
+):
+    """Must be registered before `/users/{user_id}` so `export` is not parsed as a UUID."""
+    query = select(User).where(User.is_deleted == False)
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                User.first_name.ilike(term),
+                User.last_name.ilike(term),
+                User.email.ilike(term),
+                User.phone.ilike(term),
+            )
+        )
+    if status and status != "all":
+        if status == "active":
+            query = query.where(User.is_active == True, User.is_verified == True)
+        elif status == "blocked":
+            query = query.where(User.is_active == False)
+        elif status == "inactive":
+            query = query.where(User.is_verified == False)
+
+    result = await db.execute(query.order_by(User.created_at.desc()).limit(10000))
+    users = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "Registered"])
+    for u in users:
+        writer.writerow(
+            [
+                str(u.id),
+                f"{u.first_name} {u.last_name}".strip(),
+                u.email,
+                u.phone,
+                _user_status(u),
+                u.created_at.date().isoformat() if u.created_at else "",
+            ]
+        )
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=wavego-users.csv"},
+    )
 
 
 @router.get("/users/{user_id}")
@@ -577,6 +636,54 @@ async def list_drivers(
         "limit": limit,
         "total_pages": max(1, (total + limit - 1) // limit),
     }
+
+
+@router.get("/drivers/export")
+async def export_drivers(
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+    search: str | None = None,
+    status: str | None = None,
+):
+    """Must be registered before `/drivers/{driver_id}` so `export` is not parsed as a UUID."""
+    query = select(Driver).where(Driver.is_deleted == False)
+    if search:
+        term = f"%{search}%"
+        query = query.where(
+            or_(
+                Driver.first_name.ilike(term),
+                Driver.last_name.ilike(term),
+                Driver.email.ilike(term),
+                Driver.phone.ilike(term),
+            )
+        )
+
+    result = await db.execute(query.order_by(Driver.created_at.desc()).limit(10000))
+    drivers = result.scalars().all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Email", "Phone", "Status", "KYC", "Joined"])
+    for d in drivers:
+        mapped = _map_driver(d, None, 0.0)
+        if status and status != "all" and mapped["status"] != status:
+            continue
+        writer.writerow(
+            [
+                str(d.id),
+                f"{d.first_name} {d.last_name}".strip(),
+                d.email,
+                d.phone,
+                mapped["status"],
+                d.kyc_status,
+                d.created_at.date().isoformat() if d.created_at else "",
+            ]
+        )
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=wavego-drivers.csv"},
+    )
 
 
 @router.get("/drivers/{driver_id}")

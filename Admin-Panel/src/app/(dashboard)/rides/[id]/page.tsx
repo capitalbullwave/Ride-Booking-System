@@ -2,9 +2,10 @@
 
 import { notFound } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, MapPin, Navigation, Clock, IndianRupee, MessageSquare } from "lucide-react";
+import { ArrowLeft, Navigation, Clock, IndianRupee, MessageSquare } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { RideRouteMap } from "@/components/rides/ride-route-map";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -90,6 +91,7 @@ export default function RideDetailPage({
 
   const statusIndex = timelineSteps.findIndex((s) => s.status === ride.status);
   const activeIndex = statusIndex >= 0 ? statusIndex : 0;
+  const stops = (ride.stops ?? []).filter((s) => s.address.trim());
 
   return (
     <div className="space-y-6">
@@ -110,15 +112,15 @@ export default function RideDetailPage({
           <Card>
             <CardHeader><CardTitle>Live Map</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex h-64 items-center justify-center rounded-lg bg-muted/50 border-2 border-dashed">
-                <div className="text-center">
-                  <MapPin className="mx-auto h-12 w-12 text-primary/50" />
-                  <p className="mt-2 text-sm font-medium">Route Map Placeholder</p>
-                  <p className="text-xs text-muted-foreground">
-                    {ride.pickupLocation} → {ride.dropLocation}
-                  </p>
-                </div>
-              </div>
+              <RideRouteMap
+                pickupLocation={ride.pickupLocation}
+                dropLocation={ride.dropLocation}
+                pickupLat={ride.pickupLat}
+                pickupLng={ride.pickupLng}
+                dropLat={ride.dropLat}
+                dropLng={ride.dropLng}
+                stops={stops}
+              />
             </CardContent>
           </Card>
 
@@ -132,6 +134,22 @@ export default function RideDetailPage({
                   <p className="font-medium">{ride.pickupLocation}</p>
                 </div>
               </div>
+              {stops.map((stop, index) => (
+                <div key={`${stop.lat}-${stop.lng}-${index}`}>
+                  <div className="ml-1.5 border-l-2 border-dashed border-muted-foreground/30 h-6" />
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-violet-600 text-[9px] font-bold text-white rotate-45">
+                      <span className="-rotate-45">{index + 1}</span>
+                    </div>
+                    <div>
+                      <p className="text-xs text-violet-600 font-medium">
+                        Stop {index + 1}
+                      </p>
+                      <p className="font-medium">{stop.address}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
               <div className="ml-1.5 border-l-2 border-dashed border-muted-foreground/30 h-8" />
               <div className="flex items-start gap-3">
                 <div className="mt-1 h-3 w-3 rounded-full bg-red-500" />
@@ -158,6 +176,11 @@ export default function RideDetailPage({
                   <p className="text-xs text-muted-foreground">Fare</p>
                 </div>
               </div>
+              {stops.length > 0 && (
+                <p className="text-center text-xs text-muted-foreground">
+                  {stops.length} intermediate stop{stops.length > 1 ? "s" : ""} on this trip
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -254,6 +277,9 @@ export default function RideDetailPage({
                 ["Vehicle Type", capitalize(ride.vehicleType)],
                 ["Payment", capitalize(ride.paymentMethod)],
                 ["Status", capitalize(ride.status)],
+                ...(stops.length > 0
+                  ? [["Stops", String(stops.length)] as const]
+                  : []),
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-4">
                   <span className="text-sm text-muted-foreground">{label}</span>

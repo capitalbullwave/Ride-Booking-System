@@ -66,11 +66,18 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
   Future<void> _openNavigation(ActiveRide ride) async {
     final target = _navTarget(ride);
     final app = ref.read(navigationAppProvider);
+    final waypoints = ride.status == 'started'
+        ? ride.stops
+            .where((s) => s.lat != 0 && s.lng != 0)
+            .map((s) => (lat: s.lat, lng: s.lng))
+            .toList()
+        : <({double lat, double lng})>[];
     final launched = await NavigationLauncher.openMaps(
       lat: target.latitude,
       lng: target.longitude,
       label: _navLabel(ride),
       app: app,
+      waypoints: waypoints,
     );
     if (!launched && mounted) {
       context.showSnackBar('Could not open navigation app', isError: true);
@@ -366,24 +373,8 @@ class _ActiveTripScreenState extends ConsumerState<ActiveTripScreen> {
                           .titleLarge
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.person_pin_circle,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            ride.pickupAddress,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 12),
+                    _TripRouteList(ride: ride),
                     const SizedBox(height: 8),
                     Text(
                       ride.passengerName,
@@ -702,25 +693,7 @@ class _StartedTripSheet extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.location_on, size: 16, color: AppColors.success),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                ride.destinationAddress,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  height: 1.3,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _TripRouteList(ride: ride, compact: true),
         const SizedBox(height: 8),
         Text(
           ride.passengerName,
@@ -747,6 +720,137 @@ class _StartedTripSheet extends StatelessWidget {
               onTap: onChat,
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TripRouteList extends StatelessWidget {
+  const _TripRouteList({
+    required this.ride,
+    this.compact = false,
+  });
+
+  final ActiveRide ride;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final stops = ride.stops.where((s) => s.address.trim().isNotEmpty).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _RoutePointRow(
+          color: AppColors.success,
+          label: 'Pickup',
+          address: ride.pickupAddress,
+          compact: compact,
+        ),
+        for (var i = 0; i < stops.length; i++) ...[
+          SizedBox(height: compact ? 6 : 10),
+          _RoutePointRow(
+            color: AppColors.primary,
+            label: 'Stop ${i + 1}',
+            address: stops[i].address,
+            compact: compact,
+            diamond: true,
+            number: i + 1,
+          ),
+        ],
+        SizedBox(height: compact ? 6 : 10),
+        _RoutePointRow(
+          color: AppColors.error,
+          label: 'Drop',
+          address: ride.destinationAddress,
+          compact: compact,
+        ),
+      ],
+    );
+  }
+}
+
+class _RoutePointRow extends StatelessWidget {
+  const _RoutePointRow({
+    required this.color,
+    required this.label,
+    required this.address,
+    this.compact = false,
+    this.diamond = false,
+    this.number,
+  });
+
+  final Color color;
+  final String label;
+  final String address;
+  final bool compact;
+  final bool diamond;
+  final int? number;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (diamond && number != null)
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: Center(
+              child: Transform.rotate(
+                angle: 0.785398,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  alignment: Alignment.center,
+                  color: color,
+                  child: Transform.rotate(
+                    angle: -0.785398,
+                    child: Text(
+                      '$number',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          )
+        else
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: compact ? 11 : 12,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+              Text(
+                address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: compact ? 13 : 14,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
