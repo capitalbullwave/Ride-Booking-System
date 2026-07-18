@@ -197,7 +197,7 @@ export function LandingView() {
       <section className="relative bg-background">
         <div className="pointer-events-none absolute inset-0 overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-secondary/15 via-background to-background" />
 
-        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 py-14 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-center md:gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-14 lg:py-20">
+        <div className="relative mx-auto grid max-w-7xl gap-10 px-6 pb-14 pt-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] md:items-center md:gap-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-14 lg:pb-20 lg:pt-3">
           <AnimateIn className="relative z-10 max-w-xl">
             <h1 className="font-heading text-4xl font-bold leading-[1.08] tracking-tight text-foreground sm:text-5xl lg:text-[3.25rem]">
               Go anywhere.

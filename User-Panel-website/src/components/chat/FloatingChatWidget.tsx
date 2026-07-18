@@ -3,9 +3,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Loader2,
+  Mic,
+  MicOff,
   ShieldCheck,
   Sparkles,
   Timer,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import Image from "next/image";
@@ -21,6 +25,79 @@ import { getAiFeatureFallback } from "@/lib/ai-feature-fallbacks";
 import { isAuthenticated } from "@/lib/auth-session";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/lib/utils";
+
+/** Browser SpeechRecognition (Chrome / Edge / Safari variants). */
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  0: { transcript: string };
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<SpeechRecognitionResultLike> & { length: number };
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionCtor(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
+
+/** Prefer a female Indian / Hindi English voice for TTS. */
+function pickIndianFemaleVoice(
+  voices: SpeechSynthesisVoice[]
+): SpeechSynthesisVoice | null {
+  if (!voices.length) return null;
+
+  const score = (voice: SpeechSynthesisVoice): number => {
+    const name = voice.name.toLowerCase();
+    const lang = voice.lang.toLowerCase();
+    let points = 0;
+
+    if (lang === "en-in") points += 50;
+    else if (lang.startsWith("en-in")) points += 45;
+    else if (lang === "hi-in" || lang.startsWith("hi")) points += 35;
+    else if (lang.startsWith("en")) points += 10;
+
+    // Known female Indian / Indian-English voice names across Chrome, Edge, macOS
+    if (
+      /heera|neerja|priya|raveena|aditi|veena|swara|ananya|isha|kavya|meera|indian.*female|female.*indian/.test(
+        name
+      )
+    ) {
+      points += 40;
+    }
+    if (/female|woman|zira|samantha|karen|moira|tessa|fiona/.test(name)) {
+      points += 8;
+    }
+    if (/male|david|ravi|prabhat|hemant|mark|daniel/.test(name)) {
+      points -= 30;
+    }
+    if (voice.localService) points += 2;
+    return points;
+  };
+
+  return [...voices].sort((a, b) => score(b) - score(a))[0] ?? null;
+}
 
 /** Guest marketing pages only — never inside the logged-in app. */
 function isExternalMarketingPath(pathname: string): boolean {
@@ -151,6 +228,14 @@ function cleanReplyText(text: string): string {
     .trim();
 }
 
+function textForSpeech(text: string): string {
+  return cleanReplyText(text)
+    .replace(/[•]/g, ",")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 600);
+}
+
 function formatMessage(text: string) {
   const cleaned = cleanReplyText(text);
   return cleaned.split("\n").map((line, index) => (
@@ -169,8 +254,30 @@ export function FloatingChatWidget() {
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<AiChatMessage[]>([WELCOME]);
   const [activeTopic, setActiveTopic] = useState<QuickAction | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [listening, setListening] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [ttsSupported, setTtsSupported] = useState(false);
+  const [voiceHint, setVoiceHint] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  /** Hands-free loop: keep listening after each spoken reply until user stops mic. */
+  const voiceModeRef = useRef(false);
+  const pendingTranscriptRef = useRef("");
+  const sentFromVoiceRef = useRef(false);
+  const messagesRef = useRef(messages);
+  const busyRef = useRef(busy);
+  const voiceEnabledRef = useRef(voiceEnabled);
+  const askRef = useRef<(text: string, displayAs?: string) => Promise<void>>(
+    async () => undefined
+  );
+
+  messagesRef.current = messages;
+  busyRef.current = busy;
+  voiceEnabledRef.current = voiceEnabled;
 
   useEffect(() => {
     const syncVisibility = () => {
@@ -189,18 +296,265 @@ export function FloatingChatWidget() {
   }, [pathname]);
 
   useEffect(() => {
+    const Recognition = getSpeechRecognitionCtor();
+    setSpeechSupported(Boolean(Recognition));
+    setTtsSupported(
+      typeof window !== "undefined" && "speechSynthesis" in window
+    );
+
+    const loadVoices = () => {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+        return;
+      }
+      voiceRef.current = pickIndianFemaleVoice(window.speechSynthesis.getVoices());
+    };
+    loadVoices();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+        window.speechSynthesis.cancel();
+      }
+      voiceModeRef.current = false;
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      voiceModeRef.current = false;
+      pendingTranscriptRef.current = "";
+      sentFromVoiceRef.current = false;
+      recognitionRef.current?.abort();
+      setListening(false);
+      setVoiceMode(false);
+      window.speechSynthesis?.cancel();
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const node = listRef.current;
     if (node) node.scrollTop = node.scrollHeight;
     const timer = window.setTimeout(() => inputRef.current?.focus(), 180);
     return () => window.clearTimeout(timer);
-  }, [open, messages, busy, activeTopic]);
+  }, [open, messages, busy, activeTopic, listening]);
+
+  function speakAssistant(text: string): Promise<void> {
+    // Voice output only while mic / voice mode is active
+    if (!voiceModeRef.current || !voiceEnabledRef.current) {
+      return Promise.resolve();
+    }
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return Promise.resolve();
+    }
+
+    const spoken = textForSpeech(text);
+    if (!spoken) return Promise.resolve();
+
+    window.speechSynthesis.cancel();
+
+    return new Promise((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(spoken);
+      utterance.lang = "en-IN";
+      utterance.rate = 0.95;
+      utterance.pitch = 1.08;
+      const preferred = voiceRef.current;
+      if (preferred) {
+        utterance.voice = preferred;
+        utterance.lang = preferred.lang || "en-IN";
+      }
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+      utterance.onend = finish;
+      utterance.onerror = finish;
+      // Some browsers drop the first speak() after cancel — retry once.
+      window.setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+      }, 40);
+      // Safety timeout so voice-mode listening can resume
+      window.setTimeout(finish, Math.min(20000, spoken.length * 80 + 2500));
+    });
+  }
+
+  function stopVoiceMode() {
+    voiceModeRef.current = false;
+    pendingTranscriptRef.current = "";
+    sentFromVoiceRef.current = false;
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setListening(false);
+    setVoiceMode(false);
+    window.speechSynthesis?.cancel();
+  }
+
+  function submitVoiceTranscript(raw: string) {
+    const cleaned = raw.trim();
+    if (!cleaned || busyRef.current || sentFromVoiceRef.current) return;
+    sentFromVoiceRef.current = true;
+    pendingTranscriptRef.current = "";
+    setInput("");
+    setVoiceHint("Sending…");
+    void askRef.current(cleaned);
+  }
+
+  function startListening() {
+    const Recognition = getSpeechRecognitionCtor();
+    if (!Recognition) {
+      setVoiceHint("Voice input isn’t supported in this browser.");
+      return;
+    }
+    if (busyRef.current) return;
+
+    // Pause bot speech so mic can hear the user clearly
+    window.speechSynthesis?.cancel();
+    voiceModeRef.current = true;
+    setVoiceMode(true);
+    pendingTranscriptRef.current = "";
+    sentFromVoiceRef.current = false;
+    setVoiceHint("Listening… your message will send automatically");
+
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
+    }
+
+    const recognition = new Recognition();
+    // Indian English + Hindi/Hinglish recognition
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setListening(true);
+      setVoiceHint("Listening… your message will send automatically");
+    };
+
+    recognition.onresult = (event) => {
+      let finalChunk = "";
+      let interimChunk = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const piece = event.results[i][0]?.transcript ?? "";
+        if (event.results[i].isFinal) finalChunk += piece;
+        else interimChunk += piece;
+      }
+
+      if (finalChunk.trim()) {
+        pendingTranscriptRef.current = [
+          pendingTranscriptRef.current,
+          finalChunk.trim(),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+      }
+
+      const display = (
+        pendingTranscriptRef.current || interimChunk || finalChunk
+      ).trim();
+      if (display) setInput(display);
+
+      // Final result → send immediately (no Send button)
+      if (finalChunk.trim()) {
+        submitVoiceTranscript(pendingTranscriptRef.current || finalChunk);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      setListening(false);
+      if (event.error === "not-allowed") {
+        voiceModeRef.current = false;
+        setVoiceMode(false);
+        setVoiceHint("Microphone access is blocked. Please allow permission to continue.");
+      } else if (event.error === "no-speech") {
+        setVoiceHint("No speech detected. Please try again.");
+      } else if (event.error !== "aborted") {
+        setVoiceHint("We couldn’t hear that. Tap the mic and try again.");
+      }
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+
+      // If browser ended without isFinal, still auto-send what we heard
+      if (
+        voiceModeRef.current &&
+        !busyRef.current &&
+        !sentFromVoiceRef.current &&
+        pendingTranscriptRef.current.trim()
+      ) {
+        submitVoiceTranscript(pendingTranscriptRef.current);
+        return;
+      }
+
+      // Keep listening in hands-free mode while idle (no reply in flight)
+      if (
+        voiceModeRef.current &&
+        !busyRef.current &&
+        !sentFromVoiceRef.current &&
+        !window.speechSynthesis?.speaking
+      ) {
+        window.setTimeout(() => {
+          if (
+            voiceModeRef.current &&
+            !busyRef.current &&
+            !sentFromVoiceRef.current
+          ) {
+            try {
+              recognition.start();
+            } catch {
+              // recreate session if start() rejects after end
+              startListening();
+            }
+          }
+        }, 280);
+      }
+    };
+
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+      voiceModeRef.current = false;
+      setVoiceMode(false);
+      setVoiceHint("Couldn’t start the microphone. Try again.");
+    }
+  }
+
+  function toggleListening() {
+    if (listening || voiceMode) {
+      stopVoiceMode();
+      window.speechSynthesis?.cancel();
+      setVoiceHint(null);
+      return;
+    }
+    startListening();
+  }
 
   async function ask(text: string, displayAs?: string) {
     const cleaned = text.trim();
-    if (!cleaned || busy) return;
+    if (!cleaned || busyRef.current) return;
 
-    const prior = messages;
+    // Stop mic while we fetch + speak the reply
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setListening(false);
+    window.speechSynthesis?.cancel();
+
+    const prior = messagesRef.current;
     const nextUser: AiChatMessage = {
       role: "user",
       content: (displayAs || cleaned).trim(),
@@ -208,25 +562,38 @@ export function FloatingChatWidget() {
     setMessages((prev) => [...prev, nextUser]);
     setInput("");
     setBusy(true);
+    setVoiceHint(voiceModeRef.current ? "Processing your request…" : null);
 
+    let content = "";
     try {
       const reply = await sendAiChatMessage(cleaned, prior);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: cleanReplyText(reply) },
-      ]);
+      content = cleanReplyText(reply);
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: cleanReplyText(getAiFeatureFallback(cleaned)),
-        },
-      ]);
-    } finally {
-      setBusy(false);
+      content = cleanReplyText(getAiFeatureFallback(cleaned));
+    }
+
+    setMessages((prev) => [...prev, { role: "assistant", content }]);
+    setBusy(false);
+
+    // Speak reply only when mic / voice mode is on
+    if (voiceModeRef.current && voiceEnabledRef.current) {
+      setVoiceHint("Playing response…");
+      await speakAssistant(content);
+    }
+
+    sentFromVoiceRef.current = false;
+    pendingTranscriptRef.current = "";
+
+    // Hands-free: after reply is spoken, listen again automatically
+    if (voiceModeRef.current) {
+      setVoiceHint("Listening… your message will send automatically");
+      startListening();
+    } else {
+      setVoiceHint(null);
     }
   }
+
+  askRef.current = ask;
 
   function onQuickAction(id: QuickAction) {
     if (busy) return;
@@ -237,6 +604,11 @@ export function FloatingChatWidget() {
       { role: "user", content: topic.title },
       { role: "assistant", content: topic.intro },
     ]);
+    if (voiceModeRef.current) {
+      void speakAssistant(topic.intro).then(() => {
+        if (voiceModeRef.current) startListening();
+      });
+    }
   }
 
   function onQuestionClick(item: FollowUpQuestion) {
@@ -247,6 +619,13 @@ export function FloatingChatWidget() {
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     void ask(input);
+  }
+
+  function toggleVoiceOutput() {
+    const next = !voiceEnabled;
+    setVoiceEnabled(next);
+    voiceEnabledRef.current = next;
+    if (!next) window.speechSynthesis?.cancel();
   }
 
   const followUps = activeTopic ? TOPIC_QUESTIONS[activeTopic].questions : [];
@@ -288,18 +667,43 @@ export function FloatingChatWidget() {
                     </p>
                     <p className="mt-0.5 flex items-center gap-1 text-xs text-white/85">
                       <Sparkles className="h-3 w-3" />
-                      AI & Smart Features
+                      AI & Voice Assistant
                     </p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  aria-label="Close chat"
-                  onClick={() => setOpen(false)}
-                  className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {ttsSupported ? (
+                    <button
+                      type="button"
+                      aria-label={
+                        voiceEnabled
+                          ? "Mute assistant voice"
+                          : "Unmute assistant voice"
+                      }
+                      title={
+                        voiceEnabled
+                          ? "Mute voice responses"
+                          : "Enable voice responses"
+                      }
+                      onClick={toggleVoiceOutput}
+                      className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15"
+                    >
+                      {voiceEnabled ? (
+                        <Volume2 className="h-4 w-4" />
+                      ) : (
+                        <VolumeX className="h-4 w-4" />
+                      )}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-label="Close chat"
+                    onClick={() => setOpen(false)}
+                    className="rounded-xl p-1.5 text-white/90 transition hover:bg-white/15"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </header>
 
@@ -378,16 +782,62 @@ export function FloatingChatWidget() {
                   );
                 })}
               </div>
+              {voiceHint ? (
+                <p
+                  className={cn(
+                    "pb-1.5 text-xs",
+                    listening ? "text-primary font-medium" : "text-muted-foreground"
+                  )}
+                  aria-live="polite"
+                >
+                  {voiceHint}
+                </p>
+              ) : null}
               <form onSubmit={onSubmit} className="flex items-center gap-2 pb-3">
-                <input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder="Ask about features, safety, or fares…"
-                  maxLength={1200}
-                  disabled={busy}
-                  className="h-11 flex-1 rounded-[18px] border border-border bg-muted px-3.5 text-sm text-foreground outline-none ring-primary/30 placeholder:text-muted-foreground focus:bg-white focus:ring-2 disabled:opacity-60"
-                />
+                <div className="relative flex h-11 min-w-0 flex-1 items-center">
+                  <input
+                    ref={inputRef}
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder={
+                      listening || voiceMode
+                        ? "Listening…"
+                        : "Ask about features, safety, or fares…"
+                    }
+                    maxLength={1200}
+                    disabled={busy}
+                    className="h-11 w-full rounded-[18px] border border-border bg-muted py-2 pl-3.5 pr-11 text-sm text-foreground outline-none ring-primary/30 placeholder:text-muted-foreground focus:bg-white focus:ring-2 disabled:opacity-60"
+                  />
+                  {speechSupported ? (
+                    <button
+                      type="button"
+                      aria-label={
+                        listening || voiceMode
+                          ? "Stop voice chat"
+                          : "Start voice chat"
+                      }
+                      title={
+                        listening || voiceMode
+                          ? "Stop voice chat"
+                          : "Start voice chat"
+                      }
+                      disabled={busy && !voiceMode}
+                      onClick={toggleListening}
+                      className={cn(
+                        "absolute right-1.5 inline-flex h-8 w-8 items-center justify-center rounded-full transition disabled:opacity-50",
+                        listening || voiceMode
+                          ? "bg-primary text-primary-foreground shadow-sm animate-pulse"
+                          : "text-secondary hover:bg-primary/10"
+                      )}
+                    >
+                      {listening || voiceMode ? (
+                        <MicOff className="h-4 w-4" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                    </button>
+                  ) : null}
+                </div>
                 <button
                   type="submit"
                   disabled={busy || !input.trim()}

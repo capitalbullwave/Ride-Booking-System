@@ -39,8 +39,7 @@ export function LandingHeroSlider({ slides }: LandingHeroSliderProps) {
         {slides.map((slide, index) => {
           const offset = getOffset(index, active, slides.length);
           const absOffset = Math.abs(offset);
-          if (absOffset > 1) return null;
-
+          const isVisible = absOffset <= 1;
           const isActive = offset === 0;
           const scale = isActive ? 1 : 0.86;
           const shift = offset * 30;
@@ -49,16 +48,22 @@ export function LandingHeroSlider({ slides }: LandingHeroSliderProps) {
             <button
               key={slide.src}
               type="button"
+              aria-hidden={!isVisible}
+              tabIndex={isVisible ? 0 : -1}
               aria-label={isActive ? slide.alt : `View ${slide.alt}`}
-              onClick={() => setActive(index)}
+              onClick={() => {
+                if (!isVisible) return;
+                setActive(index);
+              }}
               className={cn(
-                "absolute top-1/2 left-1/2 w-[min(95%,440px)] max-w-full transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                !isActive && "cursor-pointer",
+                "absolute top-1/2 left-1/2 w-[min(95%,440px)] max-w-full transition-[transform,opacity,z-index] duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                isVisible && !isActive && "cursor-pointer",
+                !isVisible && "pointer-events-none",
               )}
               style={{
                 transform: `translate(calc(-50% + ${shift}%), -50%) scale(${scale})`,
-                zIndex: 30 - absOffset * 10,
-                opacity: isActive ? 1 : 0.88,
+                zIndex: isVisible ? 30 - absOffset * 10 : 0,
+                opacity: !isVisible ? 0 : isActive ? 1 : 0.88,
               }}
             >
               <div
@@ -74,7 +79,7 @@ export function LandingHeroSlider({ slides }: LandingHeroSliderProps) {
                   alt={slide.alt}
                   fill
                   sizes="(max-width: 768px) 95vw, 440px"
-                  priority={index === 0}
+                  priority
                   className="object-cover object-center"
                 />
                 {isActive && (
