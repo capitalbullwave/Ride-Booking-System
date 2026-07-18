@@ -40,6 +40,13 @@ export function AccountSettingsView() {
       route: ROUTES.profileEmail,
     },
     {
+      id: "emergency",
+      label: "Emergency contact",
+      value: "Used for SOS during active rides",
+      status: null as "warning" | "verified" | null,
+      route: ROUTES.profileEmergencyContact,
+    },
+    {
       id: "language",
       label: "Language",
       value: "Update device language",

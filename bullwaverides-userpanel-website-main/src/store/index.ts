@@ -1,1 +1,0 @@
-export { useAmbulanceStore } from "./useAmbulanceStore";

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell, PageHeader } from "@/components/layout";
 import { RideCard } from "@/components/home/RideCard";
+import { ROUTES } from "@/constants/routes";
 import { getRideHistory, type Ride } from "@/lib/ride-api";
 import { formatFare } from "@/lib/ride-booking";
 import type { ActivityTab } from "@/types/activity";
@@ -25,12 +27,14 @@ function formatRideDate(iso: string) {
 }
 
 function mapStatus(status: string): "Completed" | "Cancelled" | "Upcoming" {
-  if (status === "completed") return "Completed";
-  if (status === "cancelled") return "Cancelled";
+  const upper = status.toUpperCase();
+  if (upper === "COMPLETED") return "Completed";
+  if (upper === "CANCELLED") return "Cancelled";
   return "Upcoming";
 }
 
 export function ActivityView() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActivityTab>("Rides");
   const [rides, setRides] = useState<Ride[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,6 +112,9 @@ export function ActivityView() {
                   date={activity.date}
                   price={formatFare(activity.price)}
                   status={activity.status}
+                  onClick={() =>
+                    router.push(`${ROUTES.bookingDetail}?id=${encodeURIComponent(activity.id)}`)
+                  }
                 />
               ))
             ) : (

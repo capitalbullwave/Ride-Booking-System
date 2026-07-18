@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Loader2 } from "lucide-react";
+import { VehicleOptionImage } from "@/components/booking/VehicleOptionImage";
 import { ROUTES } from "@/constants/routes";
+import { getProtectedPath, isAuthenticated } from "@/lib/auth-session";
 import { getRentalCategories, type VehicleCategory } from "@/lib/home-api";
 import { bookRide } from "@/lib/ride-api";
 import { vehicleImageForCategory } from "@/lib/vehicle-map";
@@ -37,14 +38,23 @@ export function RentalView() {
   const router = useRouter();
   const [categories, setCategories] = useState<VehicleCategory[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [rentalHours, setRentalHours] = useState(4);
   const [pickup, setPickup] = useState("");
+  const [pickupLat, setPickupLat] = useState<number | undefined>();
+  const [pickupLng, setPickupLng] = useState<number | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [isBooking, setIsBooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hourOptions = [2, 4, 6, 8, 12];
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setPickup(params.get("pickup") || "");
+    const plat = params.get("plat");
+    const plng = params.get("plng");
+    if (plat != null && plat !== "") setPickupLat(Number(plat));
+    if (plng != null && plng !== "") setPickupLng(Number(plng));
   }, []);
 
   useEffect(() => {
@@ -78,8 +88,16 @@ export function RentalView() {
 
   async function handleConfirm() {
     if (!selected) return;
+    if (!isAuthenticated()) {
+      router.replace(getProtectedPath(ROUTES.rental));
+      return;
+    }
     if (!pickup.trim()) {
       setError("Please set a pickup location from the home screen first.");
+      return;
+    }
+    if (pickupLat == null || pickupLng == null) {
+      setError("Pickup coordinates missing. Set pickup from home using current location or search.");
       return;
     }
 
@@ -89,9 +107,26 @@ export function RentalView() {
       const ride = await bookRide({
         pickup_address: pickup,
         dropoff_address: pickup,
+        pickup_lat: pickupLat,
+        pickup_lng: pickupLng,
+        dropoff_lat: pickupLat,
+        dropoff_lng: pickupLng,
         vehicle_category_id: selected.id,
+        payment_method: "CASH",
+        rental_hours: rentalHours,
       });
-      router.push(`${ROUTES.bookSearching}?rideId=${ride.id}`);
+      const params = new URLSearchParams({
+        rideId: ride.id,
+        pickup,
+        dropoff: pickup,
+        plat: String(pickupLat),
+        plng: String(pickupLng),
+        dlat: String(pickupLat),
+        dlng: String(pickupLng),
+        tab: "rides",
+        vehicle: "cab",
+      });
+      router.push(`${ROUTES.bookSearching}?${params.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to confirm rental");
     } finally {
@@ -131,6 +166,29 @@ export function RentalView() {
           </p>
         </div>
 
+        <div className="mb-6 rounded-[20px] border border-border bg-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Rental hours
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {hourOptions.map((hours) => (
+              <button
+                key={hours}
+                type="button"
+                onClick={() => setRentalHours(hours)}
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                  rentalHours === hours
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                )}
+              >
+                {hours} hrs
+              </button>
+            ))}
+          </div>
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -154,7 +212,11 @@ export function RentalView() {
                   )}
                 >
                   <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-secondary/30">
-                    <Image src={image} alt={category.name} fill className="object-cover" />
+                    <VehicleOptionImage
+                      src={image}
+                      alt={category.name}
+                      className="h-16 w-16"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-heading text-base font-bold">{category.name}</h3>

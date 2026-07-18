@@ -117,12 +117,23 @@ export function getAuthSession(): AuthSession | null {
 }
 
 export function isAuthenticated(): boolean {
-  return getAuthSession() !== null;
+  const session = getAuthSession();
+  // Require a real API token — cookie alone is not enough to book/search.
+  return Boolean(session?.accessToken);
+}
+
+export function requireAuthRedirect(returnPath: string): string {
+  const next = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
+  return `${ROUTES.login}?next=${encodeURIComponent(next)}&redirect=${encodeURIComponent(next)}`;
 }
 
 export function getProtectedPath(path: string): string {
   if (isAuthenticated()) return path;
-  return `${ROUTES.login}?next=${encodeURIComponent(path)}`;
+  // Stale auth cookie without sessionStorage token — clear it so middleware matches.
+  if (hasAuthCookie() && !getAuthSession()?.accessToken) {
+    clearAuthSession();
+  }
+  return requireAuthRedirect(path);
 }
 
 export function clearAuthSession() {

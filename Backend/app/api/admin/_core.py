@@ -928,21 +928,147 @@ async def driver_rides(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_
     return [_map_ride(r) for r in result.scalars().all()]
 
 
-@router.get("/drivers/{driver_id}/documents")
-async def driver_documents(driver_id: UUID, admin: Annotated[AdminUser, Depends(get_current_admin)], db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(DriverDocument).where(DriverDocument.driver_id == driver_id))
-    docs = result.scalars().all()
+_ADMIN_DOC_LABELS = {
+    "DRIVING_LICENSE": "Driving License (Front)",
+    "DRIVING_LICENSE_BACK": "Driving License (Back)",
+    "AADHAAR": "Aadhaar Card (Front)",
+    "AADHAAR_BACK": "Aadhaar Card (Back)",
+    "PAN": "PAN Card",
+    "VEHICLE_RC": "RC Front",
+    "VEHICLE_RC_BACK": "RC Back",
+    "INSURANCE": "Vehicle Insurance",
+    "POLLUTION": "Pollution Certificate",
+    "PERMIT": "Commercial Permit",
+    "FITNESS": "Fitness Certificate",
+    "VEHICLE_FRONT": "Vehicle Front Photo",
+    "VEHICLE_BACK": "Vehicle Back Photo",
+    "VEHICLE_SIDE": "Vehicle Side Photo",
+    "PROFILE_PHOTO": "Profile Photo",
+}
+
+
+class DocumentBulkReviewRequest(BaseModel):
+    documentIds: list[str] = Field(..., min_length=1)
+    status: str = Field(..., pattern="^(approved|rejected)$")
+    reason: str | None = None
+
+
+class DocumentRejectRequest(BaseModel):
+    reason: str | None = None
+
+
+def _map_admin_document(doc: DriverDocument) -> dict:
+    doc_type = (doc.document_type or "").upper()
     return {
-        "documents": [
-            {
-                "id": str(d.id),
-                "driverId": str(d.driver_id),
-                "type": d.document_type.lower(),
-                "name": d.document_type.replace("_", " ").title(),
-                "status": d.status.lower(),
-                "uploadedAt": d.created_at.isoformat(),
-                "url": d.document_url,
-            }
-            for d in docs
-        ]
+        "id": str(doc.id),
+        "driverId": str(doc.driver_id),
+        "type": doc_type.lower(),
+        "name": _ADMIN_DOC_LABELS.get(doc_type, doc_type.replace("_", " ").title()),
+        "status": (doc.status or KYCStatus.PENDING.value).lower(),
+        "uploadedAt": doc.created_at.isoformat() if doc.created_at else None,
+        "url": doc.document_url,
+        "documentNumber": doc.document_number,
+        "rejectionReason": doc.rejection_reason,
+        "expiryDate": doc.expiry_date.isoformat() if doc.expiry_date else None,
     }
+
+
+@router.get("/drivers/{driver_id}/documents")
+async def driver_documents(
+    driver_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverDocument)
+        .where(DriverDocument.driver_id == driver_id)
+        .order_by(DriverDocument.created_at.asc())
+    )
+    docs = result.scalars().all()
+    return {"documents": [_map_admin_document(d) for d in docs]}
+
+
+@router.post("/drivers/{driver_id}/documents/bulk-review")
+async def bulk_review_driver_documents(
+    driver_id: UUID,
+    data: DocumentBulkReviewRequest,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        doc_ids = [UUID(value) for value in data.documentIds]
+    except ValueError as exc:
+        raise NotFoundException("Invalid document id") from exc
+
+    result = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.driver_id == driver_id,
+            DriverDocument.id.in_(doc_ids),
+        )
+    )
+    docs = list(result.scalars().all())
+    if not docs:
+        raise NotFoundException("Documents not found")
+
+    status_value = (
+        KYCStatus.APPROVED.value if data.status == "approved" else KYCStatus.REJECTED.value
+    )
+    reason = (data.reason or "").strip() or None
+    now = datetime.now(timezone.utc)
+    for doc in docs:
+        doc.status = status_value
+        doc.rejection_reason = reason if status_value == KYCStatus.REJECTED.value else None
+        doc.verified_by = admin.id
+        doc.verified_at = now
+
+    await db.flush()
+    return {"documents": [_map_admin_document(d) for d in docs]}
+
+
+@router.post("/drivers/{driver_id}/documents/{document_id}/approve")
+async def approve_driver_document(
+    driver_id: UUID,
+    document_id: UUID,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.id == document_id,
+            DriverDocument.driver_id == driver_id,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise NotFoundException("Document not found")
+    doc.status = KYCStatus.APPROVED.value
+    doc.rejection_reason = None
+    doc.verified_by = admin.id
+    doc.verified_at = datetime.now(timezone.utc)
+    await db.flush()
+    return _map_admin_document(doc)
+
+
+@router.post("/drivers/{driver_id}/documents/{document_id}/reject")
+async def reject_driver_document(
+    driver_id: UUID,
+    document_id: UUID,
+    data: DocumentRejectRequest,
+    admin: Annotated[AdminUser, Depends(get_current_admin)],
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(DriverDocument).where(
+            DriverDocument.id == document_id,
+            DriverDocument.driver_id == driver_id,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise NotFoundException("Document not found")
+    doc.status = KYCStatus.REJECTED.value
+    doc.rejection_reason = (data.reason or "").strip() or None
+    doc.verified_by = admin.id
+    doc.verified_at = datetime.now(timezone.utc)
+    await db.flush()
+    return _map_admin_document(doc)

@@ -48,6 +48,9 @@ export interface DriverDocument {
   status: string;
   uploadedAt: string;
   url?: string;
+  documentNumber?: string | null;
+  rejectionReason?: string | null;
+  expiryDate?: string | null;
 }
 
 function normalizeDriver(
@@ -193,16 +196,75 @@ export async function fetchDriverRides(driverId: string): Promise<DriverRide[]> 
   }));
 }
 
+function normalizeDriverDocument(
+  doc: DriverDocument & {
+    document_number?: string | null;
+    rejection_reason?: string | null;
+    expiry_date?: string | null;
+  },
+): DriverDocument {
+  return {
+    ...doc,
+    documentNumber: doc.documentNumber ?? doc.document_number ?? null,
+    rejectionReason: doc.rejectionReason ?? doc.rejection_reason ?? null,
+    expiryDate: doc.expiryDate ?? doc.expiry_date ?? null,
+    url: resolveMediaUrl(doc.url) ?? undefined,
+  };
+}
+
 export async function fetchDriverDocuments(
   driverId: string,
 ): Promise<DriverDocument[]> {
   const response = await apiFetch<{ documents: DriverDocument[] }>(
     `/api/v1/admin/drivers/${driverId}/documents`,
   );
-  return response.documents.map((doc) => ({
-    ...doc,
-    url: resolveMediaUrl(doc.url) ?? undefined,
-  }));
+  return response.documents.map(normalizeDriverDocument);
+}
+
+export async function approveDriverDocument(
+  driverId: string,
+  documentId: string,
+): Promise<DriverDocument> {
+  const doc = await apiFetch<DriverDocument>(
+    `/api/v1/admin/drivers/${driverId}/documents/${documentId}/approve`,
+    { method: "POST" },
+  );
+  return normalizeDriverDocument(doc);
+}
+
+export async function rejectDriverDocument(
+  driverId: string,
+  documentId: string,
+  reason?: string,
+): Promise<DriverDocument> {
+  const doc = await apiFetch<DriverDocument>(
+    `/api/v1/admin/drivers/${driverId}/documents/${documentId}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: reason ?? null }),
+    },
+  );
+  return normalizeDriverDocument(doc);
+}
+
+export async function bulkReviewDriverDocuments(
+  driverId: string,
+  documentIds: string[],
+  status: "approved" | "rejected",
+  reason?: string,
+): Promise<DriverDocument[]> {
+  const response = await apiFetch<{ documents: DriverDocument[] }>(
+    `/api/v1/admin/drivers/${driverId}/documents/bulk-review`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        documentIds,
+        status,
+        reason: reason ?? null,
+      }),
+    },
+  );
+  return response.documents.map(normalizeDriverDocument);
 }
 
 export interface DriverWalletTransaction {

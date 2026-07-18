@@ -4,6 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.public.schemas import (
+    AiChatRequest,
+    AiChatResponse,
     DirectionsResponse,
     LatLngPoint,
     PlaceDetailsResponse,
@@ -15,12 +17,17 @@ from app.api.public.schemas import (
 from app.database.session import get_db
 from app.maps.service import MapsService
 from app.models import AppSetting
+from app.services.ai_chat_service import AiChatService
 
 router = APIRouter(tags=["Public"])
 
 
 def get_maps_service() -> MapsService:
     return MapsService()
+
+
+def get_ai_chat_service() -> AiChatService:
+    return AiChatService()
 
 
 @router.get("/places/search", response_model=PlaceSearchResponse)
@@ -131,3 +138,18 @@ async def contact(db: AsyncSession = Depends(get_db)):
         "phone": settings.get("contact_phone", "+91 98765 43210"),
         "address": settings.get("contact_address", "India"),
     }
+
+
+@router.post("/ai-chat", response_model=AiChatResponse)
+async def ai_chat(
+    body: AiChatRequest,
+    db: AsyncSession = Depends(get_db),
+    chat: AiChatService = Depends(get_ai_chat_service),
+):
+    """Bullwave Assistant — guest Q&A on features, safety, women safety, and live fare estimates."""
+    reply = await chat.reply(
+        body.message,
+        history=[m.model_dump() for m in body.history],
+        db=db,
+    )
+    return AiChatResponse(reply=reply)

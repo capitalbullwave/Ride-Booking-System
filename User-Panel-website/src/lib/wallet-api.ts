@@ -87,17 +87,35 @@ export function requestWalletWithdraw(amount: number) {
   );
 }
 
-export function addWalletMoney(amount: number): Promise<WalletBalance> {
-  return authFetch<{ balance: number }>(
-    "/payment",
+export interface WalletCheckout {
+  order_id: string;
+  payment_session_id: string;
+  environment?: string;
+  amount?: number;
+  currency?: string;
+}
+
+export function createWalletCheckout(amount: number): Promise<{ checkout: WalletCheckout } | WalletCheckout> {
+  return authFetch<{ checkout: WalletCheckout } | WalletCheckout>(
+    "/wallet/checkout",
     { method: "POST", body: JSON.stringify({ amount }) },
-    "Unable to add money"
-  ).then((res) => ({
-    balance: res.balance,
-    bonus_balance: 0,
-    referral_balance: 0,
-    total: res.balance,
-  }));
+    "Unable to start wallet top-up"
+  );
+}
+
+export function verifyWalletPayment(orderId: string): Promise<{ balance?: number; message?: string }> {
+  return authFetch(
+    "/wallet/verify-payment",
+    { method: "POST", body: JSON.stringify({ order_id: orderId }) },
+    "Unable to verify wallet payment"
+  );
+}
+
+/** @deprecated Direct credit disabled — use createWalletCheckout + Cashfree. */
+export function addWalletMoney(amount: number): Promise<WalletBalance> {
+  return createWalletCheckout(amount).then(() => {
+    throw new Error("Complete payment in Cashfree checkout to add money");
+  });
 }
 
 export function getPaymentMethods(): Promise<PaymentMethod[]> {

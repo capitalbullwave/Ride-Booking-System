@@ -8,7 +8,7 @@ export interface ServiceItem {
 }
 
 export const homeServices: ServiceItem[] = [
-  { name: "Bike-Taxi", description: "Beat the traffic, save money", image: "/images/services/bike.png", route: `${ROUTES.start}?tab=rides&vehicle=bike` },
+  { name: "Bike", description: "Beat the traffic, save money", image: "/images/services/bike.png", route: `${ROUTES.start}?tab=rides&vehicle=bike` },
   { name: "Electric Auto", description: "No haggling, just easy rides", image: "/images/services/auto.png", route: `${ROUTES.start}?tab=rides&vehicle=auto` },
   { name: "Cab", description: "Comfortable rides for you", image: "/images/services/car.png", route: `${ROUTES.start}?tab=rides&vehicle=cab` },
   { name: "Parcel", description: "Quick, secure & insured deliveries", image: "/images/services/parcel.png", route: `${ROUTES.start}?tab=parcel&vehicle=parcel` },
@@ -45,7 +45,7 @@ export const loginAuthServices = [
 ] as const;
 
 export const landingServices: ServiceItem[] = [
-  { name: "Bike-Taxi", description: "Beat the traffic, save money", image: "/images/services/bike.png", route: ROUTES.login },
+  { name: "Bike", description: "Beat the traffic, save money", image: "/images/services/bike.png", route: ROUTES.login },
   { name: "Electric Auto", description: "No haggling, just easy rides", image: "/images/services/auto.png", route: ROUTES.login },
   { name: "Cab", description: "Comfortable rides for you", image: "/images/services/car.png", route: ROUTES.login },
   { name: "Parcel", description: "Quick, secure & insured deliveries", image: "/images/services/parcel.png", route: ROUTES.login },
@@ -56,7 +56,7 @@ export const landingServices: ServiceItem[] = [
 export const landingHeroImage = "/images/landing/hero-mobility.png";
 
 export const landingHeroSlides = [
-  { src: "/images/landing/hero-slide-bike.png", alt: "Bull Wave Rides bike taxi ride" },
+  { src: "/images/landing/hero-slide-bike.png", alt: "Bull Wave Rides bike ride" },
   { src: "/images/landing/hero-slide-e-auto.png", alt: "Bull Wave Rides electric auto ride" },
   { src: "/images/landing/hero-slide-parcel.png", alt: "Bull Wave Rides parcel delivery" },
   { src: "/images/landing/hero-slide-fleet.png", alt: "Bull Wave Rides mobility fleet" },

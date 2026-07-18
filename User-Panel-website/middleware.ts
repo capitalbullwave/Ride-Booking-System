@@ -16,6 +16,9 @@ const PUBLIC_PATHS = new Set<string>([
   ROUTES.terms,
   ROUTES.privacy,
   ROUTES.legalSafety,
+  // Guest fare browse: pickup/drop → see prices → vehicle list (login only on Book)
+  ROUTES.location,
+  ROUTES.book,
   "/robots.txt",
   "/sitemap.xml",
   "/opengraph-image",
@@ -59,7 +62,9 @@ export function middleware(request: NextRequest) {
 
   if (!isAuthenticated) {
     const loginUrl = new URL(ROUTES.login, request.url);
-    loginUrl.searchParams.set("redirect", pathname);
+    const returnTo = `${pathname}${request.nextUrl.search}`;
+    loginUrl.searchParams.set("redirect", returnTo);
+    loginUrl.searchParams.set("next", returnTo);
     return NextResponse.redirect(loginUrl);
   }
 

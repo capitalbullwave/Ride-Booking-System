@@ -13,40 +13,48 @@ export const PUBLIC_API = "/api/v1/public";
 
 
 function resolveUserPath(path: string): string {
-
-  if (path.startsWith(USER_API) || path.startsWith(AUTH_API) || path.startsWith(COMMON_API) || path.startsWith(PUBLIC_API)) {
-
+  if (
+    path.startsWith(USER_API) ||
+    path.startsWith(AUTH_API) ||
+    path.startsWith(COMMON_API) ||
+    path.startsWith(PUBLIC_API) ||
+    path.startsWith("/api/v1/rides/")
+  ) {
     return path;
-
   }
 
   if (path.startsWith("/api/v1/user-panel")) {
-
     return path.replace("/api/v1/user-panel", USER_API);
+  }
 
+  // Match Flutter: base /api/v1 + /rides/estimate (not under /user).
+  if (path.startsWith("/rides/estimate")) {
+    return `/api/v1${path}`;
+  }
+
+  // Match Flutter: /public/places/* → /api/v1/public/places/*
+  if (path.startsWith("/public/")) {
+    return `/api/v1${path}`;
+  }
+
+  if (path.startsWith("/common/")) {
+    return `${COMMON_API}${path.slice("/common".length)}`;
   }
 
   if (path.startsWith("/api/v1/")) {
-
     return path.replace("/api/v1/", `${USER_API}/`).replace("/auth/user/", "/auth/");
-
   }
 
   if (path.startsWith("/auth/")) {
-
     return `${AUTH_API}${path.slice(5)}`;
-
   }
 
   // Paths like "/user/student-pass" must not become "/api/v1/user/user/...".
   if (path.startsWith("/user/")) {
-
     return `${USER_API}${path.slice("/user".length)}`;
-
   }
 
   return `${USER_API}${path.startsWith("/") ? path : `/${path}`}`;
-
 }
 
 

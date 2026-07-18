@@ -10,7 +10,6 @@ import {
   Ban,
   RotateCcw,
   Star,
-  FileText,
   ChevronDown,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -73,6 +72,7 @@ import {
   DriverEditFormFields,
   DriverFormData,
 } from "@/components/drivers/driver-edit-form-fields";
+import { DocumentVerification } from "@/components/drivers/document-verification";
 
 type ConfirmAction =
   | "approve"
@@ -502,53 +502,11 @@ export default function DriverDetailPage({
         </TabsContent>
 
         <TabsContent value="documents" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Document Verification</CardTitle></CardHeader>
-            <CardContent>
-              {documents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No documents found.</p>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="rounded-lg border p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-lg bg-muted p-2">
-                            <FileText className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{doc.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Uploaded {formatDate(doc.uploadedAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <StatusBadge status={doc.status} />
-                      </div>
-                      {doc.url ? (
-                        <a
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-3 inline-block text-xs font-medium text-primary hover:underline"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            window.open(doc.url, "_blank", "noopener,noreferrer");
-                          }}
-                        >
-                          View document
-                        </a>
-                      ) : (
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          Document file unavailable
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <DocumentVerification
+            driver={driver}
+            documents={documents}
+            onDocumentsChange={setDocuments}
+          />
         </TabsContent>
 
         <TabsContent value="vehicle" className="mt-6">

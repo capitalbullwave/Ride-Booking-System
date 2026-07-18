@@ -1,10 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { buildLocationSearchUrl, type LocationFieldType } from "@/lib/location-search";
+import {
+  buildLocationSearchUrl,
+  type LocationCoords,
+  type LocationFieldType,
+} from "@/lib/location-search";
 import { buildBookUrl } from "@/lib/ride-booking";
+import { canAddStop, MAX_STOPS, type TripStop } from "@/lib/trip-stops";
 import { ROUTES } from "@/constants/routes";
 
 interface LocationCardProps {
@@ -12,6 +17,9 @@ interface LocationCardProps {
   dropoff: string;
   onSwap: () => void;
   returnTo?: string;
+  coords?: LocationCoords;
+  stops?: TripStop[];
+  onRemoveStop?: (index: number) => void;
 }
 
 export function LocationCard({
@@ -19,16 +27,23 @@ export function LocationCard({
   dropoff,
   onSwap,
   returnTo = ROUTES.home,
+  coords,
+  stops = [],
+  onRemoveStop,
 }: LocationCardProps) {
   const router = useRouter();
+  const filled = stops.filter((s) => s.label.trim());
 
-  const openLocationSearch = (field: LocationFieldType) => {
+  const openLocationSearch = (field: LocationFieldType, stopIndex?: number) => {
     router.push(
       buildLocationSearchUrl({
         field,
         returnTo,
         pickup,
         dropoff,
+        coords,
+        stops,
+        stopIndex,
       })
     );
   };
@@ -38,7 +53,15 @@ export function LocationCard({
       openLocationSearch(!pickup ? "pickup" : "dropoff");
       return;
     }
-    router.push(buildBookUrl(pickup, dropoff));
+    router.push(
+      buildBookUrl(pickup, dropoff, "rides", undefined, {
+        pickupLat: coords?.pickupLat,
+        pickupLng: coords?.pickupLng,
+        dropoffLat: coords?.dropoffLat,
+        dropoffLng: coords?.dropoffLng,
+        stops: filled,
+      })
+    );
   };
 
   return (
@@ -63,6 +86,39 @@ export function LocationCard({
             </span>
           </span>
         </button>
+
+        {filled.map((stop, index) => (
+          <div
+            key={`stop-${index}-${stop.label}`}
+            className="relative flex w-full items-start gap-3 rounded-[18px] border border-border bg-card px-4 py-3.5 shadow-sm"
+          >
+            <button
+              type="button"
+              onClick={() => openLocationSearch("stop", index)}
+              className="flex min-w-0 flex-1 items-start gap-3 text-left"
+            >
+              <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-warning" />
+              <span className="min-w-0 flex-1 pr-2">
+                <span className="block text-sm font-semibold text-warning">
+                  Stop {index + 1}
+                </span>
+                <span className="mt-0.5 block truncate text-sm font-medium leading-snug text-foreground">
+                  {stop.label}
+                </span>
+              </span>
+            </button>
+            {onRemoveStop ? (
+              <button
+                type="button"
+                onClick={() => onRemoveStop(index)}
+                className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label={`Remove stop ${index + 1}`}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        ))}
 
         <button
           type="button"
@@ -91,6 +147,21 @@ export function LocationCard({
           <ArrowDownUp className="h-4 w-4" />
         </button>
       </div>
+
+      {canAddStop(filled) ? (
+        <button
+          type="button"
+          onClick={() => openLocationSearch("stop", filled.length)}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-[14px] border border-dashed border-border px-3 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
+        >
+          <Plus className="h-4 w-4" />
+          Add stop ({filled.length}/{MAX_STOPS})
+        </button>
+      ) : (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Maximum {MAX_STOPS} stops added
+        </p>
+      )}
 
       <Button
         type="button"

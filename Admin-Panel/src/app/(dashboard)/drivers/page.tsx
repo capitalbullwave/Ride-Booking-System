@@ -6,8 +6,6 @@ import {
   MoreHorizontal,
   Eye,
   Pencil,
-  CheckCircle,
-  XCircle,
   RotateCcw,
   Trash2,
   RefreshCw,
@@ -48,11 +46,9 @@ import {
 import { Driver, DriverStatus } from "@/types";
 import { formatCurrency, capitalize, formatPublicId } from "@/lib/format";
 import {
-  approveDriver,
   deleteDriver,
   fetchDrivers,
   reactivateDriver,
-  rejectDriver,
   setDriverStatus,
   suspendDriver,
   updateDriver,
@@ -68,8 +64,6 @@ type DriverFormData = {
 };
 
 type ConfirmAction =
-  | "approve"
-  | "reject"
   | "suspend"
   | "reactivate"
   | "setOnline"
@@ -96,19 +90,6 @@ const confirmConfig: Record<
   ConfirmAction,
   { title: string; description: (name: string) => string; button: string; destructive?: boolean }
 > = {
-  approve: {
-    title: "Approve Driver",
-    description: (name) =>
-      `Approve ${name}? The driver will be marked as online and can start accepting rides.`,
-    button: "Approve Driver",
-  },
-  reject: {
-    title: "Reject Driver",
-    description: (name) =>
-      `Reject ${name}'s application? They will not be able to operate on the platform.`,
-    button: "Reject Driver",
-    destructive: true,
-  },
   suspend: {
     title: "Suspend Driver",
     description: (name) =>
@@ -296,13 +277,7 @@ export default function DriversPage() {
     setActionDriverId(driver.id);
 
     try {
-      if (confirmAction === "approve") {
-        await approveDriver(driver.id);
-        toast.success(`${driver.name} has been approved`);
-      } else if (confirmAction === "reject") {
-        await rejectDriver(driver.id);
-        toast.success(`${driver.name} has been rejected`);
-      } else if (confirmAction === "suspend") {
+      if (confirmAction === "suspend") {
         await suspendDriver(driver.id);
         toast.success(`${driver.name} has been suspended`);
       } else if (confirmAction === "reactivate") {
@@ -329,17 +304,13 @@ export default function DriversPage() {
       await loadDrivers({ silent: true });
     } catch (error) {
       const fallback =
-        confirmAction === "approve"
-          ? "Failed to approve driver"
-          : confirmAction === "reject"
-            ? "Failed to reject driver"
-            : confirmAction === "suspend"
-              ? "Failed to suspend driver"
-              : confirmAction === "reactivate"
-                ? "Failed to reactivate driver"
-                : confirmAction === "delete"
-                  ? "Failed to delete driver"
-                : "Failed to update driver status";
+        confirmAction === "suspend"
+          ? "Failed to suspend driver"
+          : confirmAction === "reactivate"
+            ? "Failed to reactivate driver"
+            : confirmAction === "delete"
+              ? "Failed to delete driver"
+              : "Failed to update driver status";
       toast.error(error instanceof Error ? error.message : fallback);
     } finally {
       setActionDriverId(null);
@@ -373,16 +344,6 @@ export default function DriversPage() {
       header: "Actions",
       cell: (d) => (
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            disabled={actionDriverId === d.id}
-            onClick={() => openConfirm(d, "delete")}
-            title="Delete driver"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
           <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8" />}>
             <MoreHorizontal className="h-4 w-4" />
@@ -395,23 +356,6 @@ export default function DriversPage() {
               <Pencil className="mr-2 h-4 w-4" /> Edit Driver
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {d.status === "pending" && (
-              <>
-                <DropdownMenuItem
-                  disabled={actionDriverId === d.id}
-                  onClick={() => openConfirm(d, "approve")}
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" /> Approve
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={actionDriverId === d.id}
-                  onClick={() => openConfirm(d, "reject")}
-                >
-                  <XCircle className="mr-2 h-4 w-4" /> Reject
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
             <DropdownMenuGroup>
               <DropdownMenuLabel>Change Status</DropdownMenuLabel>
               {statusActions.map(({ action, status, label, destructive }) => (

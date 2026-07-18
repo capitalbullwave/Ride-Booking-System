@@ -11,8 +11,22 @@ import { Button } from "@/components/ui/button";
 import { WaveGoLogo } from "@/components/layout/WaveGoLogo";
 import { ROUTES } from "@/constants/routes";
 import { RIDE_VEHICLE_OPTIONS } from "@/data/ride-options";
-import { bookRide, cancelRide, continueWithAllRiders } from "@/lib/ride-api";
-import { buildBookUrl, buildTrackingUrl, isRideVehicleId } from "@/lib/ride-booking";
+import {
+  bookRide,
+  cancelRide,
+  continueWithAllRiders,
+  getActiveRide,
+  isDriverAssigned,
+  type PaymentMethod,
+} from "@/lib/ride-api";
+import { getRideRealtimeClient } from "@/lib/ride-realtime";
+import {
+  buildBookUrl,
+  buildTrackingUrl,
+  isRideVehicleId,
+  parseTripCoords,
+} from "@/lib/ride-booking";
+import { getProtectedPath, isAuthenticated } from "@/lib/auth-session";
 import { VEHICLE_TO_CATEGORY_SLUG } from "@/lib/vehicle-map";
 import { getVehicleCategories } from "@/lib/home-api";
 
@@ -26,48 +40,79 @@ export function RideSearchingView() {
   const vehicleParam = searchParams.get("vehicle");
   const categoryIdParam = searchParams.get("categoryId");
   const preferWomenRiders = searchParams.get("preferWomen") === "1";
+  const existingRideId = searchParams.get("rideId");
+  const promoCode = searchParams.get("promo") || undefined;
+  const scheduledAt = searchParams.get("scheduled_at") || undefined;
+  const tripCoords = parseTripCoords(searchParams);
   const vehicle = isRideVehicleId(vehicleParam) ? vehicleParam : "bike";
+  const payment = (tripCoords.payment ?? "CASH") as PaymentMethod;
 
   const [progress, setProgress] = useState(10);
   const [status, setStatus] = useState("Finding nearby captains...");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [preferenceOpen, setPreferenceOpen] = useState(false);
   const [preferenceLoading, setPreferenceLoading] = useState(false);
-  const rideIdRef = useRef<string | null>(null);
+  const rideIdRef = useRef<string | null>(existingRideId);
   const bookingStarted = useRef(false);
-  const trackingTimers = useRef<number[]>([]);
+  const pollTimer = useRef<number | null>(null);
 
   const vehicleOption = RIDE_VEHICLE_OPTIONS.find((v) => v.id === vehicle);
   const vehicleName = vehicleOption?.name ?? "Ride";
 
-  const clearTrackingTimers = () => {
-    trackingTimers.current.forEach((id) => window.clearTimeout(id));
-    trackingTimers.current = [];
+  const clearPoll = () => {
+    if (pollTimer.current != null) {
+      window.clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
   };
 
-  const proceedAfterMatch = (rideId: string) => {
-    clearTrackingTimers();
-    setProgress(60);
-    setStatus("Searching for nearby captains...");
+  const goToTracking = (rideId: string) => {
+    clearPoll();
+    setProgress(100);
+    setStatus("Captain found!");
+    router.push(buildTrackingUrl(pickup, dropoff, vehicle, tab, rideId));
+  };
 
-    trackingTimers.current.push(
-      window.setTimeout(() => {
-        setProgress(100);
-        setStatus("Captain found!");
-      }, 1500)
-    );
+  const checkRideStatus = async () => {
+    try {
+      const active = await getActiveRide();
+      if (!active) return;
+      if (rideIdRef.current && active.id !== rideIdRef.current) return;
+      rideIdRef.current = active.id;
+      if (isDriverAssigned(active.status)) {
+        goToTracking(active.id);
+      }
+    } catch {
+      // Keep polling; transient network errors are fine.
+    }
+  };
 
-    trackingTimers.current.push(
-      window.setTimeout(() => {
-        router.push(buildTrackingUrl(pickup, dropoff, vehicle, tab, rideId));
-      }, 2500)
-    );
+  const startPolling = (rideId?: string) => {
+    clearPoll();
+    pollTimer.current = window.setInterval(() => {
+      void checkRideStatus();
+    }, 2000);
+
+    const id = rideId || rideIdRef.current;
+    if (!id) return;
+    const client = getRideRealtimeClient();
+    client.connect();
+    client.subscribeRide(id);
   };
 
   useEffect(() => {
-    if (!pickup || !dropoff) {
-      router.replace(ROUTES.landing);
+    if (!isAuthenticated()) {
+      const qs = searchParams.toString();
+      const returnTo = qs ? `${ROUTES.bookSearching}?${qs}` : ROUTES.bookSearching;
+      router.replace(getProtectedPath(returnTo));
       return;
+    }
+
+    if (!pickup || !dropoff) {
+      if (!existingRideId) {
+        router.replace(ROUTES.home);
+        return;
+      }
     }
 
     if (bookingStarted.current) return;
@@ -75,22 +120,64 @@ export function RideSearchingView() {
 
     async function startBooking() {
       try {
+        if (existingRideId) {
+          rideIdRef.current = existingRideId;
+          setStatus("Searching for nearby captains...");
+          setProgress(45);
+          startPolling();
+          await checkRideStatus();
+          return;
+        }
+
+        if (
+          tripCoords.pickupLat == null ||
+          tripCoords.pickupLng == null ||
+          tripCoords.dropoffLat == null ||
+          tripCoords.dropoffLng == null
+        ) {
+          setStatus("Missing route details. Please go back and try again.");
+          bookingStarted.current = false;
+          return;
+        }
+
         let categoryId = categoryIdParam ?? undefined;
         if (!categoryId) {
           const slug = VEHICLE_TO_CATEGORY_SLUG[vehicle];
           if (slug) {
-            const categories = await getVehicleCategories();
+            const categories = await getVehicleCategories("ride");
             categoryId = categories.find((c) => c.slug === slug)?.id;
           }
         }
 
+        setProgress(35);
+        setStatus("Matching your ride...");
+
         const ride = await bookRide({
           pickup_address: pickup,
           dropoff_address: dropoff,
+          pickup_lat: tripCoords.pickupLat,
+          pickup_lng: tripCoords.pickupLng,
+          dropoff_lat: tripCoords.dropoffLat,
+          dropoff_lng: tripCoords.dropoffLng,
           vehicle_category_id: categoryId,
           prefer_women_riders: preferWomenRiders,
+          payment_method: payment,
+          distance_km: tripCoords.distanceKm,
+          duration_min: tripCoords.durationMin,
+          stops: tripCoords.stops,
+          promo_code: promoCode,
+          scheduled_at: scheduledAt,
         });
         rideIdRef.current = ride.id;
+
+        if (scheduledAt) {
+          setProgress(100);
+          setStatus("Ride scheduled successfully");
+          window.setTimeout(() => {
+            router.push(ROUTES.bookings);
+          }, 1200);
+          return;
+        }
 
         if (ride.requires_rider_preference_choice) {
           setStatus("Waiting for your confirmation...");
@@ -98,32 +185,62 @@ export function RideSearchingView() {
           return;
         }
 
-        proceedAfterMatch(ride.id);
-      } catch {
-        setStatus("Unable to book ride. Please try again.");
+        if (isDriverAssigned(ride.status)) {
+          goToTracking(ride.id);
+          return;
+        }
+
+        setProgress(60);
+        setStatus("Searching for nearby captains...");
+        startPolling(ride.id);
+        await checkRideStatus();
+      } catch (err) {
+        setStatus(
+          err instanceof Error ? err.message : "Unable to book ride. Please try again."
+        );
         bookingStarted.current = false;
       }
     }
 
-    const timer1 = window.setTimeout(() => {
-      setProgress(35);
-      setStatus("Matching your ride...");
-    }, 800);
-
     void startBooking();
 
+    const client = getRideRealtimeClient();
+    const unsub = client.onMessage((msg) => {
+      const event = String(msg.event ?? "");
+      const msgRideId = String(msg.ride_id ?? "");
+      if (event !== "ride_accepted") return;
+      if (rideIdRef.current && msgRideId && msgRideId !== rideIdRef.current) return;
+      const id = rideIdRef.current || msgRideId;
+      if (id) goToTracking(id);
+    });
+
     return () => {
-      window.clearTimeout(timer1);
-      clearTrackingTimers();
+      clearPoll();
+      unsub();
+      if (rideIdRef.current) {
+        client.unsubscribeRide(rideIdRef.current);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickup, dropoff, vehicle, tab, categoryIdParam, preferWomenRiders, router]);
+  }, []);
 
   const handleCancelRide = async (reason: string) => {
+    clearPoll();
     if (rideIdRef.current) {
       await cancelRide(rideIdRef.current, reason);
     }
-    router.push(buildBookUrl(pickup, dropoff, tab, vehicle));
+    router.push(
+      buildBookUrl(pickup, dropoff, tab, vehicle, {
+        pickupLat: tripCoords.pickupLat,
+        pickupLng: tripCoords.pickupLng,
+        dropoffLat: tripCoords.dropoffLat,
+        dropoffLng: tripCoords.dropoffLng,
+        distanceKm: tripCoords.distanceKm,
+        durationMin: tripCoords.durationMin,
+        payment,
+        stops: tripCoords.stops,
+      })
+    );
   };
 
   const handlePreferenceContinue = async () => {
@@ -133,7 +250,10 @@ export function RideSearchingView() {
     try {
       await continueWithAllRiders(rideId);
       setPreferenceOpen(false);
-      proceedAfterMatch(rideId);
+      setProgress(60);
+      setStatus("Searching for nearby captains...");
+      startPolling();
+      await checkRideStatus();
     } catch {
       setStatus("Unable to continue search. Please try again.");
     } finally {
@@ -153,7 +273,18 @@ export function RideSearchingView() {
     } finally {
       setPreferenceLoading(false);
       setPreferenceOpen(false);
-      router.push(buildBookUrl(pickup, dropoff, tab, vehicle));
+      router.push(
+        buildBookUrl(pickup, dropoff, tab, vehicle, {
+          pickupLat: tripCoords.pickupLat,
+          pickupLng: tripCoords.pickupLng,
+          dropoffLat: tripCoords.dropoffLat,
+          dropoffLng: tripCoords.dropoffLng,
+          distanceKm: tripCoords.distanceKm,
+          durationMin: tripCoords.durationMin,
+          payment,
+          stops: tripCoords.stops,
+        })
+      );
     }
   };
 

@@ -1,13 +1,17 @@
 """Application configuration — single source of truth for all environment variables."""
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Always load Backend/.env (not dependent on process cwd)
+_BACKEND_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_BACKEND_ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -75,6 +79,10 @@ class Settings(BaseSettings):
     cashfree_app_id: str = ""
     cashfree_secret_key: str = ""
     cashfree_env: str = "sandbox"  # sandbox | production
+
+    # OpenAI (User Panel AI assistant)
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
 
     # PhonePe
     phonepe_merchant_id: str = ""

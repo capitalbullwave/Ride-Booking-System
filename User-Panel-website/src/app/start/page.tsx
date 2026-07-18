@@ -3,9 +3,8 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { buildLocationSearchUrl } from "@/lib/location-search";
-import { buildBookUrl } from "@/lib/ride-booking";
+import { buildBookUrl, isRideVehicleId, parseTripCoords } from "@/lib/ride-booking";
 import { ROUTES } from "@/constants/routes";
-import { isRideVehicleId } from "@/lib/ride-booking";
 
 function StartView() {
   const router = useRouter();
@@ -16,17 +15,27 @@ function StartView() {
     const dropoff = searchParams.get("dropoff") || "";
     const tab = searchParams.get("tab") || "rides";
     const vehicle = searchParams.get("vehicle");
+    const category = searchParams.get("category");
+    const coords = parseTripCoords(searchParams);
 
     const safeVehicle = isRideVehicleId(vehicle) ? vehicle : undefined;
+    const tripExtras = {
+      pickupLat: coords.pickupLat,
+      pickupLng: coords.pickupLng,
+      dropoffLat: coords.dropoffLat,
+      dropoffLng: coords.dropoffLng,
+      categoryId: category || undefined,
+    };
 
     if (!pickup) {
       router.replace(
         buildLocationSearchUrl({
           field: "pickup",
-          returnTo: `${ROUTES.start}?tab=${encodeURIComponent(tab)}${safeVehicle ? `&vehicle=${encodeURIComponent(safeVehicle)}` : ""}`,
+          returnTo: `${ROUTES.start}?tab=${encodeURIComponent(tab)}${safeVehicle ? `&vehicle=${encodeURIComponent(safeVehicle)}` : ""}${category ? `&category=${encodeURIComponent(category)}` : ""}`,
           pickup,
           dropoff,
           tab,
+          coords: tripExtras,
         })
       );
       return;
@@ -36,16 +45,17 @@ function StartView() {
       router.replace(
         buildLocationSearchUrl({
           field: "dropoff",
-          returnTo: `${ROUTES.start}?tab=${encodeURIComponent(tab)}&pickup=${encodeURIComponent(pickup)}${safeVehicle ? `&vehicle=${encodeURIComponent(safeVehicle)}` : ""}`,
+          returnTo: `${ROUTES.start}?tab=${encodeURIComponent(tab)}&pickup=${encodeURIComponent(pickup)}${safeVehicle ? `&vehicle=${encodeURIComponent(safeVehicle)}` : ""}${category ? `&category=${encodeURIComponent(category)}` : ""}`,
           pickup,
           dropoff,
           tab,
+          coords: tripExtras,
         })
       );
       return;
     }
 
-    router.replace(buildBookUrl(pickup, dropoff, tab, safeVehicle));
+    router.replace(buildBookUrl(pickup, dropoff, tab, safeVehicle, tripExtras));
   }, [router, searchParams]);
 
   return (
@@ -70,4 +80,3 @@ export default function StartPage() {
     </Suspense>
   );
 }
-

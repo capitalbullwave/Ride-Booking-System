@@ -95,7 +95,7 @@ export function AboutUsView() {
                 <p className="mt-3 max-w-lg text-base leading-relaxed text-muted-foreground">
                   Millions of riders choose Bull Wave Rides because we solve everyday intra-city travel —
                   with assured safety, transparent pricing, and rides that fit every need from
-                  bike-taxi to emergency ambulance.
+                  bike to emergency ambulance.
                 </p>
               </div>
 

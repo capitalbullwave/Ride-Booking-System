@@ -78,11 +78,14 @@ export interface Driver {
 
 export interface DriverDocument {
   id: string;
-  type: "aadhaar" | "pan" | "driving_license" | "rc" | "insurance" | "vehicle_image" | "profile_photo";
+  type: string;
   name: string;
   status: DocumentStatus;
   uploadedAt: string;
   url?: string;
+  documentNumber?: string | null;
+  rejectionReason?: string | null;
+  expiryDate?: string | null;
 }
 
 export interface RideStop {

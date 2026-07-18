@@ -1,6 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
-
-export const runtime = "edge";
 
 export const size = {
   width: 1200,
@@ -10,6 +10,11 @@ export const size = {
 export const contentType = "image/png";
 
 export default async function TwitterImage() {
+  const logo = await readFile(
+    join(process.cwd(), "public/images/bw-rides-logo-transparent.png")
+  );
+  const logoSrc = `data:image/png;base64,${logo.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -32,8 +37,9 @@ export default async function TwitterImage() {
             gap: 26,
           }}
         >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={"/images/bw-rides-logo-transparent.png"}
+            src={logoSrc}
             width={120}
             height={120}
             alt="Bullwave Rides"
@@ -57,4 +63,3 @@ export default async function TwitterImage() {
     size
   );
 }
-

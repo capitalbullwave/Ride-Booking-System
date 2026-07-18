@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { AppShell, HeroHeader } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { paymentMethods } from "@/constants/wallet";
-import { getWalletSummary, getPaymentMethods, type WalletSummary } from "@/lib/wallet-api";
+import { openSubscriptionCheckout } from "@/lib/cashfree-checkout";
+import {
+  createWalletCheckout,
+  getWalletSummary,
+  getPaymentMethods,
+  verifyWalletPayment,
+  type WalletSummary,
+} from "@/lib/wallet-api";
 import { formatFare } from "@/lib/ride-booking";
 import {
   Building2,
@@ -15,28 +22,61 @@ import {
   Sparkles,
 } from "lucide-react";
 
+const TOP_UP_AMOUNTS = [100, 200, 500, 1000];
+
 export function WalletView() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
   const [savedMethods, setSavedMethods] = useState<
     { id: string; type: string; label: string; last_four: string | null }[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [topUpAmount, setTopUpAmount] = useState(200);
+  const [topUpLoading, setTopUpLoading] = useState(false);
+  const [topUpError, setTopUpError] = useState<string | null>(null);
+  const [topUpSuccess, setTopUpSuccess] = useState<string | null>(null);
+
+  const reloadWallet = async () => {
+    const [wallet, methods] = await Promise.all([
+      getWalletSummary(),
+      getPaymentMethods().catch(() => []),
+    ]);
+    setSummary(wallet);
+    setSavedMethods(methods);
+  };
 
   useEffect(() => {
     async function load() {
       try {
-        const [wallet, methods] = await Promise.all([
-          getWalletSummary(),
-          getPaymentMethods().catch(() => []),
-        ]);
-        setSummary(wallet);
-        setSavedMethods(methods);
+        await reloadWallet();
       } finally {
         setIsLoading(false);
       }
     }
     void load();
   }, []);
+
+  const handleTopUp = async () => {
+    setTopUpLoading(true);
+    setTopUpError(null);
+    setTopUpSuccess(null);
+    try {
+      const res = await createWalletCheckout(topUpAmount);
+      const checkout = "checkout" in res && res.checkout ? res.checkout : (res as {
+        order_id: string;
+        payment_session_id: string;
+        environment?: string;
+        amount?: number;
+      });
+      const paid = await openSubscriptionCheckout(checkout);
+      await verifyWalletPayment(paid.order_id);
+      await reloadWallet();
+      setTopUpSuccess(`₹${topUpAmount} added to wallet`);
+    } catch (err) {
+      setTopUpError(err instanceof Error ? err.message : "Unable to add money");
+    } finally {
+      setTopUpLoading(false);
+    }
+  };
 
   return (
     <AppShell>
@@ -108,6 +148,45 @@ export function WalletView() {
                   Gift card
                 </Button>
               </div>
+            </div>
+
+            <div className="mb-10 rounded-[24px] border border-border bg-card p-5 shadow-sm">
+              <h2 className="font-heading text-lg font-bold text-foreground">Add money</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Top up via Cashfree — same checkout as the app
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {TOP_UP_AMOUNTS.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setTopUpAmount(amount)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                      topUpAmount === amount
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    ₹{amount}
+                  </button>
+                ))}
+              </div>
+              {topUpError ? <p className="mt-3 text-sm text-destructive">{topUpError}</p> : null}
+              {topUpSuccess ? <p className="mt-3 text-sm text-success">{topUpSuccess}</p> : null}
+              <Button
+                className="mt-4 rounded-full"
+                disabled={topUpLoading}
+                onClick={() => void handleTopUp()}
+              >
+                {topUpLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Add {formatFare(topUpAmount)}
+                  </>
+                )}
+              </Button>
             </div>
 
             <div>

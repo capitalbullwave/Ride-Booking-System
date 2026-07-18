@@ -12,7 +12,15 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { homeServices } from "@/constants/services";
 import { useAuthUser } from "@/hooks/useAuthUser";
 import { useHomeDashboard } from "@/hooks/useHomeDashboard";
-import { homeRouteForCategory, vehicleImageForCategory } from "@/lib/vehicle-map";
+import { reverseGeocode } from "@/lib/places-api";
+import { buildTrackingUrl } from "@/lib/ride-booking";
+import { isRideInProgress } from "@/lib/ride-api";
+import { parseStopsFromParams, type TripStop } from "@/lib/trip-stops";
+import {
+  displayVehicleName,
+  homeRouteForCategory,
+  vehicleImageForCategory,
+} from "@/lib/vehicle-map";
 import { cn } from "@/lib/utils";
 
 export function HomeView() {
@@ -20,6 +28,11 @@ export function HomeView() {
   const searchParams = useSearchParams();
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
+  const [pickupLat, setPickupLat] = useState<number | undefined>();
+  const [pickupLng, setPickupLng] = useState<number | undefined>();
+  const [dropoffLat, setDropoffLat] = useState<number | undefined>();
+  const [dropoffLng, setDropoffLng] = useState<number | undefined>();
+  const [stops, setStops] = useState<TripStop[]>([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const user = useAuthUser();
   const { data: dashboard, unreadCount } = useHomeDashboard();
@@ -34,15 +47,17 @@ export function HomeView() {
     rideCategories.length > 0
       ? rideCategories.map((category) => ({
           key: category.id,
-          name: category.name,
-          description: category.description ?? `Book ${category.name} instantly`,
+          name: displayVehicleName(category.name, category.slug),
+          description:
+            category.description ??
+            `Book ${displayVehicleName(category.name, category.slug)} instantly`,
           image: vehicleImageForCategory(category),
           route: homeRouteForCategory(category),
           isAmbulance: category.slug.toLowerCase().includes("ambulance"),
         }))
       : homeServices.map((service) => ({
           key: service.name,
-          name: service.name,
+          name: displayVehicleName(service.name),
           description: service.description,
           image: service.image,
           route: service.route,
@@ -75,14 +90,58 @@ export function HomeView() {
   useEffect(() => {
     const urlPickup = searchParams.get("pickup");
     const urlDropoff = searchParams.get("dropoff");
+    const plat = searchParams.get("plat");
+    const plng = searchParams.get("plng");
+    const dlat = searchParams.get("dlat");
+    const dlng = searchParams.get("dlng");
+
     if (urlPickup) setPickup(urlPickup);
     if (urlDropoff) setDropoff(urlDropoff);
+    if (plat != null && plat !== "") setPickupLat(Number(plat));
+    if (plng != null && plng !== "") setPickupLng(Number(plng));
+    if (dlat != null && dlat !== "") setDropoffLat(Number(dlat));
+    if (dlng != null && dlng !== "") setDropoffLng(Number(dlng));
+    setStops(parseStopsFromParams(searchParams));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const hasUrlPickup = Boolean(searchParams.get("pickup"));
+    if (hasUrlPickup || !navigator.geolocation) return;
+
+    let cancelled = false;
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const place = await reverseGeocode(
+            position.coords.latitude,
+            position.coords.longitude
+          );
+          if (cancelled) return;
+          setPickup((current) => current || place.label);
+          setPickupLat((current) => current ?? place.latitude);
+          setPickupLng((current) => current ?? place.longitude);
+        } catch {
+          // Keep empty pickup; user can select manually.
+        }
+      },
+      () => {
+        // Permission denied — user can pick manually.
+      },
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   const handleSwap = () => {
-    const temp = pickup;
     setPickup(dropoff);
-    setDropoff(temp);
+    setDropoff(pickup);
+    setPickupLat(dropoffLat);
+    setPickupLng(dropoffLng);
+    setDropoffLat(pickupLat);
+    setDropoffLng(pickupLng);
   };
 
   return (
@@ -125,8 +184,51 @@ export function HomeView() {
 
       <div className="relative z-20 mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6 md:px-12 lg:px-24">
         <div className="-mt-8 mb-6 md:-mt-10">
-          <LocationCard pickup={pickup} dropoff={dropoff} onSwap={handleSwap} />
+          <LocationCard
+            pickup={pickup}
+            dropoff={dropoff}
+            onSwap={handleSwap}
+            coords={{
+              pickupLat,
+              pickupLng,
+              dropoffLat,
+              dropoffLng,
+            }}
+            stops={stops}
+            onRemoveStop={(index) =>
+              setStops((prev) => prev.filter((_, i) => i !== index))
+            }
+          />
         </div>
+
+        {dashboard?.active_ride && isRideInProgress(dashboard.active_ride.status) ? (
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                buildTrackingUrl(
+                  dashboard.active_ride!.pickup_address,
+                  dashboard.active_ride!.dropoff_address,
+                  "bike",
+                  "rides",
+                  dashboard.active_ride!.id
+                )
+              )
+            }
+            className="mb-6 w-full rounded-[20px] border border-primary/30 bg-primary/10 p-4 text-left shadow-sm transition-colors hover:bg-primary/15"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Active ride
+            </p>
+            <p className="mt-1 font-heading text-base font-bold text-foreground">
+              {dashboard.active_ride.status.replace(/_/g, " ")}
+            </p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {dashboard.active_ride.pickup_address} → {dashboard.active_ride.dropoff_address}
+            </p>
+            <p className="mt-2 text-sm font-semibold text-primary">Tap to track live</p>
+          </button>
+        ) : null}
 
         <div className="mb-6 overflow-hidden rounded-[20px] border border-secondary/30 bg-gradient-to-br from-secondary/20 via-card to-primary/5 p-4 shadow-sm sm:p-5">
           <div className="flex items-start gap-3">
@@ -234,8 +336,12 @@ export function HomeView() {
                 key={service.key}
                 type="button"
                 onClick={() => {
-                  const pickupParam = pickup ? `?pickup=${encodeURIComponent(pickup)}` : "";
-                  router.push(`${ROUTES.rental}${pickupParam}`);
+                  const params = new URLSearchParams();
+                  if (pickup) params.set("pickup", pickup);
+                  if (pickupLat != null) params.set("plat", String(pickupLat));
+                  if (pickupLng != null) params.set("plng", String(pickupLng));
+                  const query = params.toString();
+                  router.push(query ? `${ROUTES.rental}?${query}` : ROUTES.rental);
                 }}
                 className="group flex w-full items-center gap-4 rounded-[20px] border border-border bg-card p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md active:scale-[0.99] sm:p-5"
               >

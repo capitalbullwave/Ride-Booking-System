@@ -18,7 +18,7 @@ export interface RideVehicleOption {
 export const RIDE_VEHICLE_OPTIONS: RideVehicleOption[] = [
   {
     id: "bike",
-    name: "Bike-Taxi",
+    name: "Bike",
     eta: "6 mins",
     price: 256,
     tagline: "Beat the traffic, save money",
@@ -67,8 +67,9 @@ export const RIDE_VEHICLE_OPTIONS: RideVehicleOption[] = [
 ];
 
 export const PAYMENT_METHODS = [
-  { id: "cash", label: "Payment via cash" },
-  { id: "wallet", label: "Payment via Bull Wave Rides Wallet" },
+  { id: "CASH", label: "Cash" },
+  { id: "UPI", label: "UPI" },
+  { id: "WALLET", label: "Wallet" },
 ] as const;
 
 export const RIDE_VEHICLE_IDS: RideVehicleId[] = RIDE_VEHICLE_OPTIONS.map((v) => v.id);

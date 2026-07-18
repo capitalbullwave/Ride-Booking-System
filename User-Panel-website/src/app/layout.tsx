@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BackendWarmup } from "@/components/BackendWarmup";
+import { FloatingChatWidget } from "@/components/chat/FloatingChatWidget";
 import { inter, playwriteEnglandJoined } from "@/lib/fonts";
 import "./globals.css";
 
@@ -93,6 +94,7 @@ export default function RootLayout({
         />
         <BackendWarmup />
         {children}
+        <FloatingChatWidget />
       </body>
     </html>
   );
