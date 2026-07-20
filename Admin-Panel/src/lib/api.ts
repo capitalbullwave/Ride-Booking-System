@@ -7,7 +7,7 @@ import { getStoredSession } from "@/lib/auth";
 const DEFAULT_API_BASE_URL = "";
 
 const BACKEND_HINT =
-  "Backend se connect nahi ho pa raha. Pehle Backend start karein: uvicorn app.main:app --reload (http://127.0.0.1:8000)";
+  "Unable to reach the server. Please check your connection and try again.";
 
 export type ApiFetchOptions = RequestInit & {
   /** Do not attach stored session token (use for /login). */
@@ -58,7 +58,7 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
       throw new Error(
         response.status >= 500
           ? BACKEND_HINT
-          : "Server ne koi response nahi diya. Backend check karein.",
+          : "The server returned an empty response. Please try again.",
       );
     }
     throw new Error(BACKEND_HINT);
@@ -72,7 +72,9 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   try {
     return JSON.parse(body) as T;
   } catch {
-    throw new Error("Server se galat response aaya. Backend dubara start karein.");
+    throw new Error(
+      "Received an invalid response from the server. Please try again.",
+    );
   }
 }
 
@@ -181,8 +183,12 @@ export async function apiFetch<T>(
         continue;
       }
       throw error instanceof Error
-        ? error
-        : new Error("Network error. Please try again.");
+        ? new Error(
+            /failed to fetch|networkerror|load failed/i.test(error.message)
+              ? BACKEND_HINT
+              : error.message,
+          )
+        : new Error("Unable to connect. Please try again.");
     }
 
     if (!RETRYABLE.has(response.status) || attempt === MAX_RETRIES) {
@@ -194,7 +200,7 @@ export async function apiFetch<T>(
   }
 
   if (!response) {
-    throw new Error("Request failed");
+    throw new Error(BACKEND_HINT);
   }
 
   // Access tokens expire in ~30 minutes; refresh once and retry.

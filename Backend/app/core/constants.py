@@ -169,3 +169,33 @@ class DevicePlatform(str, Enum):
 class RaterType(str, Enum):
     USER = "USER"
     DRIVER = "DRIVER"
+
+
+class ShiftStatus(str, Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FORCE_CLOSED = "force_closed"
+
+
+class SelfieVerificationStatus(str, Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    RATE_LIMITED = "rate_limited"
+
+
+class FaceProvider(str, Enum):
+    MOCK = "mock"
+    AWS_REKOGNITION = "aws_rekognition"
+    AZURE_FACE = "azure_face"
+    FACEPP = "facepp"
+    INSIGHTFACE = "insightface"
+    DEEPFACE = "deepface"
+
+
+class LivenessProvider(str, Enum):
+    MOCK = "mock"
+    CLIENT_CHALLENGE = "client_challenge"
+    INSTANT_CAPTURE = "instant_capture"
+    AWS_REKOGNITION = "aws_rekognition"
+    AZURE_FACE = "azure_face"

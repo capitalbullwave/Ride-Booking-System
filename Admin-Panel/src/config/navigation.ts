@@ -14,6 +14,7 @@ import {
   GraduationCap,
   Crown,
   Gift,
+  ScanFace,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,7 @@ export const navigation: NavGroup[] = [
       { title: "Users", href: "/users", icon: Users },
       { title: "Student Passes", href: "/student-passes", icon: GraduationCap },
       { title: "Drivers", href: "/drivers", icon: Car },
+      { title: "Selfie Verification", href: "/selfie-verifications", icon: ScanFace },
       { title: "Rides", href: "/rides", icon: MapPin },
       { title: "Vehicles", href: "/vehicles", icon: Truck },
     ],

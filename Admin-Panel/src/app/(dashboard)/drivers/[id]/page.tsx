@@ -73,6 +73,14 @@ import {
   DriverFormData,
 } from "@/components/drivers/driver-edit-form-fields";
 import { DocumentVerification } from "@/components/drivers/document-verification";
+import { DriverSelfieVerification } from "@/components/drivers/driver-selfie-verification";
+import {
+  DriverShiftRecord,
+  fetchDriverShifts,
+  fetchSelfieVerifications,
+  forceOfflineDriver,
+  SelfieVerificationLog,
+} from "@/lib/selfie-api";
 
 type ConfirmAction =
   | "approve"
@@ -83,7 +91,8 @@ type ConfirmAction =
   | "setOffline"
   | "setBusy"
   | "setRejected"
-  | "setSuspended";
+  | "setSuspended"
+  | "forceOffline";
 
 const statusActions: {
   action: ConfirmAction;
@@ -154,6 +163,13 @@ const confirmConfig: Record<
     button: "Set Suspended",
     destructive: true,
   },
+  forceOffline: {
+    title: "Force Offline",
+    description: (name) =>
+      `Force ${name} offline and close their active selfie-verified shift?`,
+    button: "Force Offline",
+    destructive: true,
+  },
 };
 
 function buildDriverUpdatePayload(form: DriverFormData) {
@@ -176,6 +192,8 @@ export default function DriverDetailPage({
   const [driver, setDriver] = useState<Driver | null>(null);
   const [driverRides, setDriverRides] = useState<DriverRide[]>([]);
   const [documents, setDocuments] = useState<DriverDocument[]>([]);
+  const [shifts, setShifts] = useState<DriverShiftRecord[]>([]);
+  const [selfieLogs, setSelfieLogs] = useState<SelfieVerificationLog[]>([]);
   const [wallet, setWallet] = useState<DriverWalletSummary | null>(null);
   const [creditAmount, setCreditAmount] = useState("");
   const [creditNote, setCreditNote] = useState("");
@@ -212,17 +230,22 @@ export default function DriverDetailPage({
     }
 
     try {
-      const [driverData, rides, docs, walletData] = await Promise.all([
-        fetchDriver(id),
-        fetchDriverRides(id),
-        fetchDriverDocuments(id),
-        fetchDriverWallet(id),
-      ]);
+      const [driverData, rides, docs, walletData, shiftData, selfieData] =
+        await Promise.all([
+          fetchDriver(id),
+          fetchDriverRides(id),
+          fetchDriverDocuments(id),
+          fetchDriverWallet(id),
+          fetchDriverShifts(id, { limit: 50 }),
+          fetchSelfieVerifications({ driverId: id, limit: 50 }),
+        ]);
 
       setDriver(driverData);
       setDriverRides(rides);
       setDocuments(docs);
       setWallet(walletData);
+      setShifts(shiftData.items);
+      setSelfieLogs(selfieData.items);
     } catch (error) {
       if (error instanceof Error && error.message.includes("not found")) {
         setNotFoundState(true);
@@ -304,6 +327,9 @@ export default function DriverDetailPage({
       } else if (confirmAction === "reactivate") {
         await reactivateDriver(driver.id);
         toast.success(`${driver.name} has been reactivated`);
+      } else if (confirmAction === "forceOffline") {
+        await forceOfflineDriver(driver.id, "Forced offline from driver actions");
+        toast.success(`${driver.name} forced offline (shift closed)`);
       } else {
         const statusMap: Partial<Record<ConfirmAction, DriverStatus>> = {
           setOnline: "online",
@@ -414,6 +440,19 @@ export default function DriverDetailPage({
                     </DropdownMenuItem>
                   </>
                 )}
+              {(driver.status === "online" ||
+                driver.status === "busy" ||
+                shifts.some((s) => s.status === "active")) && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => openConfirm("forceOffline")}
+                  >
+                    <Ban className="mr-2 h-4 w-4" /> Force Offline (Selfie Shift)
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </PageHeader>
@@ -434,7 +473,7 @@ export default function DriverDetailPage({
             {driver.phone} · {capitalize(driver.vehicleType)} · {driver.vehicleNumber}
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-6 text-center">
+        <div className="grid grid-cols-2 gap-4 text-center sm:grid-cols-3 lg:grid-cols-5">
           <div>
             <p className="text-2xl font-bold flex items-center justify-center gap-1">
               <Star className="h-5 w-5 text-amber-500" /> {driver.rating}
@@ -453,6 +492,18 @@ export default function DriverDetailPage({
             <p className="text-2xl font-bold">{formatCurrency(driver.walletBalance)}</p>
             <p className="text-xs text-muted-foreground">Wallet</p>
           </div>
+          <div>
+            <p className="text-sm font-bold pt-1">
+              {shifts.some((s) => s.status === "active" && s.selfieVerified) ? (
+                <StatusBadge status="success" />
+              ) : shifts.some((s) => s.status === "active") ? (
+                <StatusBadge status="pending" />
+              ) : (
+                <StatusBadge status="offline" />
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">Selfie Shift</p>
+          </div>
         </div>
       </div>
 
@@ -464,6 +515,7 @@ export default function DriverDetailPage({
           <TabsTrigger value="bank">Bank Details</TabsTrigger>
           <TabsTrigger value="wallet">Wallet</TabsTrigger>
           <TabsTrigger value="rides">Ride History</TabsTrigger>
+          <TabsTrigger value="selfie">Selfie & Shifts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="mt-6">
@@ -491,6 +543,20 @@ export default function DriverDetailPage({
                 ["Referral Code", driver.referralCode || "—"],
                 ["Joined Date", formatDate(driver.joinedDate)],
                 ["Account Status", capitalize(driver.status)],
+                [
+                  "Active Selfie Shift",
+                  shifts.some((s) => s.status === "active" && s.selfieVerified)
+                    ? "Verified & active"
+                    : shifts.some((s) => s.status === "active")
+                      ? "Active (selfie pending)"
+                      : "No active shift",
+                ],
+                [
+                  "Last Selfie Score",
+                  selfieLogs[0]?.confidenceScore != null
+                    ? `${selfieLogs[0].confidenceScore.toFixed(1)}%`
+                    : "—",
+                ],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-lg border p-4">
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -774,6 +840,15 @@ export default function DriverDetailPage({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="selfie" className="mt-6">
+          <DriverSelfieVerification
+            driver={driver}
+            shifts={shifts}
+            selfieLogs={selfieLogs}
+            onRefresh={() => loadDriverData({ silent: true })}
+          />
         </TabsContent>
       </Tabs>
 

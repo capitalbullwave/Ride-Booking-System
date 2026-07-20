@@ -201,6 +201,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               await ref.read(dashboardViewModelProvider.notifier).loadDashboard();
               await _refreshOnlineData();
             },
+            onOnlineChanged: (isOnline) async {
+              if (isOnline) {
+                _startRealtimeRideListener();
+                _startOnlinePollTimer();
+                await _refreshOnlineData();
+              } else {
+                _stopOnlinePollTimer();
+                _stopRealtimeRideListener();
+              }
+            },
           ),
           const TripHistoryScreen(embedded: true),
           const WalletScreen(embedded: true),
@@ -333,10 +343,12 @@ class _HomeTab extends ConsumerWidget {
   const _HomeTab({
     required this.state,
     required this.onRefresh,
+    required this.onOnlineChanged,
   });
 
   final DashboardState state;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(bool isOnline) onOnlineChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -405,9 +417,21 @@ class _HomeTab extends ConsumerWidget {
                             final error = await ref
                                 .read(dashboardViewModelProvider.notifier)
                                 .toggleOnline(v);
-                            if (error != null && context.mounted) {
-                              context.showSnackBar(error, isError: true);
+                            if (!context.mounted) return;
+                            if (error == kSelfieRequired) {
+                              final ok = await context.push<bool>(
+                                RouteNames.selfieVerification,
+                              );
+                              if (ok == true && context.mounted) {
+                                await onOnlineChanged(true);
+                              }
+                              return;
                             }
+                            if (error != null) {
+                              context.showSnackBar(error, isError: true);
+                              return;
+                            }
+                            await onOnlineChanged(v);
                           },
                         ),
                       ],

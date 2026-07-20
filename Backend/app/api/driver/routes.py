@@ -55,8 +55,10 @@ logger = get_logger(__name__)
 from app.services.payment_service import PaymentService, WalletService
 from app.services.ride_service import RideService
 from app.api.websocket.manager import manager
+from app.api.driver.selfie_routes import router as selfie_router
 
 router = APIRouter(tags=["Driver"])
+router.include_router(selfie_router)
 
 
 def _driver_active_ride_payload(ride: Ride) -> dict:
@@ -365,24 +367,11 @@ async def complete_registration(
 
 @router.put("/go-online")
 async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
-    if driver.kyc_status != KYCStatus.APPROVED.value:
-        if driver.kyc_status == KYCStatus.REJECTED.value:
-            raise ForbiddenException(
-                "Your documents were rejected. Please update and resubmit before going online."
-            )
-        raise ForbiddenException(
-            "Account verification is pending. You can go online after admin approval."
-        )
-    if not driver.is_verified:
-        raise ForbiddenException(
-            "Phone verification is required before going online."
-        )
+    """Legacy PUT — requires prior selfie verification (same as POST /go-online)."""
+    from app.selfie_verification.service import DriverSelfieShiftService
 
-    driver.status = DriverStatus.ONLINE.value
-    await DriverRepository(db).update(driver)
+    result = await DriverSelfieShiftService(db).go_online(driver)
     matching = DriverMatchingService(db)
-    lat, lng = await matching.driver_default_location(driver.id)
-    await matching.ensure_driver_online(driver, lat, lng)
 
     # Immediately attach only PRESENT fresh searching rides (never past/stale).
     try:
@@ -428,15 +417,18 @@ async def go_online(driver: Annotated[Driver, Depends(get_current_driver)], db: 
             error=str(exc),
         )
 
-    return {"status": driver.status}
+    return {"status": result.status, "shift": result.shift.model_dump(mode="json")}
 
 
 @router.put("/go-offline")
 async def go_offline(driver: Annotated[Driver, Depends(get_current_driver)], db: AsyncSession = Depends(get_db)):
-    driver.status = DriverStatus.OFFLINE.value
-    await DriverRepository(db).update(driver)
-    await DriverMatchingService(db).set_driver_offline(driver.id)
-    return {"status": driver.status}
+    from app.selfie_verification.service import DriverSelfieShiftService
+
+    result = await DriverSelfieShiftService(db).go_offline(driver)
+    return {
+        "status": result.status,
+        "shift": result.shift.model_dump(mode="json") if result.shift else None,
+    }
 
 
 @router.post("/location")
@@ -551,6 +543,10 @@ async def accept_ride(
 
     from app.models import Vehicle
     from app.notifications.service import NotificationService
+    from app.selfie_verification.service import DriverSelfieShiftService
+
+    # Block ride acceptance without an active selfie-verified shift.
+    await DriverSelfieShiftService(db).assert_can_accept_rides(driver)
 
     matching = DriverMatchingService(db)
     vehicle_id = data.vehicle_id

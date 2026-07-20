@@ -19,6 +19,7 @@ class RouteNames {
       '/auth/onboarding/vehicle-documents';
   static const String registration = '/registration';
   static const String verificationPending = '/verification-pending';
+  static const String selfieVerification = '/selfie-verification';
   static const String dashboard = '/dashboard';
   static const String rideRequest = '/ride-request';
   static const String activeTrip = '/active-trip';

@@ -29,6 +29,12 @@ class ApiEndpoints {
   static const String registrationSubmit = '/driver/registration/submit';
   static const String goOnline = '/driver/go-online';
   static const String goOffline = '/driver/go-offline';
+  static const String goOnlinePost = '/driver/go-online';
+  static const String goOfflinePost = '/driver/go-offline';
+  static const String selfieVerify = '/driver/selfie/verify';
+  static const String livenessChallenge = '/driver/selfie/liveness-challenge';
+  static const String verificationStatus = '/driver/verification-status';
+  static const String currentShift = '/driver/current-shift';
   static const String driverLocation = '/driver/location';
 
   // Documents (mock fallback — no backend route yet)

@@ -227,7 +227,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   final error = await ref
                                       .read(dashboardViewModelProvider.notifier)
                                       .toggleOnline(v);
-                                  if (error != null && context.mounted) {
+                                  if (!context.mounted) return;
+                                  if (error == kSelfieRequired) {
+                                    final ok = await context.push<bool>(
+                                      RouteNames.selfieVerification,
+                                    );
+                                    if (ok == true && context.mounted) {
+                                      context.showSnackBar(
+                                        'You are online. Ready to receive rides.',
+                                      );
+                                    }
+                                    return;
+                                  }
+                                  if (error != null) {
                                     context.showSnackBar(error, isError: true);
                                   }
                                 },

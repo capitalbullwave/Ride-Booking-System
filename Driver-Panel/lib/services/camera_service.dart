@@ -94,14 +94,28 @@ class CameraService {
     }
   }
 
-  Future<CameraCaptureResult> capturePhoto() async {
+  Future<CameraCaptureResult> capturePhoto({bool compress = true}) async {
     final active = _controller;
     if (active == null || !active.value.isInitialized) {
       throw StateError('Camera is not initialized');
     }
 
     try {
-      final photo = await active.takePicture();
+      final photo = await active.takePicture().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => throw TimeoutException('Camera capture timed out'),
+      );
+      // Web/mobile often freeze the preview after takePicture; resume when still open.
+      try {
+        await active.resumePreview();
+      } catch (_) {
+        // Some platforms have no pause/resume — ignore.
+      }
+      if (!compress || kIsWeb) {
+        // Web: skip heavy decode/encode here — caller builds a data URL quickly.
+        CameraLog.captureSuccess(photo.path);
+        return CameraCaptureResult(path: photo.path);
+      }
       final outputPath = await _processCapturedFile(photo);
       CameraLog.captureSuccess(outputPath);
       return CameraCaptureResult(path: outputPath);
@@ -115,14 +129,7 @@ class CameraService {
   }
 
   Future<String> _processCapturedFile(XFile file) async {
-    if (kIsWeb) {
-      final bytes = await file.readAsBytes();
-      final compressed = await ImageCompressor.compressBytes(bytes);
-      if (compressed.length == bytes.length) {
-        return file.path;
-      }
-      return file.path;
-    }
+    if (kIsWeb) return file.path;
     return ImageCompressor.compressFromPath(file.path);
   }
 

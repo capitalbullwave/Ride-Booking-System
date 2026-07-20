@@ -64,6 +64,19 @@ async def lifespan(app: FastAPI):
         initialize_firebase()
     except Exception as exc:
         logger.warning("firebase_startup_skipped", error=str(exc))
+
+    # Warm InsightFace model once so first selfie verify is not cold-start slow.
+    if (settings.face_provider or "").lower().strip() == "insightface":
+        try:
+            import asyncio
+
+            from app.selfie_verification.face.insightface import get_face_analysis
+
+            await asyncio.to_thread(get_face_analysis)
+            logger.info("insightface_warmup_ok")
+        except Exception as exc:
+            logger.warning("insightface_warmup_skipped", error=str(exc))
+
     yield
     await close_redis()
     logger.info("application_stopped")

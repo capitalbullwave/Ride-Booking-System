@@ -12,6 +12,10 @@ import 'package:wavego_driver/providers/app_providers.dart';
 import 'package:wavego_driver/repositories/auth_repository.dart';
 import 'package:wavego_driver/services/location_service.dart';
 import 'package:wavego_driver/services/profile_service.dart';
+import 'package:wavego_driver/services/selfie_verification_service.dart';
+
+/// Returned by [DashboardViewModel.toggleOnline] when a live selfie is required.
+const kSelfieRequired = 'SELFIE_REQUIRED';
 
 class DashboardViewModel extends StateNotifier<DashboardState> {
   DashboardViewModel(
@@ -19,12 +23,14 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
     this._profileService,
     this._localStorage,
     this._locationService,
+    this._selfieService,
   ) : super(const DashboardState());
 
   final ProfileRepository _profileRepo;
   final ProfileService _profileService;
   final LocalStorageService _localStorage;
   final LocationService _locationService;
+  final SelfieVerificationService _selfieService;
 
   StreamSubscription<dynamic>? _locationSubscription;
 
@@ -79,9 +85,24 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
           : 'Account verification is pending. You can go online after admin approval.';
     }
 
+    if (value) {
+      try {
+        final status = await _selfieService.getVerificationStatus();
+        if (status.selfieRequired) {
+          return kSelfieRequired;
+        }
+      } catch (e) {
+        return e.userMessage;
+      }
+    }
+
     state = state.copyWith(isOnline: value, isTogglingOnline: true);
     try {
-      await _profileRepo.setOnlineStatus(value);
+      if (value) {
+        await _selfieService.goOnline();
+      } else {
+        await _selfieService.goOffline();
+      }
       await _localStorage.setBool(AppConstants.isOnlineKey, value);
       if (value) {
         _startLocationSync();
@@ -91,9 +112,23 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
       state = state.copyWith(isTogglingOnline: false);
       return null;
     } catch (e) {
+      final message = e.userMessage;
+      if (value &&
+          (message.toLowerCase().contains('selfie') ||
+              message.toLowerCase().contains('verification required'))) {
+        state = state.copyWith(isOnline: false, isTogglingOnline: false);
+        return kSelfieRequired;
+      }
       state = state.copyWith(isOnline: !value, isTogglingOnline: false);
-      return e.userMessage;
+      return message;
     }
+  }
+
+  /// Called after [SelfieVerificationScreen] successfully verifies + goes online.
+  Future<void> markOnlineAfterSelfie() async {
+    await _localStorage.setBool(AppConstants.isOnlineKey, true);
+    _startLocationSync();
+    state = state.copyWith(isOnline: true, isTogglingOnline: false);
   }
 
   void _startLocationSync() {
@@ -170,6 +205,7 @@ final dashboardViewModelProvider =
     ref.watch(profileServiceProvider),
     ref.watch(localStorageProvider),
     ref.watch(locationServiceProvider),
+    ref.watch(selfieVerificationServiceProvider),
   );
 });
 

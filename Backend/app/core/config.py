@@ -107,6 +107,22 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = False
 
+    # Driver selfie verification (shift gate)
+    face_provider: str = "mock"  # mock | aws_rekognition | azure_face | facepp | insightface | deepface
+    liveness_provider: str = "instant_capture"  # instant_capture | mock | client_challenge | aws_rekognition | azure_face
+    face_match_threshold: float = 80.0
+    selfie_max_failed_attempts: int = 10
+    selfie_lockout_minutes: int = 5
+    selfie_verification_ttl_minutes: int = 10
+    shift_max_hours: int = 16
+    selfie_encrypt_at_rest: bool = True
+    # Provider credentials (optional — mock works without these)
+    aws_rekognition_collection_id: str = ""
+    azure_face_endpoint: str = ""
+    azure_face_key: str = ""
+    facepp_api_key: str = ""
+    facepp_api_secret: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

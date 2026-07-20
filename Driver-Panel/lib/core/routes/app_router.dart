@@ -38,6 +38,7 @@ import 'package:wavego_driver/screens/splash/splash_screen.dart';
 import 'package:wavego_driver/screens/support/support_screen.dart';
 import 'package:wavego_driver/screens/trip/trip_detail_screen.dart';
 import 'package:wavego_driver/screens/trip/trip_history_screen.dart';
+import 'package:wavego_driver/screens/verification/selfie_verification_screen.dart';
 import 'package:wavego_driver/screens/verification/verification_pending_screen.dart';
 import 'package:wavego_driver/screens/wallet/payment_method_screen.dart';
 import 'package:wavego_driver/screens/wallet/wallet_screen.dart';
@@ -145,6 +146,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RouteNames.dashboard,
         builder: (_, __) => const DashboardScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.selfieVerification,
+        builder: (_, __) => const SelfieVerificationScreen(),
       ),
       GoRoute(
         path: RouteNames.rideRequest,

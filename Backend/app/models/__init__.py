@@ -15,6 +15,7 @@ from app.auth.models import AuthDevice, OtpLog, UserSession
 from app.common.models import AuditLog
 from app.coupons.models import PromoCode, ReferralCode, ReferralProgram, ReferralReward
 from app.drivers.models import Driver, DriverBankAccount, DriverDocument, DriverEmergencyContact, DriverLocation
+from app.selfie_verification.models import DriverSelfieLog, DriverShift
 from app.notifications.models import Notification
 from app.payments.models import Payment
 from app.platform_settings.models import AppSetting, City, PricingRule, SystemConfig
@@ -52,6 +53,8 @@ __all__ = [
     "DriverLocation",
     "DriverWallet",
     "DriverWalletTransaction",
+    "DriverShift",
+    "DriverSelfieLog",
     "Faq",
     "Notification",
     "OtpLog",
