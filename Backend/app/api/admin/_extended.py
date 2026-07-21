@@ -287,6 +287,8 @@ async def _get_settings(db: AsyncSession) -> dict:
 
 
 async def _ride_with_names(db: AsyncSession, ride: Ride) -> dict:
+    from app.corporate.models import Company, CompanyEmployee
+
     user = await db.get(User, ride.user_id)
     driver = await db.get(Driver, ride.driver_id) if ride.driver_id else None
     mapped = _map_ride(ride, user, driver)
@@ -294,6 +296,17 @@ async def _ride_with_names(db: AsyncSession, ride: Ride) -> dict:
         vt = await db.get(VehicleType, ride.vehicle_type_id)
         if vt:
             mapped["vehicleType"] = vt.name.lower().replace(" ", "_")
+    if getattr(ride, "company_id", None):
+        company = await db.get(Company, ride.company_id)
+        if company:
+            mapped["companyName"] = company.company_name
+            mapped["companyCode"] = company.company_code
+    if getattr(ride, "employee_id", None):
+        employee = await db.get(CompanyEmployee, ride.employee_id)
+        if employee:
+            mapped["employeeCode"] = employee.employee_code
+            mapped["employeeDepartment"] = employee.department
+            mapped["employeeDesignation"] = employee.designation
     return mapped
 
 

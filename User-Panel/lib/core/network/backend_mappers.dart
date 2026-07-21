@@ -119,6 +119,8 @@ class BackendMappers {
     final fare = json['fare'] as num? ??
         json['fare_final'] as num? ??
         json['fare_estimate'] as num?;
+    final isCorporate = json['is_corporate'] == true ||
+        (json['ride_type'] as String?) == 'CORPORATE';
     return ActivityItem(
       id: int.tryParse(json['id']?.toString() ?? '') ?? 0,
       title: json['pickup_address'] as String? ?? 'Ride',
@@ -126,6 +128,10 @@ class BackendMappers {
       date: _relativeTime(json['created_at'] as String?),
       price: fare != null ? '₹${fare.toStringAsFixed(0)}' : '',
       status: json['status'] as String? ?? '',
+      isCorporate: isCorporate,
+      companyName: json['company_name'] as String?,
+      paidByCompany: json['paid_by_company'] == true ||
+          (json['payment_source'] as String?) == 'COMPANY',
     );
   }
 

@@ -154,14 +154,36 @@ class _RideRequestSheetState extends ConsumerState<_RideRequestSheet> {
                       const Icon(Icons.star, color: AppColors.warning, size: 18),
                       Text(' ${request.passengerRating}'),
                       const SizedBox(width: 8),
-                      Text(
-                        request.passengerName,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      Flexible(
+                        child: Text(
+                          request.passengerName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
+              if (request.paymentMode.toUpperCase() == 'COMPANY') ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Corporate Ride · Paid by Company',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               _AddressRow(
                 icon: Icons.trip_origin,

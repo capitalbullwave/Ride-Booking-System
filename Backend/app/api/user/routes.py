@@ -90,6 +90,9 @@ class BookRideRequest(BaseModel):
     distance_km: float | None = Field(default=None, ge=0)
     duration_min: float | None = Field(default=None, ge=0)
     stops: list[RideStopIn] | None = Field(default=None, max_length=3)
+    ride_type: str = "NORMAL"
+    company_id: str | None = None
+    employee_id: str | None = None
 
 
 class ValidateCouponRequest(BaseModel):
@@ -203,6 +206,8 @@ def _ride_summary(ride: Ride) -> dict:
     prefer_women = bool(getattr(ride, "prefer_women_riders", False))
     allow_all = bool(getattr(ride, "allow_all_riders", True))
     women_safety = bool(getattr(ride, "women_safety_enabled", False))
+    ride_type = getattr(ride, "ride_type", "NORMAL") or "NORMAL"
+    company = getattr(ride, "company", None)
     return {
         "id": str(ride.id),
         "public_id": ride.public_id,
@@ -217,6 +222,13 @@ def _ride_summary(ride: Ride) -> dict:
         "allow_all_riders": allow_all,
         "women_safety_enabled": women_safety,
         "is_emergency": bool(getattr(ride, "is_emergency", False)),
+        "ride_type": ride_type,
+        "payment_source": getattr(ride, "payment_source", "USER") or "USER",
+        "payment_method": ride.payment_method,
+        "is_corporate": ride_type == "CORPORATE",
+        "company_id": str(ride.company_id) if getattr(ride, "company_id", None) else None,
+        "company_name": company.company_name if company else None,
+        "paid_by_company": (getattr(ride, "payment_source", None) == "COMPANY"),
     }
 
 
@@ -497,6 +509,9 @@ async def book_ride(
         scheduled_at=data.scheduled_at,
         distance_km=data.distance_km,
         duration_min=data.duration_min,
+        ride_type=(data.ride_type or "NORMAL").upper(),
+        company_id=UUID(data.company_id) if data.company_id else None,
+        employee_id=UUID(data.employee_id) if data.employee_id else None,
         stops=(
             [
                 RideStopSchema(

@@ -623,7 +623,9 @@ class DriverMatchingService:
         )
 
         result = await self.db.execute(
-            select(Ride).options(selectinload(Ride.user)).where(Ride.id == ride.id)
+            select(Ride)
+            .options(selectinload(Ride.user), selectinload(Ride.company))
+            .where(Ride.id == ride.id)
         )
         ride = result.scalar_one()
 
@@ -682,6 +684,10 @@ class DriverMatchingService:
             "passenger_phone": ride.user.phone if ride.user else None,
             "status": ride.status,
             "actions": ["accept", "reject"],
+            "ride_type": getattr(ride, "ride_type", "NORMAL") or "NORMAL",
+            "payment_source": getattr(ride, "payment_source", "USER") or "USER",
+            "is_corporate": (getattr(ride, "ride_type", None) == "CORPORATE"),
+            "company_name": getattr(getattr(ride, "company", None), "company_name", None),
         }
         message = (
             f"{passenger_name}\n"
@@ -778,6 +784,10 @@ class DriverMatchingService:
             "passenger_phone": ride.user.phone if ride.user else None,
             "status": ride.status,
             "actions": ["accept", "reject"],
+            "ride_type": getattr(ride, "ride_type", "NORMAL") or "NORMAL",
+            "payment_source": getattr(ride, "payment_source", "USER") or "USER",
+            "is_corporate": (getattr(ride, "ride_type", None) == "CORPORATE"),
+            "company_name": getattr(getattr(ride, "company", None), "company_name", None),
         }
         if ws_manager:
             for driver in drivers:

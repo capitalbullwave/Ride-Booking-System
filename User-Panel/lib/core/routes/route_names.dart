@@ -32,6 +32,7 @@ class RouteNames {
   static const String profileAbout = '/profile/about';
   static const String profileSubscription = '/profile/subscription';
   static const String profileStudentPass = '/profile/student-pass';
+  static const String profileCorporate = '/profile/corporate';
   static const String profileReferEarn = '/profile/refer-earn';
 
   static const String walletBalance = '/wallet/balance';

@@ -17,6 +17,7 @@ import 'package:wavego_user/screens/notifications/notifications_screen.dart';
 import 'package:wavego_user/screens/onboarding/onboarding_screen.dart';
 import 'package:wavego_user/screens/rental/rental_flow_screens.dart';
 import 'package:wavego_user/screens/profile/student_pass_screen.dart';
+import 'package:wavego_user/screens/profile/corporate_profile_screen.dart';
 import 'package:wavego_user/screens/profile/refer_earn_screen.dart';
 import 'package:wavego_user/screens/profile/subscription_screen.dart';
 import 'package:wavego_user/screens/profile/profile_screen.dart';
@@ -233,6 +234,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: RouteNames.profileStudentPass,
         builder: (_, __) => const StudentPassScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: RouteNames.profileCorporate,
+        builder: (_, __) => const CorporateProfileScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

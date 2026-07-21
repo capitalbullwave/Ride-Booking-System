@@ -28,6 +28,11 @@ RideRequest? rideRequestFromNotification(AppNotification notification) {
 
 RideRequest? rideRequestFromRealtimePayload(Map<String, dynamic> data) {
   if (data['event'] != 'ride_request' || data['ride_id'] == null) return null;
+  final isCorporate = data['is_corporate'] == true ||
+      (data['ride_type'] as String?) == 'CORPORATE';
+  final companyName = data['company_name'] as String?;
+  final passengerName = data['passenger_name'] as String? ?? 'Passenger';
+  final paymentMode = data['payment_method'] as String? ?? 'CASH';
   return RideRequest(
     id: data['ride_id']?.toString() ?? '',
     pickupAddress: data['pickup_address'] as String? ?? '',
@@ -40,8 +45,10 @@ RideRequest? rideRequestFromRealtimePayload(Map<String, dynamic> data) {
     estimatedTime:
         ((data['estimated_duration_min'] as num?)?.toDouble() ?? 0).round(),
     estimatedFare: (data['estimated_fare'] as num?)?.toDouble() ?? 0,
-    paymentMode: data['payment_method'] as String? ?? 'CASH',
-    passengerName: data['passenger_name'] as String? ?? 'Passenger',
+    paymentMode: isCorporate ? 'COMPANY' : paymentMode,
+    passengerName: isCorporate && companyName != null && companyName.isNotEmpty
+        ? '$passengerName · $companyName'
+        : passengerName,
     passengerPhone: data['passenger_phone'] as String?,
     expiresIn: 60,
   );

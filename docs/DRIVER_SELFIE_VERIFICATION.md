@@ -63,7 +63,9 @@ Accept ride is also gated: `assert_can_accept_rides` requires an active `selfie_
 1. Active shift age **> 16 hours**, or
 2. Shift calendar date **≠** current UTC date
 
-Celery beat task `force_close_stale_driver_shifts` runs every 5 minutes. Closing a shift also happens opportunistically when the driver next hits verification/go-online APIs.
+When a shift is **completed** or **force-closed**, the driver is **always set offline** (DB + matching Redis), regardless of prior `online` / `busy` / `on_ride` status.
+
+Celery beat task `force_close_stale_driver_shifts` runs every 5 minutes. The FastAPI app also runs the same job in a background loop every 5 minutes (so local/dev works without Celery). Closing a shift also happens opportunistically when the driver next hits verification/go-online APIs.
 
 Going offline marks the active shift `completed`.
 

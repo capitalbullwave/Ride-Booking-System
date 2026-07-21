@@ -135,6 +135,47 @@ class _ActivityCard extends StatelessWidget {
                       color: AppColors.mutedForeground,
                     ),
               ),
+              if (item.isCorporate) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Corporate',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    if (item.companyName != null && item.companyName!.isNotEmpty)
+                      Text(
+                        item.companyName!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    if (item.paidByCompany)
+                      Text(
+                        'Paid by Company',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

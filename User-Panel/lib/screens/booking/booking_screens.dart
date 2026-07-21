@@ -21,6 +21,7 @@ import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/screens/booking/map_picker_screen.dart';
 import 'package:wavego_user/services/location_service.dart';
 import 'package:wavego_user/services/places_service.dart';
+import 'package:wavego_user/services/corporate_service.dart';
 import 'package:wavego_user/services/recent_places_service.dart';
 import 'package:wavego_user/services/ride_realtime_service.dart';
 import 'package:wavego_user/services/saved_places_service.dart';
@@ -859,6 +860,12 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   }
 
   Future<void> _openPaymentSheet() async {
+    final corporateMode = ref.read(corporateRideModeProvider);
+    if (corporateMode) {
+      setState(() => _paymentMethod = 'COMPANY');
+      return;
+    }
+
     const methods = [
       ('CASH', 'Cash'),
       ('UPI', 'UPI'),
@@ -896,6 +903,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
   }
 
   String get _paymentLabel {
+    if (ref.watch(corporateRideModeProvider) || _paymentMethod == 'COMPANY') {
+      return 'Paid by Company';
+    }
     switch (_paymentMethod) {
       case 'UPI':
         return 'UPI';
@@ -1176,6 +1186,20 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
 
     setState(() => _booking = true);
     try {
+      final corporateMode = ref.read(corporateRideModeProvider);
+      final membership = corporateMode
+          ? await ref.read(corporateMembershipProvider.future)
+          : null;
+      if (corporateMode && membership?.canBookCorporate != true) {
+        if (mounted) {
+          context.showSnackBar(
+            'Corporate booking is not available for your account',
+            isError: true,
+          );
+        }
+        return;
+      }
+
       final result = await ref.read(rideBookingServiceProvider).bookRide(
             pickupAddress: pickup.label,
             dropoffAddress: dropoff.label,
@@ -1184,7 +1208,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             dropoffLat: route.dropoff.lat,
             dropoffLng: route.dropoff.lng,
             vehicleCategoryId: selectedVehicle?.id,
-            paymentMethod: _paymentMethod,
+            paymentMethod: corporateMode ? 'COMPANY' : _paymentMethod,
             promoCode: _appliedCoupon?.coupon.code,
             scheduledAt: trip.scheduledAt,
             preferWomenRiders: preferWomenRiders,
@@ -1194,6 +1218,9 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
             stops: trip.stops
                 .where((s) => s.label.trim().isNotEmpty && s.hasCoordinates)
                 .toList(),
+            rideType: corporateMode ? 'CORPORATE' : 'NORMAL',
+            companyId: membership?.companyId,
+            employeeId: membership?.employeeId,
           );
       final rideId = result['id']?.toString();
       if (rideId != null && rideId.isNotEmpty) {
@@ -1306,6 +1333,7 @@ class _BookRideScreenState extends ConsumerState<BookRideScreen> {
                     ],
                   ),
                 ],
+                const _CorporateRideToggle(),
                 if (_route != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -2515,6 +2543,83 @@ class _TrackingBottomSheet extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CorporateRideToggle extends ConsumerWidget {
+  const _CorporateRideToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final membershipAsync = ref.watch(corporateMembershipProvider);
+    final membership = membershipAsync.valueOrNull;
+    if (membership == null || !membership.canBookCorporate) {
+      return const SizedBox.shrink();
+    }
+
+    final corporateMode = ref.watch(corporateRideModeProvider);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Material(
+        color: corporateMode
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            ref.read(corporateRideModeProvider.notifier).state = !corporateMode;
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: corporateMode ? AppColors.primary : AppColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.business_center_outlined,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Corporate Ride',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        membership.companyName ?? 'Paid by company',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.mutedForeground,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  value: corporateMode,
+                  activeColor: AppColors.primary,
+                  onChanged: (v) {
+                    ref.read(corporateRideModeProvider.notifier).state = v;
+                  },
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

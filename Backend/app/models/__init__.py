@@ -13,6 +13,7 @@ from app.admin.models import (
 )
 from app.auth.models import AuthDevice, OtpLog, UserSession
 from app.common.models import AuditLog
+from app.corporate.models import Company, CompanyEmployee, CompanyPolicy
 from app.coupons.models import PromoCode, ReferralCode, ReferralProgram, ReferralReward
 from app.drivers.models import Driver, DriverBankAccount, DriverDocument, DriverEmergencyContact, DriverLocation
 from app.selfie_verification.models import DriverSelfieLog, DriverShift
@@ -45,6 +46,9 @@ __all__ = [
     "ChatMessage",
     "City",
     "CommissionSettings",
+    "Company",
+    "CompanyEmployee",
+    "CompanyPolicy",
     "CompanyRevenueLedger",
     "Driver",
     "DriverBankAccount",

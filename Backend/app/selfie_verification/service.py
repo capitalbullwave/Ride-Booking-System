@@ -102,6 +102,22 @@ class DriverSelfieShiftService:
             return True, "Shift date differs from current date"
         return False, None
 
+    async def _ensure_driver_offline(self, driver: Driver | None) -> None:
+        """Always mark the driver offline when a shift ends (complete or force-close)."""
+        if driver is None:
+            return
+        if driver.status != DriverStatus.OFFLINE.value:
+            driver.status = DriverStatus.OFFLINE.value
+            await self.drivers.update(driver)
+        try:
+            await DriverMatchingService(self.db).set_driver_offline(driver.id)
+        except Exception as exc:
+            logger.warning(
+                "driver_offline_sync_failed",
+                driver_id=str(driver.id),
+                error=str(exc),
+            )
+
     async def force_close_shift(self, shift: DriverShift, reason: str) -> DriverShift:
         now = _utcnow()
         shift.status = ShiftStatus.FORCE_CLOSED.value
@@ -110,20 +126,15 @@ class DriverSelfieShiftService:
         await self.shifts.save(shift)
 
         driver = await self.drivers.get_by_id(shift.driver_id)
-        if driver and driver.status in (
-            DriverStatus.ONLINE.value,
-            DriverStatus.BUSY.value,
-        ):
-            # Do not yank ON_RIDE mid-trip; matching layer still checks verification.
-            driver.status = DriverStatus.OFFLINE.value
-            await self.drivers.update(driver)
-            await DriverMatchingService(self.db).set_driver_offline(driver.id)
+        # Shift over → always offline (including previously ON_RIDE / BUSY / ONLINE).
+        await self._ensure_driver_offline(driver)
 
         logger.info(
             "shift_force_closed",
             shift_id=str(shift.id),
             driver_id=str(shift.driver_id),
             reason=reason,
+            driver_status=driver.status if driver else None,
         )
         return shift
 
@@ -181,7 +192,11 @@ class DriverSelfieShiftService:
         return failures, locked_until
 
     async def get_verification_status(self, driver: Driver) -> VerificationStatusResponse:
-        await self.close_stale_shifts_for_driver(driver.id)
+        closed = await self.close_stale_shifts_for_driver(driver.id)
+        # If a stale shift was just force-closed, persist offline immediately.
+        if closed is not None and closed.status == ShiftStatus.FORCE_CLOSED.value:
+            await self.db.commit()
+
         active = await self.shifts.get_active_shift(driver.id)
         failures, locked_until = await self._lockout_info(driver.id)
 
@@ -458,9 +473,7 @@ class DriverSelfieShiftService:
             active.ended_at = _utcnow()
             await self.shifts.save(active)
 
-        driver.status = DriverStatus.OFFLINE.value
-        await self.drivers.update(driver)
-        await DriverMatchingService(self.db).set_driver_offline(driver.id)
+        await self._ensure_driver_offline(driver)
         await self.db.commit()
 
         return GoOfflineResponse(
@@ -470,7 +483,9 @@ class DriverSelfieShiftService:
         )
 
     async def get_current_shift(self, driver: Driver) -> Optional[ShiftResponse]:
-        await self.close_stale_shifts_for_driver(driver.id)
+        closed = await self.close_stale_shifts_for_driver(driver.id)
+        if closed is not None and closed.status == ShiftStatus.FORCE_CLOSED.value:
+            await self.db.commit()
         active = await self.shifts.get_active_shift(driver.id)
         return _shift_to_response(active) if active else None
 
@@ -479,11 +494,8 @@ class DriverSelfieShiftService:
         await self.close_stale_shifts_for_driver(driver.id)
         active = await self.shifts.get_active_shift(driver.id)
         if not active or not active.selfie_verified:
-            if driver.status != DriverStatus.OFFLINE.value:
-                driver.status = DriverStatus.OFFLINE.value
-                await self.drivers.update(driver)
-                await DriverMatchingService(self.db).set_driver_offline(driver.id)
-                await self.db.commit()
+            await self._ensure_driver_offline(driver)
+            await self.db.commit()
             raise ForbiddenException(
                 "Selfie verification required before accepting rides.",
                 details={"error_code": "SELFIE_REQUIRED", "selfie_required": True},
@@ -504,9 +516,7 @@ class DriverSelfieShiftService:
         if active:
             await self.force_close_shift(active, reason)
         else:
-            driver.status = DriverStatus.OFFLINE.value
-            await self.drivers.update(driver)
-            await DriverMatchingService(self.db).set_driver_offline(driver.id)
+            await self._ensure_driver_offline(driver)
         await self.db.commit()
         return {
             "driver_id": str(driver.id),

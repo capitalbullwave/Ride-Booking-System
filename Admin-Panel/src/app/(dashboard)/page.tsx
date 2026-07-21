@@ -14,6 +14,8 @@ import {
   Wallet,
   Building2,
   Loader2,
+  Clock,
+  Briefcase,
 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatCard } from "@/components/shared/stat-card";
@@ -34,8 +36,14 @@ import {
   type DashboardCharts,
   type OnlineDriverItem,
 } from "@/lib/dashboard-api";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import {
+  fetchCorporateDashboard,
+  type CorporateDashboard,
+} from "@/lib/corporate-api";
+import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import type { ActivityItem, DashboardStats } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ButtonLink } from "@/components/ui/button-link";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
@@ -44,17 +52,20 @@ export default function DashboardPage() {
   const [charts, setCharts] = useState<DashboardCharts | null>(null);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [onlineDrivers, setOnlineDrivers] = useState<OnlineDriverItem[]>([]);
+  const [corporate, setCorporate] = useState<CorporateDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [statsResult, chartsResult, activitiesResult, driversResult] = await Promise.allSettled([
-        fetchDashboardStats(),
-        fetchDashboardCharts(),
-        fetchDashboardActivities(),
-        fetchOnlineDrivers(),
-      ]);
+      const [statsResult, chartsResult, activitiesResult, driversResult, corporateResult] =
+        await Promise.allSettled([
+          fetchDashboardStats(),
+          fetchDashboardCharts(),
+          fetchDashboardActivities(),
+          fetchOnlineDrivers(),
+          fetchCorporateDashboard(),
+        ]);
 
       if (statsResult.status === "fulfilled") {
         setStats(statsResult.value);
@@ -64,10 +75,15 @@ export default function DashboardPage() {
       setCharts(chartsResult.status === "fulfilled" ? chartsResult.value : null);
       setActivities(activitiesResult.status === "fulfilled" ? activitiesResult.value : []);
       setOnlineDrivers(driversResult.status === "fulfilled" ? driversResult.value : []);
+      setCorporate(corporateResult.status === "fulfilled" ? corporateResult.value : null);
 
-      const firstError = [statsResult, chartsResult, activitiesResult, driversResult].find(
-        (result) => result.status === "rejected"
-      );
+      const firstError = [
+        statsResult,
+        chartsResult,
+        activitiesResult,
+        driversResult,
+        corporateResult,
+      ].find((result) => result.status === "rejected");
       if (firstError?.status === "rejected") {
         const reason = firstError.reason;
         toast.error(reason instanceof Error ? reason.message : "Failed to load dashboard data");
@@ -84,6 +100,8 @@ export default function DashboardPage() {
   }, [isAuthenticated, load]);
 
   const displayValue = (value: string) => (isLoading ? "—" : value);
+  const corpValue = (value: string | number) =>
+    isLoading || !corporate ? "—" : typeof value === "number" ? formatNumber(value) : value;
 
   return (
     <div className="space-y-6">
@@ -103,7 +121,7 @@ export default function DashboardPage() {
         <StatCard
           title="Total Users"
           value={displayValue(formatNumber(stats.totalUsers))}
-          change="Registered riders"
+          change="Registered users"
           changeType="neutral"
           icon={Users}
         />
@@ -194,6 +212,115 @@ export default function DashboardPage() {
           changeType="neutral"
           icon={IndianRupee}
         />
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Corporate</h2>
+          <ButtonLink href="/corporate/companies" variant="outline" size="sm">
+            Manage companies
+          </ButtonLink>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            title="Total Companies"
+            value={corpValue(corporate?.total_companies ?? 0)}
+            change="Registered"
+            changeType="neutral"
+            icon={Briefcase}
+          />
+          <StatCard
+            title="Pending Companies"
+            value={corpValue(corporate?.pending_companies ?? 0)}
+            change="Awaiting approval"
+            changeType="neutral"
+            icon={Clock}
+          />
+          <StatCard
+            title="Approved Companies"
+            value={corpValue(corporate?.approved_companies ?? 0)}
+            change="Active accounts"
+            changeType="neutral"
+            icon={CheckCircle}
+            iconColor="bg-success/15 text-success"
+          />
+          <StatCard
+            title="Active Employees"
+            value={corpValue(corporate?.active_employees ?? 0)}
+            change="Linked users"
+            changeType="neutral"
+            icon={Users}
+          />
+          <StatCard
+            title="Today's Corporate Rides"
+            value={corpValue(corporate?.today_corporate_rides ?? 0)}
+            change="Booked today"
+            changeType="neutral"
+            icon={MapPin}
+            iconColor="bg-primary/10 text-primary"
+          />
+          <StatCard
+            title="Monthly Corporate Revenue"
+            value={
+              isLoading || !corporate
+                ? "—"
+                : formatCurrency(corporate.monthly_corporate_revenue)
+            }
+            change="This month"
+            changeType="neutral"
+            icon={IndianRupee}
+          />
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Approvals</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!corporate || corporate.pending_approvals.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No pending companies.</p>
+              ) : (
+                corporate.pending_approvals.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between rounded-xl border px-3 py-2"
+                  >
+                    <div>
+                      <p className="font-medium">{c.company_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.contact_person} · {formatDate(c.created_at)}
+                      </p>
+                    </div>
+                    <ButtonLink size="sm" variant="outline" href={`/corporate/companies/${c.id}`}>
+                      Review
+                    </ButtonLink>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Companies</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {!corporate || corporate.top_companies.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No spend data yet.</p>
+              ) : (
+                corporate.top_companies.map((c) => (
+                  <div key={c.company_id} className="flex justify-between text-sm">
+                    <span className="font-medium">{c.company_name}</span>
+                    <span className="text-muted-foreground">
+                      {c.ride_count} rides · {formatCurrency(c.spend)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

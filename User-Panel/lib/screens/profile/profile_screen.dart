@@ -5,10 +5,12 @@ import 'package:wavego_user/core/routes/route_names.dart';
 import 'package:wavego_user/core/theme/app_colors.dart';
 import 'package:wavego_user/core/theme/app_radius.dart';
 import 'package:wavego_user/models/membership_models.dart';
+import 'package:wavego_user/models/corporate_models.dart';
 import 'package:wavego_user/providers/profile_display_provider.dart';
 import 'package:wavego_user/core/utils/profile_refresh.dart';
 import 'package:wavego_user/repositories/user_repositories.dart';
 import 'package:wavego_user/services/membership_service.dart';
+import 'package:wavego_user/services/corporate_service.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -24,6 +26,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       refreshUserProfile(ref);
       ref.invalidate(studentPassProvider);
+      ref.invalidate(corporateMembershipProvider);
       refreshActiveMembershipPlan(ref);
     });
   }
@@ -53,6 +56,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       icon: Icons.school_outlined,
       label: 'Student Pass',
       route: RouteNames.profileStudentPass,
+    ),
+    _ProfileMenuItem(
+      icon: Icons.business_center_outlined,
+      label: 'Corporate',
+      route: RouteNames.profileCorporate,
     ),
     _ProfileMenuItem(
       icon: Icons.help_outline,
@@ -187,6 +195,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              _CorporateMembershipCard(
+                membership: ref.watch(corporateMembershipProvider).valueOrNull,
+              ),
               _SubscriptionSection(
                 plan: activePlanAsync.valueOrNull,
                 onOpenSubscription: () async {
@@ -444,6 +455,70 @@ class _MenuTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CorporateMembershipCard extends StatelessWidget {
+  const _CorporateMembershipCard({this.membership});
+
+  final CorporateMembership? membership;
+
+  @override
+  Widget build(BuildContext context) {
+    if (membership == null || !membership!.isCorporateMember) {
+      return const SizedBox.shrink();
+    }
+    final m = membership!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Corporate Membership',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            _infoRow('Company', m.companyName ?? '—'),
+            _infoRow('Employee Code', m.employeeCode ?? '—'),
+            _infoRow('Department', m.department ?? '—'),
+            _infoRow('Designation', m.designation ?? '—'),
+            _infoRow('Corporate Status', m.employeeStatus ?? m.companyStatus ?? '—'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: AppColors.mutedForeground, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

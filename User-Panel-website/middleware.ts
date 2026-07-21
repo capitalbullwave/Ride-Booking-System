@@ -19,11 +19,19 @@ const PUBLIC_PATHS = new Set<string>([
   // Guest fare browse: pickup/drop → see prices → vehicle list (login only on Book)
   ROUTES.location,
   ROUTES.book,
+  // Corporate / Business (company auth is separate from rider login)
+  ROUTES.corporateRegister,
+  ROUTES.corporateLogin,
+  ROUTES.corporatePortal,
   "/robots.txt",
   "/sitemap.xml",
   "/opengraph-image",
   "/twitter-image",
   "/icon",
+  "/apple-icon",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
 ]);
 
 /** Nested public sections (blog articles, legal pages, safety sub-pages). */
@@ -31,6 +39,7 @@ const PUBLIC_PREFIXES = [
   `${ROUTES.blogs}/`,
   `${ROUTES.safety}/`,
   "/legal/",
+  "/corporate/",
 ] as const;
 
 function isPublicPath(pathname: string) {
@@ -77,6 +86,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|twitter-image|icon|images|api|uploads|.*\\.(?:svg|png|jpg|jpeg|gif|webp|apk)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|apple-icon|apple-touch-icon.png|icon-192.png|icon-512.png|robots.txt|sitemap.xml|opengraph-image|twitter-image|icon|images|api|uploads|.*\\.(?:svg|png|jpg|jpeg|gif|webp|apk)$).*)",
   ],
 };

@@ -124,6 +124,29 @@ class DashboardViewModel extends StateNotifier<DashboardState> {
     }
   }
 
+  /// Sync local online toggle with backend. If shift was force-closed / expired,
+  /// mark the driver offline on the device immediately.
+  Future<bool> syncOnlineFromServer() async {
+    if (!state.isOnline) return false;
+    try {
+      final status = await _selfieService.getVerificationStatus();
+      final profile = await _profileRepo.getProfile();
+      final stillOnline = profile.isOnline && status.hasActiveShift;
+      if (!stillOnline) {
+        await _localStorage.setBool(AppConstants.isOnlineKey, false);
+        _stopLocationSync();
+        state = state.copyWith(
+          isOnline: false,
+          profile: profile,
+          isTogglingOnline: false,
+        );
+        return true;
+      }
+      state = state.copyWith(profile: profile);
+    } catch (_) {}
+    return false;
+  }
+
   /// Called after [SelfieVerificationScreen] successfully verifies + goes online.
   Future<void> markOnlineAfterSelfie() async {
     await _localStorage.setBool(AppConstants.isOnlineKey, true);

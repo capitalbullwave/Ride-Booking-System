@@ -48,6 +48,7 @@ ALLOWED_PREFIXES = (
     f"{settings.api_v1_prefix}/drivers",
     f"{settings.api_v1_prefix}/notifications",
     f"{settings.api_v1_prefix}/admin",
+    f"{settings.api_v1_prefix}/corporate",
     f"{settings.api_v1_prefix}/common",
     f"{settings.api_v1_prefix}/public",
     "/ws",
@@ -77,7 +78,39 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.warning("insightface_warmup_skipped", error=str(exc))
 
+    # Auto force-close stale shifts + offline drivers (works even without Celery).
+    import asyncio
+
+    stale_shift_task: asyncio.Task | None = None
+
+    async def _stale_shift_loop() -> None:
+        from app.core.database import AsyncSessionLocal
+        from app.selfie_verification.service import DriverSelfieShiftService
+
+        while True:
+            try:
+                async with AsyncSessionLocal() as session:
+                    closed = await DriverSelfieShiftService(session).force_close_all_stale_shifts()
+                    if closed:
+                        logger.info("stale_shifts_auto_closed", closed=closed)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("stale_shift_loop_error", error=str(exc))
+            await asyncio.sleep(300)  # every 5 minutes
+
+    stale_shift_task = asyncio.create_task(_stale_shift_loop())
+    logger.info("stale_shift_auto_close_started", interval_sec=300)
+
     yield
+
+    if stale_shift_task is not None:
+        stale_shift_task.cancel()
+        try:
+            await stale_shift_task
+        except asyncio.CancelledError:
+            pass
+
     await close_redis()
     logger.info("application_stopped")
 

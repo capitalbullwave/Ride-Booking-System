@@ -100,7 +100,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Platform Information</CardTitle>
               <CardDescription>
-                Public-facing details shown across the Bull Wave Rides rider and driver apps — not your admin login.
+                Public-facing details shown across the Bull Wave Rides user and driver apps — not your admin login.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-5 sm:grid-cols-2">
@@ -160,7 +160,7 @@ export default function SettingsPage() {
               <Label htmlFor="maps-api-key">Google Maps API Key</Label>
               <FieldHint>
                 Used for pickup/drop pins, live ride tracking, route display, and distance or ETA
-                calculations in rider and driver apps.
+                calculations in user and driver apps.
               </FieldHint>
               <Input
                 id="maps-api-key"

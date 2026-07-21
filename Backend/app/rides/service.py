@@ -8,7 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import ActorType, RideEventType, RideStatus
+from app.core.constants import (
+    ActorType,
+    PaymentMethod,
+    PaymentSource,
+    RideEventType,
+    RideStatus,
+    RideType,
+)
 from app.core.exceptions import ForbiddenException, NotFoundException, ValidationException
 from app.core.security import generate_otp
 from app.maps.service import MapsService
@@ -435,6 +442,29 @@ class RideService:
             )
             fare["promo_discount"] = promo_discount
 
+        ride_type = (data.ride_type or RideType.NORMAL.value).upper()
+        company_id = None
+        employee_id = None
+        payment_source = PaymentSource.USER.value
+        payment_method = data.payment_method
+
+        if ride_type == RideType.CORPORATE.value:
+            from app.corporate.repository import CorporateRepository
+            from app.corporate.validators import validate_corporate_booking
+
+            company, membership = await validate_corporate_booking(
+                CorporateRepository(self.db),
+                user_id=user_id,
+                company_id=data.company_id,
+                employee_id=data.employee_id,
+                vehicle_type_id=data.vehicle_type_id,
+                estimated_fare=float(fare["estimated_fare"]),
+            )
+            company_id = company.id
+            employee_id = membership.id
+            payment_source = PaymentSource.COMPANY.value
+            payment_method = PaymentMethod.COMPANY.value
+
         ride = Ride(
             user_id=user_id,
             vehicle_type_id=data.vehicle_type_id,
@@ -462,7 +492,11 @@ class RideService:
             platform_fee=fare["platform_fee"],
             promo_discount=fare.get("promo_discount", 0),
             promo_code_id=promo_code_id,
-            payment_method=data.payment_method,
+            payment_method=payment_method,
+            ride_type=ride_type,
+            company_id=company_id,
+            employee_id=employee_id,
+            payment_source=payment_source,
             ride_otp=generate_otp(4),
             scheduled_at=data.scheduled_at,
         )

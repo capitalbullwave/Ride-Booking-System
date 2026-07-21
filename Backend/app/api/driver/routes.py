@@ -68,9 +68,17 @@ def _driver_active_ride_payload(ride: Ride) -> dict:
     payload["payment_method"] = ride.payment_method
     payload["estimated_distance_km"] = ride.estimated_distance_km
     payload["stops"] = list(ride.stops or [])
+    payload["ride_type"] = getattr(ride, "ride_type", "NORMAL") or "NORMAL"
+    payload["payment_source"] = getattr(ride, "payment_source", "USER") or "USER"
+    payload["is_corporate"] = payload["ride_type"] == "CORPORATE"
     if ride.user:
         payload["passenger_name"] = f"{ride.user.first_name} {ride.user.last_name}".strip() or "Passenger"
         payload["passenger_phone"] = ride.user.phone
+    company = getattr(ride, "company", None)
+    if company is not None:
+        payload["company_name"] = company.company_name
+    elif getattr(ride, "company_id", None):
+        payload["company_name"] = None
     return payload
 
 
@@ -83,6 +91,7 @@ async def _load_driver_ride(db: AsyncSession, ride_id: UUID) -> Ride:
             selectinload(Ride.user),
             selectinload(Ride.vehicle),
             selectinload(Ride.vehicle_type),
+            selectinload(Ride.company),
         )
         .where(Ride.id == ride_id)
     )
@@ -780,6 +789,30 @@ async def collect_payment(
                 "success": True,
                 "payment_status": PaymentStatus.COMPLETED.value,
                 "payment_collected": True,
+            }
+        )
+        return payload
+
+    # Corporate rides are billed to the company — skip passenger collection
+    if (
+        getattr(ride, "payment_source", None) == "COMPANY"
+        or getattr(ride, "ride_type", None) == "CORPORATE"
+        or (ride.payment_method or "").upper() == "COMPANY"
+    ):
+        payment = await payment_service.process_payment(
+            ride.id, ride.user_id, fare, PaymentMethod.COMPANY.value
+        )
+        ride.payment_method = PaymentMethod.COMPANY.value
+        await db.flush()
+        ride = await _ensure_ride_settled(db, ride)
+        await db.commit()
+        payload = _payment_breakdown_payload(ride, PaymentMethod.COMPANY.value)
+        payload.update(
+            {
+                "success": True,
+                "payment_status": payment.status,
+                "payment_collected": True,
+                "paid_by_company": True,
             }
         )
         return payload

@@ -20,6 +20,10 @@ function getActiveFromUrl(pathname: string) {
     return ROUTES.safety;
   }
 
+  if (pathname === ROUTES.corporateRegister) {
+    return ROUTES.corporateRegister;
+  }
+
   if (pathname === ROUTES.blogs || pathname.startsWith(`${ROUTES.blogs}/`)) {
     return ROUTES.blogs;
   }

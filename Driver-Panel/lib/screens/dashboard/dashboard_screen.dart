@@ -109,6 +109,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _refreshOnlineData() async {
     if (!ref.read(dashboardViewModelProvider).isOnline) return;
+    // Detect server-side force-close / shift end → flip UI to offline.
+    final forcedOffline = await ref
+        .read(dashboardViewModelProvider.notifier)
+        .syncOnlineFromServer();
+    if (!mounted) return;
+    if (forcedOffline) {
+      _stopOnlinePollTimer();
+      _stopRealtimeRideListener();
+      return;
+    }
     await _pollForRides();
     await _pollNotifications();
     await _checkActiveRideRedirect();

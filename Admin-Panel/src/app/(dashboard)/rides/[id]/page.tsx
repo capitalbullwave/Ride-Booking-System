@@ -1,8 +1,8 @@
 "use client";
 
-import { notFound } from "next/navigation";
+import { notFound, useSearchParams } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Navigation, Clock, IndianRupee, MessageSquare } from "lucide-react";
+import { ArrowLeft, Navigation, Clock, IndianRupee, MessageSquare, Building2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { RideRouteMap } from "@/components/rides/ride-route-map";
@@ -29,6 +29,9 @@ export default function RideDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const fromCorporate = searchParams.get("from") === "corporate";
+  const backHref = fromCorporate ? "/corporate/rides" : "/rides";
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [ride, setRide] = useState<Ride | null>(null);
   const [messages, setMessages] = useState<RideChatMessage[]>([]);
@@ -75,7 +78,7 @@ export default function RideDetailPage({
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <ButtonLink variant="ghost" size="icon" href="/rides">
+          <ButtonLink variant="ghost" size="icon" href={backHref}>
             <ArrowLeft className="h-4 w-4" />
           </ButtonLink>
           <PageHeader title="Ride details" description="Loading ride information..." />
@@ -92,11 +95,12 @@ export default function RideDetailPage({
   const statusIndex = timelineSteps.findIndex((s) => s.status === ride.status);
   const activeIndex = statusIndex >= 0 ? statusIndex : 0;
   const stops = (ride.stops ?? []).filter((s) => s.address.trim());
+  const isCorporate = (ride.rideType ?? "").toUpperCase() === "CORPORATE";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <ButtonLink variant="ghost" size="icon" href="/rides">
+        <ButtonLink variant="ghost" size="icon" href={backHref}>
           <ArrowLeft className="h-4 w-4" />
         </ButtonLink>
         <PageHeader
@@ -274,8 +278,12 @@ export default function RideDetailPage({
             <CardContent className="space-y-3">
               {[
                 ["Ride ID", formatPublicId(ride.publicId, ride.id)],
+                ["Type", isCorporate ? "Corporate" : "Personal"],
                 ["Vehicle Type", capitalize(ride.vehicleType)],
-                ["Payment", capitalize(ride.paymentMethod)],
+                [
+                  "Payment",
+                  isCorporate ? "Paid by Company" : capitalize(ride.paymentMethod),
+                ],
                 ["Status", capitalize(ride.status)],
                 ...(stops.length > 0
                   ? [["Stops", String(stops.length)] as const]
@@ -283,13 +291,52 @@ export default function RideDetailPage({
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-4">
                   <span className="text-sm text-muted-foreground">{label}</span>
-                  <span className="text-sm font-medium text-right" title={label === "Ride ID" ? ride.id : undefined}>
+                  <span
+                    className="text-sm font-medium text-right"
+                    title={label === "Ride ID" ? ride.id : undefined}
+                  >
                     {value}
                   </span>
                 </div>
               ))}
             </CardContent>
           </Card>
+
+          {isCorporate && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Corporate
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[
+                  ["Company", ride.companyName || "—"],
+                  ["Company Code", ride.companyCode || "—"],
+                  ["Employee Code", ride.employeeCode || "—"],
+                  ["Department", ride.employeeDepartment || "—"],
+                  ["Designation", ride.employeeDesignation || "—"],
+                  ["Payment Source", ride.paymentSource || "COMPANY"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-4">
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                    <span className="text-sm font-medium text-right">{value}</span>
+                  </div>
+                ))}
+                {ride.companyId && (
+                  <ButtonLink
+                    href={`/corporate/companies/${ride.companyId}`}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  >
+                    View company
+                  </ButtonLink>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader><CardTitle>User Information</CardTitle></CardHeader>

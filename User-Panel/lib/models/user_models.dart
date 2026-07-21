@@ -342,6 +342,9 @@ class ActivityItem {
     required this.date,
     required this.price,
     required this.status,
+    this.isCorporate = false,
+    this.companyName,
+    this.paidByCompany = false,
   });
 
   final int id;
@@ -350,6 +353,9 @@ class ActivityItem {
   final String date;
   final String price;
   final String status;
+  final bool isCorporate;
+  final String? companyName;
+  final bool paidByCompany;
 
   factory ActivityItem.fromJson(Map<String, dynamic> json) => ActivityItem(
         id: json['id'] as int? ?? 0,
@@ -358,6 +364,11 @@ class ActivityItem {
         date: json['date'] as String? ?? '',
         price: json['price'] as String? ?? '',
         status: json['status'] as String? ?? '',
+        isCorporate: json['is_corporate'] == true ||
+            (json['ride_type'] as String?) == 'CORPORATE',
+        companyName: json['company_name'] as String?,
+        paidByCompany: json['paid_by_company'] == true ||
+            (json['payment_source'] as String?) == 'COMPANY',
       );
 }
 

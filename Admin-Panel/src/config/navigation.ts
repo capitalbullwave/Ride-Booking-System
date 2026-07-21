@@ -15,6 +15,9 @@ import {
   Crown,
   Gift,
   ScanFace,
+  Briefcase,
+  UserCheck,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +49,15 @@ export const navigation: NavGroup[] = [
       { title: "Selfie Verification", href: "/selfie-verifications", icon: ScanFace },
       { title: "Rides", href: "/rides", icon: MapPin },
       { title: "Vehicles", href: "/vehicles", icon: Truck },
+    ],
+  },
+  {
+    title: "Corporate",
+    items: [
+      { title: "Companies", href: "/corporate/companies", icon: Briefcase },
+      { title: "Employees", href: "/corporate/employees", icon: UserCheck },
+      { title: "Corporate Rides", href: "/corporate/rides", icon: MapPin },
+      { title: "Ride Policies", href: "/corporate/policies", icon: FileText },
     ],
   },
   {

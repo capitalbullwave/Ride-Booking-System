@@ -434,6 +434,9 @@ class RideBookingService extends BaseApiService {
     double? distanceKm,
     double? durationMin,
     List<SelectedPlace>? stops,
+    String rideType = 'NORMAL',
+    String? companyId,
+    String? employeeId,
   }) async {
     if (useMock) {
       await Future<void>.delayed(const Duration(milliseconds: 800));
@@ -474,6 +477,9 @@ class RideBookingService extends BaseApiService {
                 'sequence': i + 1,
               },
           ],
+        'ride_type': rideType,
+        if (companyId != null) 'company_id': companyId,
+        if (employeeId != null) 'employee_id': employeeId,
       },
       parser: (raw) => raw as Map<String, dynamic>,
     );

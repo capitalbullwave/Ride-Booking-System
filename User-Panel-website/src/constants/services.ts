@@ -113,6 +113,7 @@ export const landingNavLinks = [
   { label: "Services", href: "#services" },
   { label: "About Us", href: ROUTES.about },
   { label: "Safety", href: ROUTES.safety },
+  { label: "Business", href: ROUTES.corporateRegister },
   { label: "Blogs", href: ROUTES.blogs },
   { label: "SOS", href: "#sos" },
   { label: "Captains", href: "#captains" },

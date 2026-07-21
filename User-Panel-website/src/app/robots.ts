@@ -26,6 +26,7 @@ export default function robots(): MetadataRoute.Robots {
           "/location",
           "/ambulance",
           "/rental",
+          "/corporate/portal",
         ],
       },
     ],

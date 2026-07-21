@@ -10,6 +10,20 @@ class AppConfig {
   static const String productionApiBaseUrl =
       'https://ride-application-backend.onrender.com/api/v1';
 
+  /// Public user website (company registration, marketing).
+  /// Override: `--dart-define=WEBSITE_BASE_URL=https://your-site.com`
+  static String get websiteBaseUrl {
+    const fromEnv = String.fromEnvironment('WEBSITE_BASE_URL');
+    if (fromEnv.isNotEmpty) return fromEnv.replaceAll(RegExp(r'/$'), '');
+
+    const useLocal = bool.fromEnvironment('USE_LOCAL_API', defaultValue: true);
+    if (useLocal) return 'http://localhost:3000';
+
+    return 'https://bullwaverides.com';
+  }
+
+  static String get corporateRegisterUrl => '$websiteBaseUrl/corporate/register';
+
   /// Host for local dev backend. On a real phone use:
   /// `flutter run --dart-define=HOST_IP=192.168.x.x`
   static String get _localHost {

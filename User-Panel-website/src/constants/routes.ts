@@ -38,4 +38,7 @@ export const ROUTES = {
   ambulanceHistory: "/ambulance/history",
   terms: "/legal/terms",
   privacy: "/legal/privacy",
+  corporateRegister: "/corporate/register",
+  corporateLogin: "/corporate/login",
+  corporatePortal: "/corporate/portal",
 } as const;

@@ -7,10 +7,18 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.constants import ActorType, PaymentMethod, RideEventType, RideStatus
+from app.core.constants import (
+    ActorType,
+    PaymentMethod,
+    PaymentSource,
+    RideEventType,
+    RideStatus,
+    RideType,
+)
 from app.core.database import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.corporate.models import Company, CompanyEmployee
     from app.coupons.models import PromoCode
     from app.drivers.models import Driver
     from app.payments.models import Payment
@@ -89,12 +97,30 @@ class Ride(UUIDMixin, TimestampMixin, Base):
     # Women Safety Ride mode (SOS / share / safety check UI).
     women_safety_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_emergency: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Corporate ride fields (NORMAL by default — personal booking unchanged)
+    ride_type: Mapped[str] = mapped_column(
+        String(20), default=RideType.NORMAL.value, nullable=False, index=True
+    )
+    company_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    employee_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("company_employees.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    payment_source: Mapped[str] = mapped_column(
+        String(20), default=PaymentSource.USER.value, nullable=False
+    )
 
     user: Mapped["User"] = relationship("User", back_populates="rides", foreign_keys=[user_id])
     driver: Mapped[Optional["Driver"]] = relationship("Driver", back_populates="rides", foreign_keys=[driver_id])
     vehicle: Mapped[Optional["Vehicle"]] = relationship("Vehicle", back_populates="rides")
     vehicle_type: Mapped["VehicleType"] = relationship("VehicleType", back_populates="rides")
     promo_code: Mapped[Optional["PromoCode"]] = relationship("PromoCode", back_populates="rides")
+    company: Mapped[Optional["Company"]] = relationship("Company", back_populates="rides")
+    employee: Mapped[Optional["CompanyEmployee"]] = relationship("CompanyEmployee", back_populates="rides")
     tracking: Mapped[List["RideTracking"]] = relationship("RideTracking", back_populates="ride")
     events: Mapped[List["RideEvent"]] = relationship("RideEvent", back_populates="ride", order_by="RideEvent.created_at")
     payment: Mapped[Optional["Payment"]] = relationship("Payment", back_populates="ride", uselist=False)

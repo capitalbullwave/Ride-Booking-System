@@ -166,7 +166,7 @@ export function LocationSearchView() {
   const navigateWithPlace = (place: SelectedPlace) => {
     let nextPickup = savedPickup;
     let nextDropoff = savedDropoff;
-    let nextStops = [...existingStops];
+    const nextStops = [...existingStops];
     const coords = { ...baseCoords };
 
     if (field === "pickup") {

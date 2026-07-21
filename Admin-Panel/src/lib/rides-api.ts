@@ -74,6 +74,15 @@ function normalizeRide(ride: RideApiItem): Ride {
     duration: ride.duration != null ? Number(ride.duration) : undefined,
     paymentMethod: ride.paymentMethod ?? "cash",
     status: (ride.status ?? "requested") as RideStatus,
+    rideType: ride.rideType ?? "NORMAL",
+    paymentSource: ride.paymentSource ?? null,
+    companyId: ride.companyId ?? null,
+    companyName: ride.companyName ?? null,
+    companyCode: ride.companyCode ?? null,
+    employeeId: ride.employeeId ?? null,
+    employeeCode: ride.employeeCode ?? null,
+    employeeDepartment: ride.employeeDepartment ?? null,
+    employeeDesignation: ride.employeeDesignation ?? null,
   };
 }
 

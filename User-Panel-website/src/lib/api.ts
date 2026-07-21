@@ -12,13 +12,14 @@ export const PUBLIC_API = "/api/v1/public";
 
 
 
-function resolveUserPath(path: string): string {
+export function resolveUserPath(path: string): string {
   if (
     path.startsWith(USER_API) ||
     path.startsWith(AUTH_API) ||
     path.startsWith(COMMON_API) ||
     path.startsWith(PUBLIC_API) ||
-    path.startsWith("/api/v1/rides/")
+    path.startsWith("/api/v1/rides/") ||
+    path.startsWith("/api/v1/corporate/")
   ) {
     return path;
   }
@@ -59,15 +60,11 @@ function resolveUserPath(path: string): string {
 
 
 
-const LOCAL_API_URL = "http://127.0.0.1:8000";
-/** Staging fallback when env vars are missing on the host (avoids 503 from 127.0.0.1). */
+/** Default backend — Render staging (avoids 503 from local 127.0.0.1). */
 const STAGING_API_URL = "https://ride-application-backend.onrender.com";
 
 function defaultApiBaseUrl(): string {
-  if (process.env.NODE_ENV === "production") {
-    return STAGING_API_URL;
-  }
-  return LOCAL_API_URL;
+  return STAGING_API_URL;
 }
 
 export function getApiBaseUrl(): string {

@@ -27,6 +27,13 @@ export const ROUTES = {
   reports: "/reports",
   settings: "/settings",
   settingsDriverCommission: "/settings/driver-commission",
+  corporate: "/corporate/companies",
+  corporateCompanies: "/corporate/companies",
+  corporateCompanyDetail: (id: string) => `/corporate/companies/${id}`,
+  corporateEmployees: "/corporate/employees",
+  corporateRides: "/corporate/rides",
+  corporatePolicies: "/corporate/policies",
+  corporateReports: "/reports",
 } as const;
 
 export const APP_NAME = "Bull Wave Rides";

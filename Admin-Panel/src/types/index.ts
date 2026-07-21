@@ -122,6 +122,15 @@ export interface Ride {
   date: string;
   duration?: number;
   paymentMethod: string;
+  rideType?: string;
+  paymentSource?: string | null;
+  companyId?: string | null;
+  companyName?: string | null;
+  companyCode?: string | null;
+  employeeId?: string | null;
+  employeeCode?: string | null;
+  employeeDepartment?: string | null;
+  employeeDesignation?: string | null;
 }
 
 export interface VehicleCategory {

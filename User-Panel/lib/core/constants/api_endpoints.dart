@@ -52,4 +52,7 @@ class ApiEndpoints {
   static const String createSupportTicket = '/user/support';
   static const String supportTickets = '/user/support/tickets';
   static const String supportFaqs = '/common/support/faqs';
+
+  // Corporate
+  static const String corporateMembership = '/corporate/membership';
 }

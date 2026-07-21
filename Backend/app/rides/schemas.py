@@ -71,7 +71,7 @@ class RideBookRequest(BaseModel):
     dropoff_lat: float = Field(..., ge=-90, le=90)
     dropoff_lng: float = Field(..., ge=-180, le=180)
     vehicle_type_id: uuid.UUID
-    payment_method: str = Field(default="CASH", pattern="^(CASH|WALLET|UPI|CARD)$")
+    payment_method: str = Field(default="CASH", pattern="^(CASH|WALLET|UPI|CARD|COMPANY)$")
     promo_code: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     rental_hours: Optional[float] = Field(default=None, ge=0)
@@ -90,6 +90,10 @@ class RideBookRequest(BaseModel):
         max_length=3,
         description="Optional intermediate stops between pickup and final dropoff (max 3).",
     )
+    # Corporate booking (optional — personal rides omit these)
+    ride_type: str = Field(default="NORMAL", pattern="^(NORMAL|CORPORATE)$")
+    company_id: Optional[uuid.UUID] = None
+    employee_id: Optional[uuid.UUID] = None
 
 
 class RideCancelRequest(BaseModel):
@@ -135,6 +139,11 @@ class RideResponse(BaseSchema):
     driver_earning: Optional[float] = None
     company_earning: Optional[float] = None
     payment_method: str
+    ride_type: str = "NORMAL"
+    company_id: Optional[uuid.UUID] = None
+    employee_id: Optional[uuid.UUID] = None
+    payment_source: str = "USER"
+    company_name: Optional[str] = None
     created_at: datetime
     accepted_at: Optional[datetime] = None
     started_at: Optional[datetime] = None

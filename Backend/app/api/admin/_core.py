@@ -231,6 +231,10 @@ def _map_ride(ride: Ride, user: User | None = None, driver: Driver | None = None
         "date": ride.created_at.isoformat(),
         "duration": int(ride.actual_duration_min or ride.estimated_duration_min),
         "paymentMethod": ride.payment_method.lower(),
+        "rideType": getattr(ride, "ride_type", None) or "NORMAL",
+        "paymentSource": getattr(ride, "payment_source", None),
+        "companyId": str(ride.company_id) if getattr(ride, "company_id", None) else None,
+        "employeeId": str(ride.employee_id) if getattr(ride, "employee_id", None) else None,
     }
 
 
